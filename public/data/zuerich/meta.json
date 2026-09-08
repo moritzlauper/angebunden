@@ -1,0 +1,99 @@
+{
+  "serviceDate": "20260908",
+  "window": "7:00–9:00",
+  "departures": 24,
+  "buildings": 47085,
+  "cells": 830,
+  "addresses": 57507,
+  "stations": 1893,
+  "originStations": 564,
+  "trips": 30583,
+  "minutes": {
+    "best": 20.5,
+    "p05": 23.9,
+    "p25": 27.3,
+    "median": 30.7,
+    "p75": 34.6,
+    "p95": 42.6,
+    "worst": 86.3
+  },
+  "extreme": {
+    "bestes": {
+      "rang": 1,
+      "minuten": 20.5,
+      "orte": 640,
+      "lon": 8.53942,
+      "lat": 47.37684,
+      "adresse": "Bahnhofstrasse 93",
+      "name": "Hotel Schweizerhof"
+    },
+    "schlechtestes": {
+      "rang": 47085,
+      "minuten": 86.3,
+      "orte": 0,
+      "lon": 8.5015,
+      "lat": 47.32401,
+      "adresse": null,
+      "name": "Säntisblick"
+    }
+  },
+  "kultur": {
+    "orte": 3323,
+    "budgets": {
+      "velo": 10,
+      "fuss": 15
+    },
+    "arten": [
+      "cafe",
+      "bar",
+      "buehne",
+      "kino",
+      "museum",
+      "kunst",
+      "bibliothek",
+      "badi",
+      "treff",
+      "restaurant"
+    ],
+    "proArt": [
+      451,
+      364,
+      138,
+      19,
+      162,
+      521,
+      85,
+      41,
+      108,
+      1434
+    ],
+    "verteilung": {
+      "min": 0,
+      "p25": 23,
+      "median": 54,
+      "p75": 124,
+      "max": 683
+    },
+    "extreme": {
+      "bestes": {
+        "rang": 1,
+        "minuten": 24.5,
+        "orte": 683,
+        "lon": 8.53309,
+        "lat": 47.37288,
+        "adresse": "Sihlstrasse 95",
+        "name": null
+      },
+      "schlechtestes": {
+        "rang": 47085,
+        "minuten": 66.2,
+        "orte": 0,
+        "lon": 8.50449,
+        "lat": 47.33248,
+        "adresse": null,
+        "name": "Alpinahütte"
+      }
+    }
+  },
+  "builtAt": "2026-09-07T15:49:01.417Z"
+}

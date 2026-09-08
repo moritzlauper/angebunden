@@ -1,0 +1,179 @@
+/*
+ * Zuerst MapLibre, dann Tailwind: MapLibre setzt auf `.maplibregl-map` ein
+ * `position: relative` und würde sonst die Utility-Klassen des Containers
+ * überschreiben – der Container hätte Höhe 0 und die Karte bliebe leer.
+ */
+@import "maplibre-gl/dist/maplibre-gl.css";
+@import "tailwindcss";
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overscroll-behavior: none;
+}
+
+/* Sanfter Sprung für den Kontakt-Anker auf /methode; die Karte scrollt nicht. */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Die Karte bringt ihr eigenes Schwarzweiss mit, das Chrome soll sich anpassen. */
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+}
+
+/*
+ * Ein Klick auf die Karte fokussiert die MapLibre-Zeichenfläche (sie hat
+ * `tabindex="0"` für die Pfeiltasten-Steuerung). Kommt danach eine Taste –
+ * etwa Enter für «Auf der Karte vergleichen» –, zieht der Browser sonst einen
+ * blauen Fokusrahmen ums ganze Fenster. Die Tastensteuerung bleibt, nur der
+ * Rahmen entfällt.
+ */
+.maplibregl-canvas:focus {
+  outline: none;
+}
+
+/*
+ * Der Regler ist von Hand gezeichnet: eine dünne Spur und ein kleiner runder
+ * Knopf. `accent-color` überlässt die Form dem Betriebssystem und bringt je
+ * nach Browser einen klobigen Balken mit, der neben dem Rest nicht steht.
+ * `--fuellung` (der Verlauf) setzt der Regler selbst, `--knopf` und `--ring`
+ * kommen vom Panel und wechseln mit Hell/Dunkel.
+ */
+.regler {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 16px;
+  background: transparent;
+  cursor: pointer;
+}
+.regler:focus {
+  outline: none;
+}
+
+.regler::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--fuellung);
+}
+.regler::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--knopf);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.12),
+    0 1px 3px rgb(0 0 0 / 0.3);
+  transition: transform 0.12s ease;
+}
+.regler:hover::-webkit-slider-thumb,
+.regler:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+.regler:focus-visible::-webkit-slider-thumb {
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.12),
+    0 0 0 4px var(--ring);
+}
+
+.regler::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--fuellung);
+}
+.regler::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--knopf);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.12),
+    0 1px 3px rgb(0 0 0 / 0.3);
+  transition: transform 0.12s ease;
+}
+.regler:hover::-moz-range-thumb,
+.regler:active::-moz-range-thumb {
+  transform: scale(1.15);
+}
+.regler:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px var(--ring);
+}
+
+/* Anklickbare Zeilen färben sich beim Überfahren leicht ein. */
+.zeile {
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.zeile:hover {
+  background: var(--weich);
+}
+
+/* Auf dem Handy kein Zoom-Steuerkreuz: Pinch reicht, und der Platz unten rechts
+ * gehört dem Regler-Balken, der über der Karte liegt. */
+@media (max-width: 767px) {
+  .maplibregl-ctrl-bottom-right {
+    display: none;
+  }
+}
+
+/* Zoomknöpfe und Quellenangabe sollen so leise sein wie das Bedienfeld. */
+.maplibregl-ctrl-group {
+  border-radius: 10px !important;
+  box-shadow:
+    0 1px 2px rgb(20 20 20 / 0.06),
+    0 8px 24px -10px rgb(20 20 20 / 0.25) !important;
+}
+.dunkel .maplibregl-ctrl-group {
+  background: rgb(24 24 26 / 0.85);
+}
+.dunkel .maplibregl-ctrl-group button + button {
+  border-top-color: rgb(255 255 255 / 0.1);
+}
+.dunkel .maplibregl-ctrl-icon {
+  filter: invert(1);
+}
+.dunkel .maplibregl-ctrl-attrib {
+  background: rgb(24 24 26 / 0.7) !important;
+  color: #9c9c9e;
+}
+.dunkel .maplibregl-ctrl-attrib a {
+  color: #c9c9cb;
+}
+
+/* Schwebendes Namensschild für den Kulturort unter dem Zeiger. */
+.ort-label {
+  pointer-events: none;
+}
+.ort-label .maplibregl-popup-content {
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.96);
+  color: #18181b;
+  box-shadow:
+    0 1px 2px rgb(20 20 20 / 0.08),
+    0 6px 20px -10px rgb(20 20 20 / 0.35);
+}
+.ort-label .maplibregl-popup-tip {
+  display: none;
+}
+.dunkel .ort-label .maplibregl-popup-content {
+  background: rgb(24 24 26 / 0.92);
+  color: #f4f4f5;
+}

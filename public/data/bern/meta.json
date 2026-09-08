@@ -1,0 +1,99 @@
+{
+  "serviceDate": "20260908",
+  "window": "7:00–9:00",
+  "departures": 24,
+  "buildings": 20540,
+  "cells": 418,
+  "addresses": 22742,
+  "stations": 633,
+  "originStations": 300,
+  "trips": 10017,
+  "minutes": {
+    "best": 15.7,
+    "p05": 20.1,
+    "p25": 23.3,
+    "median": 25.8,
+    "p75": 30,
+    "p95": 39.4,
+    "worst": 88.9
+  },
+  "extreme": {
+    "bestes": {
+      "rang": 1,
+      "minuten": 15.7,
+      "orte": 357,
+      "lon": 7.43742,
+      "lat": 46.94672,
+      "adresse": "Hirschengraben 6",
+      "name": null
+    },
+    "schlechtestes": {
+      "rang": 20540,
+      "minuten": 88.9,
+      "orte": 0,
+      "lon": 7.30692,
+      "lat": 46.92325,
+      "adresse": null,
+      "name": null
+    }
+  },
+  "kultur": {
+    "orte": 1109,
+    "budgets": {
+      "velo": 10,
+      "fuss": 15
+    },
+    "arten": [
+      "cafe",
+      "bar",
+      "buehne",
+      "kino",
+      "museum",
+      "kunst",
+      "bibliothek",
+      "badi",
+      "treff",
+      "restaurant"
+    ],
+    "proArt": [
+      122,
+      112,
+      54,
+      14,
+      36,
+      175,
+      55,
+      11,
+      33,
+      497
+    ],
+    "verteilung": {
+      "min": 0,
+      "p25": 23,
+      "median": 48,
+      "p75": 101,
+      "max": 378
+    },
+    "extreme": {
+      "bestes": {
+        "rang": 1,
+        "minuten": 17.4,
+        "orte": 378,
+        "lon": 7.44395,
+        "lat": 46.94832,
+        "adresse": "Waaghausgasse 2",
+        "name": null
+      },
+      "schlechtestes": {
+        "rang": 20540,
+        "minuten": 32.2,
+        "orte": 0,
+        "lon": 7.46087,
+        "lat": 46.97059,
+        "adresse": null,
+        "name": null
+      }
+    }
+  },
+  "builtAt": "2026-09-07T15:49:19.975Z"
+}

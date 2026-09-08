@@ -1,0 +1,99 @@
+{
+  "serviceDate": "20260908",
+  "window": "7:00–9:00",
+  "departures": 24,
+  "buildings": 23308,
+  "cells": 284,
+  "addresses": 25030,
+  "stations": 1049,
+  "originStations": 236,
+  "trips": 11878,
+  "minutes": {
+    "best": 14.7,
+    "p05": 17.4,
+    "p25": 19.9,
+    "median": 21.7,
+    "p75": 24.9,
+    "p95": 30,
+    "worst": 46.4
+  },
+  "extreme": {
+    "bestes": {
+      "rang": 1,
+      "minuten": 14.7,
+      "orte": 324,
+      "lon": 7.58965,
+      "lat": 47.54831,
+      "adresse": "Centralbahnstrasse 10",
+      "name": null
+    },
+    "schlechtestes": {
+      "rang": 23308,
+      "minuten": 46.4,
+      "orte": 0,
+      "lon": 7.59775,
+      "lat": 47.58425,
+      "adresse": null,
+      "name": null
+    }
+  },
+  "kultur": {
+    "orte": 1340,
+    "budgets": {
+      "velo": 10,
+      "fuss": 15
+    },
+    "arten": [
+      "cafe",
+      "bar",
+      "buehne",
+      "kino",
+      "museum",
+      "kunst",
+      "bibliothek",
+      "badi",
+      "treff",
+      "restaurant"
+    ],
+    "proArt": [
+      176,
+      151,
+      61,
+      10,
+      78,
+      186,
+      48,
+      18,
+      33,
+      579
+    ],
+    "verteilung": {
+      "min": 0,
+      "p25": 33,
+      "median": 72,
+      "p75": 154,
+      "max": 387
+    },
+    "extreme": {
+      "bestes": {
+        "rang": 1,
+        "minuten": 15.3,
+        "orte": 387,
+        "lon": 7.58899,
+        "lat": 47.55473,
+        "adresse": "Barfüsserplatz 24",
+        "name": null
+      },
+      "schlechtestes": {
+        "rang": 23308,
+        "minuten": 41.3,
+        "orte": 1,
+        "lon": 7.55687,
+        "lat": 47.57104,
+        "adresse": null,
+        "name": null
+      }
+    }
+  },
+  "builtAt": "2026-09-07T15:49:36.705Z"
+}

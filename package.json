@@ -1,0 +1,43 @@
+{
+  "name": "angebunden",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "predev": "node scripts/copy-maplibre-worker.mjs && node scripts/fetch-glyphs.mjs",
+    "dev": "next dev",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs && node scripts/fetch-glyphs.mjs",
+    "build": "next build",
+    "start": "next start",
+    "daten:stadt": "node pipeline/01-fetch-osm.ts && node pipeline/01b-fetch-dem.ts && node pipeline/02-build-network.ts && node pipeline/03-build-targets.ts && node pipeline/04-compute-scores.ts",
+    "daten": "STADT=zuerich npm run daten:stadt",
+    "daten:zuerich": "STADT=zuerich npm run daten:stadt",
+    "daten:basel": "STADT=basel npm run daten:stadt",
+    "daten:bern": "STADT=bern npm run daten:stadt",
+    "daten:alle": "npm run daten:zuerich && npm run daten:basel && npm run daten:bern",
+    "daten:osm": "node pipeline/01-fetch-osm.ts",
+    "daten:netz": "node pipeline/02-build-network.ts",
+    "daten:ziele": "node pipeline/03-build-targets.ts",
+    "daten:werte": "node pipeline/04-compute-scores.ts",
+    "daten:dem": "node pipeline/01b-fetch-dem.ts",
+    "verify": "node pipeline/verify.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p pipeline/tsconfig.json",
+    "export": "STATISCH=1 next build"
+  },
+  "dependencies": {
+    "maplibre-gl": "^6.7.0",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pngjs": "^6.0.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "pngjs": "^7.0.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@10.30.1"
+}
