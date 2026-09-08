@@ -4,7 +4,7 @@ Wie viele Leute pro Tag auf der Seite waren – ohne eigene Datenbank.
 
 ## Woher die Zahlen kommen
 
-Ein kleines Script von [GoatCounter](https://www.goatcounter.com) auf jeder Seite
+Ein Script von [GoatCounter](https://www.goatcounter.com) auf jeder Seite
 (`app/besucher-zaehler.tsx`) meldet jeden Aufruf. GoatCounter zählt cookielos: die
 Besucher-Kennung ist ein Hash aus IP, Browser und einem täglich wechselnden Salt,
 den GoatCounter nur im Arbeitsspeicher hält. GoatCounter speichert nichts
