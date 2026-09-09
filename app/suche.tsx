@@ -108,22 +108,74 @@ export function bauIndex(
 const ART_RANG = { adresse: 1, ort: 0, halt: 0 }
 
 /**
+ * Wörter, die in einer kopierten Adresse stehen, aber in keinem Eintrag: Die
+ * Postleitzahl, der Stadtname, das Land. Der Index kennt nur Strasse und
+ * Hausnummer, denn die Stadt ist ohnehin durch die Karte gegeben.
+ */
+/**
+ * «muehlegasse» zu «muhlegasse». Der Index kennt nur die entkoppelte Form
+ * («muhlegasse»), manche Adressverzeichnisse schreiben den Umlaut aber aus.
+ */
+const entumlautet = (w: string) => w.replace(/ue/g, 'u').replace(/oe/g, 'o').replace(/ae/g, 'a')
+
+const FUELLWOERTER = new Set(['zurich', 'basel', 'bern', 'ch', 'schweiz', 'switzerland'])
+const istFueller = (w: string) =>
+  FUELLWOERTER.has(w) || FUELLWOERTER.has(entumlautet(w)) || /^\d{4}$/.test(w)
+
+/**
+ * Wo eine Zeichenkette im Eintrag steht: 0 ganz am Anfang, 1 am Anfang eines
+ * Wortes, 2 irgendwo mittendrin, -1 gar nicht.
+ */
+function stelle(norm: string, teil: string) {
+  const i = norm.indexOf(teil)
+  if (i < 0) return -1
+  return i === 0 ? 0 : norm[i - 1] === ' ' ? 1 : 2
+}
+
+/** Alle Einträge, denen die Bewertung einen Rang gibt. */
+function sammeln(index: Eintrag[], rangVon: (norm: string) => number) {
+  const funde: { e: Eintrag; rang: number }[] = []
+  for (const e of index) {
+    const rang = rangVon(e.norm)
+    if (rang < 0) continue
+    funde.push({ e, rang })
+    // Wer "strasse" tippt, trifft zehntausende Häuser. Für sieben Zeilen
+    // reicht ein Ausschnitt – die Reihenfolge darin bleibt dieselbe.
+    if (funde.length >= 4000) break
+  }
+  return funde
+}
+
+/**
  * Gesucht wird als Teilzeichenkette, gewichtet nach der Fundstelle: am Anfang
  * des Namens vor dem Wortanfang vor irgendwo mittendrin. Innerhalb einer
  * Strasse ordnet die Hausnummer, damit nach der 9 die 10 kommt und nicht die 100.
+ *
+ * Bringt die ganze Eingabe nichts, wird sie in Wörter zerlegt, Postleitzahl und
+ * Stadtname fallen weg, und es müssen alle übrigen Wörter vorkommen, jedes auch
+ * in der Form mit ausgeschriebenem Umlaut. Damit findet auch eine irgendwo
+ * herauskopierte Adresse ihr Haus: «Stationsstrasse 32, 8003 Zürich» so gut wie
+ * «8003 Zuerich, Stationsstr. 32». Reine Zahlen müssen dabei am Wortanfang
+ * stehen, sonst brächte die 32 auch die 132 mit.
  */
 export function suchen(index: Eintrag[], frage: string, max = 7): Eintrag[] {
   const q = normalisiere(frage)
   if (q.length < 2) return []
 
-  const funde: { e: Eintrag; rang: number }[] = []
-  for (const e of index) {
-    const i = e.norm.indexOf(q)
-    if (i < 0) continue
-    funde.push({ e, rang: i === 0 ? 0 : e.norm[i - 1] === ' ' ? 1 : 2 })
-    // Wer "strasse" tippt, trifft zehntausende Häuser. Für sieben Zeilen
-    // reicht ein Ausschnitt – die Reihenfolge darin bleibt dieselbe.
-    if (funde.length >= 4000) break
+  let funde = sammeln(index, (norm) => stelle(norm, q))
+
+  const gesucht = q.split(' ').filter((w) => !istFueller(w))
+  if (funde.length === 0 && gesucht.length > 0) {
+    funde = sammeln(index, (norm) => {
+      let rang = -1
+      for (const w of gesucht) {
+        let r = stelle(norm, w)
+        if (r < 0 && entumlautet(w) !== w) r = stelle(norm, entumlautet(w))
+        if (r < 0 || (r === 2 && /^\d+$/.test(w))) return -1
+        if (rang < 0) rang = r
+      }
+      return rang
+    })
   }
 
   funde.sort(
