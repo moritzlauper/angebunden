@@ -11,12 +11,17 @@ den GoatCounter nur im Arbeitsspeicher hält. GoatCounter speichert nichts
 Personenbezogenes, ein Consent-Banner braucht es nicht.
 
 Die GitHub-Action `.github/workflows/besucher-zahlen.yml` läuft täglich um 04:17 UTC,
-holt über die GoatCounter-API die Zahlen der abgeschlossenen Tage und committet sie
-hierher:
+holt über die GoatCounter-API die Zahlen der abgeschlossenen Tage und committet sie auf
+den Zweig [`besucherzahlen`](https://github.com/moritzlauper/angebunden/tree/besucherzahlen/analytics).
+Der Zweig trägt nur diese zwei Dateien, damit `main` keinen täglichen Bot-Commit
+bekommt und die Arbeitskopie nicht ständig hinterherhinkt. Auf `main` sind die beiden
+Dateien deshalb ignoriert, ein lokaler Lauf hinterlässt keine Änderung.
 
 * `besucher.csv` – eine Zeile pro Tag, `datum,besucher`. Zum schnellen Reinschauen.
 * `besucher.json` – dieselben Zahlen als `{ "tage": { "2026-09-06": 42 } }`, plus
-  Zeitstempel des letzten Laufs.
+  Zeitstempel des letzten Laufs. Diese Datei ist auch die Vorlage für den nächsten
+  Lauf: Die Action holt sie vom Zweig, das Script schreibt sie fort. So bleiben Tage
+  erhalten, die älter sind als das 45-Tage-Fenster der API.
 
 `node scripts/besucher-holen.mjs` macht dasselbe von Hand (`GOATCOUNTER_TOKEN`
 gesetzt vorausgesetzt).

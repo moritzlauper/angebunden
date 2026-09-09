@@ -295,8 +295,10 @@ finden die Seiten ihre Dateien nicht.
 Wie viele Leute pro Tag da waren, zählt ein cookieloses Script von
 [GoatCounter](https://www.goatcounter.com), ohne eigene Datenbank und ohne Consent-Banner.
 Die GitHub-Action `besucher-zahlen.yml` holt die Tageszahlen einmal täglich über die API
-und schreibt sie nach `analytics/besucher.csv` und `analytics/besucher.json`. Einrichtung
-und was die Zahl genau misst, steht in [`analytics/README.md`](analytics/README.md).
+und committet sie als `analytics/besucher.csv` und `analytics/besucher.json` auf den Zweig
+`besucherzahlen`. Auf `main` liegen die beiden Dateien nicht, sonst käme dort jeden Tag ein
+Bot-Commit an. Einrichtung und was die Zahl genau misst, steht in
+[`analytics/README.md`](analytics/README.md).
 
 ## Lizenz
 

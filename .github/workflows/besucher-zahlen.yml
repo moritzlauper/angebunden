@@ -1,13 +1,14 @@
 name: Besucherzahlen
 
-# Holt einmal pro Tag bei GoatCounter die Besuche des Vortags und schreibt sie
-# nach analytics/. Braucht das Repository-Secret GOATCOUNTER_TOKEN (Recht
-# «Read statistics»); der GoatCounter-Code kommt aus der Variable
-# GOATCOUNTER_CODE oder ist «angebunden».
+# Holt einmal pro Tag bei GoatCounter die Besuche des Vortags und committet sie
+# auf den Zweig «besucherzahlen». main bleibt dabei unberührt, damit die
+# Arbeitskopie nicht wegen der Zahlen täglich hinterherhinkt. Braucht das
+# Repository-Secret GOATCOUNTER_TOKEN (Recht «Read statistics»); der
+# GoatCounter-Code kommt aus der Variable GOATCOUNTER_CODE oder ist «angebunden».
 
 on:
   schedule:
-    - cron: '17 4 * * *' # 04:17 UTC – der Vortag ist in Zürich dann sicher komplett
+    - cron: '17 4 * * *' # 04:17 UTC, der Vortag ist in Zürich dann sicher komplett
   workflow_dispatch:
 
 concurrency:
@@ -16,6 +17,9 @@ concurrency:
 
 permissions:
   contents: write
+
+env:
+  ZWEIG: besucherzahlen
 
 jobs:
   holen:
@@ -27,6 +31,31 @@ jobs:
         with:
           node-version: 22
 
+      - name: Datenzweig bereitstellen
+        run: |
+          set -euo pipefail
+          git config user.name  "besucher-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin "${ZWEIG}" >/dev/null 2>&1; then
+            # Ganze Vorgeschichte des Zweigs holen, er besteht nur aus zwei Dateien.
+            # Ohne eigene Refspec landet sie nicht als origin/$ZWEIG, weil
+            # actions/checkout nur main verfolgt.
+            git fetch origin "+refs/heads/${ZWEIG}:refs/remotes/origin/${ZWEIG}"
+            git worktree add daten "origin/${ZWEIG}"
+            git -C daten checkout -B "${ZWEIG}"
+          else
+            # Erster Lauf: ein Zweig ohne Vorgeschichte, der nur die Zahlen trägt.
+            git worktree add --detach daten
+            git -C daten checkout --orphan "${ZWEIG}"
+            git -C daten rm -rqf . || true
+          fi
+
+          # Bisherige Zahlen bereitlegen, damit das Script sie fortschreibt statt
+          # nur das 45-Tage-Fenster der API zu kennen.
+          mkdir -p analytics
+          cp -f daten/analytics/besucher.json analytics/ 2>/dev/null || true
+
       - name: Zahlen holen
         env:
           GOATCOUNTER_CODE: ${{ vars.GOATCOUNTER_CODE || 'angebunden' }}
@@ -35,15 +64,17 @@ jobs:
 
       - name: Committen, falls neu
         run: |
+          set -euo pipefail
+          mkdir -p daten/analytics
+          cp analytics/besucher.json analytics/besucher.csv daten/analytics/
+          git -C daten add analytics
+
           # besucher.json trägt bei jedem Lauf einen frischen Zeitstempel; erst
           # committen, wenn sich in besucher.csv eine Zahl geändert hat.
-          if git diff --quiet -- analytics/besucher.csv; then
+          if git -C daten diff --cached --quiet -- analytics/besucher.csv; then
             echo "Keine neuen Zahlen."
-            git checkout -- analytics/
             exit 0
           fi
-          git config user.name  "besucher-bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add analytics/
-          git commit -m "Besucherzahlen $(date -u +%F) [skip ci]"
-          git push
+
+          git -C daten commit -m "Besucherzahlen $(date -u +%F)"
+          git -C daten push origin "${ZWEIG}"

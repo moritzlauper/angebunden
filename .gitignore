@@ -57,3 +57,8 @@ next-env.d.ts
 # KI-Agent-Instruktionen, nur lokal (AGENTS.md schreibt `next dev` neu)
 /AGENTS.md
 /CLAUDE.md
+
+# Besucherzahlen: die Action schreibt sie auf den Zweig «besucherzahlen», damit
+# main nicht täglich einen Bot-Commit bekommt. Lokale Läufe bleiben unsichtbar.
+analytics/besucher.json
+analytics/besucher.csv

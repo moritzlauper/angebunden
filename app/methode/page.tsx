@@ -346,7 +346,11 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           </a>
           , cookielos. Die Kennung ist ein täglich wechselnder Hash aus IP und Browser, den niemand
           dauerhaft speichert; kein Profil über mehrere Seiten, keine Weitergabe. Die Tageszahlen
-          liegen offen im Quellcode unter <code>analytics/</code>.
+          liegen offen auf GitHub im Zweig{' '}
+          <Aus href="https://github.com/moritzlauper/angebunden/blob/besucherzahlen/analytics/besucher.csv">
+            besucherzahlen
+          </Aus>
+          .
         </p>
         <p className="mt-4">
           Die Seite selbst ist ein Ordner statischer Dateien. Beim Hoster bleiben ausserdem die
