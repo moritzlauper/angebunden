@@ -46,3 +46,17 @@ Balkendiagramm im GoatCounter-Dashboard.
 Die eigenen Besuche hält man aus der Statistik, indem man einmal
 `https://angebunden.ch/#toggle-goatcounter` aufruft – das setzt ein Flag im
 Browser.
+
+## Wenn die Action fehlschlägt
+
+Das Script fragt zuerst `/api/v0/me` ab und schreibt Name und Rechte des Tokens ins
+Log, damit die Ursache nicht geraten werden muss. Fehlt das Recht «Read statistics»,
+bricht es mit genau dieser Meldung ab: Dann unter
+`https://angebunden.goatcounter.com/user/api` einen neuen Token mit dem Häkchen
+anlegen und das Secret `GOATCOUNTER_TOKEN` ersetzen. Ein 401 auf `/api/v0/me` heisst,
+dass der Token nicht zum Konto der Site gehört.
+
+Antwortet `/api/v0/stats/total` mit 404, obwohl der Token das Recht hat, rechnet das
+Script die Tageswerte aus `/api/v0/stats/hits` zusammen. Diese Summe zählt pro Seite,
+liegt für Leute mit mehreren Aufrufen am selben Tag also etwas höher. In
+`besucher.json` steht dann `"quelle": "goatcounter/angebunden (stats/hits)"`.

@@ -13,6 +13,10 @@
  *                       liegen, dem die Site gehört.
  *   GOATCOUNTER_CODE    Subdomain vor .goatcounter.com; ohne Angabe «angebunden».
  *
+ * Vor dem Abruf prüft das Script über /api/v0/me, welche Rechte am Token hängen,
+ * damit ein Fehler nicht geraten werden muss. Antwortet /api/v0/stats/total mit
+ * 404, rechnet es die Tageswerte ersatzweise aus /api/v0/stats/hits zusammen.
+ *
  * GoatCounter zählt cookielos: die Kennung ist ein Hash aus IP, Browser und
  * einem täglich wechselnden Salt, nichts davon wird gespeichert. Eine Sitzung
  * hält acht Stunden und wird pro Seite einmal gezählt – wer erst die Karte und
@@ -65,39 +69,105 @@ const heute = tag(new Date())
 const start = tag(new Date(Date.now() - FENSTER_TAGE * 864e5))
 const ende = tag(new Date(Date.now() + 2 * 864e5)) // grosszügig, der laufende Tag fliegt unten raus
 
-const antwort = await hole(`/api/v0/stats/total?start=${start}&end=${ende}`)
+// Rechte am Token, wie GoatCounter sie in /api/v0/me als Bitmaske zurückgibt
+// (goatcounter/api_token.go). «Read statistics» ist das, was die Statistik-
+// Endpunkte verlangen.
+const RECHTE = [
+  [2, 'Count pageviews'],
+  [4, 'Export'],
+  [8, 'Read sites'],
+  [16, 'Create sites'],
+  [32, 'Update sites'],
+  [64, 'Read statistics'],
+]
+const RECHT_STATISTIK = 64
 
-if (!antwort.ok) {
+let tokenName = '?'
+let rechteText = '?'
+
+/** Bricht mit einer Diagnose ab, die zum HTTP-Status passt. */
+function abbruch(antwort, hinweis) {
   console.error(`Anfrage : ${antwort.url}`)
   console.error(`Antwort : HTTP ${antwort.status}`)
   console.error(`          ${klartext(antwort.text)}`)
-  console.error(`Token   : ${TOKEN.length} Zeichen, Code «${CODE}»`)
-
-  // Prüfen, ob wenigstens der Token an sich gilt.
-  const me = await hole('/api/v0/me')
-  if (me.ok) {
-    console.error(
-      '\n/api/v0/me geht – der Token gilt, aber nicht für /stats/total.\n' +
-        'Dem Token fehlt das Recht «Read statistics». Unter /user/api einen neuen\n' +
-        'Token mit diesem Häkchen anlegen und als Secret GOATCOUNTER_TOKEN hinterlegen.',
-    )
-  } else {
-    console.error(
-      `\n/api/v0/me : HTTP ${me.status} – der Token selbst wird nicht akzeptiert.\n` +
-        `Prüfen:\n` +
-        `  • Ist das Secret GOATCOUNTER_TOKEN der Token-Wert (nicht der Name)?\n` +
-        `  • Auf demselben Konto angelegt, dem ${CODE}.goatcounter.com gehört?\n` +
-        `  • E-Mail-Adresse bei GoatCounter bestätigt?\n` +
-        `  • Stimmt der Code «${CODE}» (Repo-Variable GOATCOUNTER_CODE oder Standard)?`,
-    )
-  }
+  console.error(`Token   : «${tokenName}», ${TOKEN.length} Zeichen, Rechte: ${rechteText}`)
+  console.error(`Site    : ${CODE}.goatcounter.com`)
+  if (hinweis) console.error(`\n${hinweis}`)
   process.exit(1)
 }
 
-const daten = JSON.parse(antwort.text)
-const stats = Array.isArray(daten.stats) ? daten.stats : []
+// Erst den Token selbst anschauen. /api/v0/me verlangt kein besonderes Recht und
+// liefert Name und Rechte, damit ein Fehler weiter unten nicht geraten werden muss.
+const me = await hole('/api/v0/me')
+if (!me.ok) {
+  abbruch(
+    me,
+    'Der Token selbst wird nicht akzeptiert. Prüfen:\n' +
+      '  • Ist das Secret GOATCOUNTER_TOKEN der Token-Wert (nicht der Name)?\n' +
+      `  • Auf demselben Konto angelegt, dem ${CODE}.goatcounter.com gehört?\n` +
+      '  • E-Mail-Adresse bei GoatCounter bestätigt?\n' +
+      `  • Stimmt der Code «${CODE}» (Repo-Variable GOATCOUNTER_CODE oder Standard)?`,
+  )
+}
+
+const token = JSON.parse(me.text)?.token ?? {}
+const rechte = token.permissions ?? 0
+tokenName = token.name || 'ohne Namen'
+rechteText = RECHTE.filter(([bit]) => rechte & bit).map(([, name]) => name).join(', ') || 'keine'
+
+if (!(rechte & RECHT_STATISTIK)) {
+  console.error(`Token «${tokenName}» hat die Rechte: ${rechteText}.`)
+  console.error(
+    `Es fehlt «Read statistics». Unter https://${CODE}.goatcounter.com/user/api einen\n` +
+      'neuen Token mit diesem Häkchen anlegen und als Secret GOATCOUNTER_TOKEN hinterlegen.',
+  )
+  process.exit(1)
+}
+
+// Der eigentliche Abruf. /api/v0/stats/total liefert die Tageswerte der ganzen
+// Site. Antwortet er mit 404, wird ersatzweise über /api/v0/stats/hits gerechnet:
+// dieselben Tage, aber als Summe über die einzelnen Seiten. Wer an einem Tag die
+// Karte und /methode ansieht, zählt dort zweimal, der Wert liegt also etwas höher.
+let quelle = 'stats/total'
+let stats = []
+
+const antwort = await hole(`/api/v0/stats/total?start=${start}&end=${ende}`)
+if (antwort.ok) {
+  stats = JSON.parse(antwort.text).stats ?? []
+} else if (antwort.status !== 404) {
+  abbruch(
+    antwort,
+    antwort.status === 403
+      ? 'GoatCounter weist den Token für diesen Endpunkt ab, obwohl er «Read statistics» trägt.'
+      : antwort.status === 429
+        ? 'Ratenlimite von GoatCounter. Der nächste Lauf holt die Tage nach.'
+        : '',
+  )
+} else {
+  console.error('/api/v0/stats/total: HTTP 404. Ersatzweise über /api/v0/stats/hits.')
+  const hits = await hole(`/api/v0/stats/hits?start=${start}&end=${ende}&limit=200`)
+  if (!hits.ok) {
+    abbruch(
+      hits,
+      'Beide Statistik-Endpunkte antworten nicht, obwohl der Token «Read statistics» hat.\n' +
+        'Das deutet auf GoatCounter selbst hin, nicht auf die Einrichtung hier.',
+    )
+  }
+  const daten = JSON.parse(hits.text)
+  if (daten.more) console.error('Achtung: mehr Seiten als abgefragt, limit erhöhen.')
+  const proTag = new Map()
+  for (const seite of daten.hits ?? []) {
+    for (const s of seite.stats ?? []) {
+      if (typeof s.day !== 'string' || typeof s.daily !== 'number') continue
+      proTag.set(s.day, (proTag.get(s.day) ?? 0) + s.daily)
+    }
+  }
+  stats = [...proTag].map(([day, daily]) => ({ day, daily }))
+  quelle = 'stats/hits'
+}
+
 if (stats.length === 0) {
-  console.error('Antwort ohne stats-Array:', JSON.stringify(daten).slice(0, 500))
+  console.error('Keine Tageswerte in der Antwort.')
   process.exit(1)
 }
 
@@ -126,7 +196,7 @@ const sortiert = ersterEchte ? alleTage.filter((d) => d >= ersterEchte) : []
 for (const d of alleTage) if (!sortiert.includes(d)) delete tage[d]
 const ausgabe = {
   aktualisiert: new Date().toISOString(),
-  quelle: `goatcounter/${CODE}`,
+  quelle: `goatcounter/${CODE} (${quelle})`,
   hinweis:
     'besucher = Besuche pro Tag, cookielos gezählt (8-Stunden-Sitzung, pro Seite einmal). ' +
     `Näherung nach oben für die Zahl verschiedener Leute. Zeitzone ${ZEITZONE}.`,
