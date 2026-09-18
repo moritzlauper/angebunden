@@ -45,7 +45,8 @@ const TOP_PUNKTE = 10000
  */
 const TOP_PUNKTE_ANZEIGE = 20
 
-type Modus = 'oev' | 'kultur'
+type Modus = 'oev' | 'kultur' | 'beide'
+const MODUS_LISTE = ['oev', 'kultur', 'beide'] as const
 
 /** Womit die Kultur erreichbar gerechnet wird – in der Karte umschaltbar. */
 type WegModus = 'velo' | 'fuss'
@@ -61,14 +62,21 @@ const MODI = {
     kurz: 'ÖV',
     punktQuelle: 'top-oev',
     schalter: 'Haltestellen',
-    schalterEbene: 'halte',
+    ebenen: ['halte'],
   },
   kultur: {
     titel: 'Kulturvielfalt',
     kurz: 'Kultur',
     punktQuelle: 'top-kultur',
     schalter: 'Kulturorte',
-    schalterEbene: 'kulturorte',
+    ebenen: ['kulturorte'],
+  },
+  beide: {
+    titel: 'ÖV und Kultur',
+    kurz: 'ÖV + Kultur',
+    punktQuelle: 'top-beide',
+    schalter: 'Halte und Orte',
+    ebenen: ['halte', 'kulturorte'],
   },
 } as const
 
@@ -178,6 +186,8 @@ type Kulturdaten = {
   anzahl: Record<WegModus, Int32Array>
   /** Abklingender Index je Sorte, je Wegart. */
   index: Record<WegModus, Float64Array>
+  /** ÖV-Rang aus der Kachel, für die Kombination mit der Kultur. */
+  rang: Int32Array
   lon: Float64Array
   lat: Float64Array
   minuten: Float64Array
@@ -195,6 +205,7 @@ function leseKulturdaten(fc: { features: RohFeature[] }, arten: number): Kulturd
     arten,
     anzahl: { velo: new Int32Array(n * arten), fuss: new Int32Array(n * arten) },
     index: { velo: new Float64Array(n * arten), fuss: new Float64Array(n * arten) },
+    rang: new Int32Array(n),
     lon: new Float64Array(n),
     lat: new Float64Array(n),
     minuten: new Float64Array(n),
@@ -211,6 +222,7 @@ function leseKulturdaten(fc: { features: RohFeature[] }, arten: number): Kulturd
       d.index.velo[b * arten + a] = (p[`i${a}`] as number) ?? 0
       d.index.fuss[b * arten + a] = (p[`f${a}`] as number) ?? 0
     }
+    d.rang[b] = p.r as number
     d.lon[b] = p.x as number
     d.lat[b] = p.y as number
     d.minuten[b] = p.m as number
@@ -228,23 +240,34 @@ function leseKulturdaten(fc: { features: RohFeature[] }, arten: number): Kulturd
  * Summe der gewählten Spalten steht in der Kachel, die Karte muss also nicht
  * neu zerlegt werden, wenn ein Schalter kippt. Neu gesetzt werden nur Farben.
  */
-type Sicht = {
+type Sicht = Rangliste & {
   wegModus: WegModus
   /** Indizes der gewählten Sorten in `meta.kultur.arten`. */
   gewaehlt: number[]
   /** Zahl der Kulturorte der gewählten Sorten in der ganzen Stadt. */
   orte: number
-  /** Summe der gewählten Indexspalten, als Ausdruck für die Karte. */
-  ausdruck: unknown
-  /** Dieselbe Summe je Haus, absteigend – daraus kommen Rang und Farbstufen. */
-  absteigend: Float64Array
   anzahl: Int32Array
   verteilung: { min: number; median: number; max: number }
+  /** Die Summe der gewählten Indexspalten eines Hauses. */
+  summeVon: (ki: number[]) => number
+  /** ÖV und Kultur zusammen, für den dritten Modus. */
+  kombi: Rangliste & {
+    /** Kombinierter Wert aus ÖV-Rang und Kultursumme eines Hauses. */
+    wertVon: (r: number, summe: number) => number
+  }
+}
+
+/** Eine Rangfolge über alle Häuser, aus Werten mit «höher ist besser». */
+type Rangliste = {
+  /** Derselbe Wert als Ausdruck für die Karte. */
+  ausdruck: unknown
+  /** Die Werte je Haus, absteigend – daraus kommen Rang und Farbstufen. */
+  absteigend: Float64Array
   bestes: Extrem
   schlechtestes: Extrem
-  /** Rang eines Indexwerts, 1 = am meisten Kultur in Gehweite. */
+  /** Rang eines Werts, 1 = am besten. */
   rangVon: (wert: number) => number
-  /** Der Indexwert, ab dem ein Haus zu den besten `n` gehört. */
+  /** Der Wert, ab dem ein Haus zu den besten `n` gehört. */
   schwelle: (n: number) => number
   /** Die besten `n` Häuser als Punktebene, für die Hervorhebung. */
   besteAls: (n: number) => PunkteFC
@@ -258,6 +281,87 @@ type PunkteFC = {
     properties: Record<string, unknown>
     geometry: { type: 'Point'; coordinates: number[] }
   }[]
+}
+
+function bildeRangliste(
+  d: Kulturdaten,
+  werte: Float64Array,
+  ausdruck: unknown,
+  extrem: (b: number, rang: number) => Extrem
+): Rangliste & { reihenfolge: number[] } {
+  const absteigend = Float64Array.from(werte).sort().reverse()
+  const reihenfolge = Array.from(werte.keys()).sort((x, y) => werte[y] - werte[x])
+  return {
+    ausdruck,
+    absteigend,
+    reihenfolge,
+    bestes: extrem(reihenfolge[0], 1),
+    schlechtestes: extrem(reihenfolge[d.n - 1], d.n),
+    rangVon: (wert) => {
+      let lo = 0
+      let hi = absteigend.length
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1
+        if (absteigend[mid] > wert) lo = mid + 1
+        else hi = mid
+      }
+      return lo + 1
+    },
+    schwelle: (n) => absteigend[Math.min(Math.max(n, 1), d.n) - 1],
+    besteAls: (n) => ({
+      type: 'FeatureCollection' as const,
+      features: reihenfolge.slice(0, Math.min(n, d.n)).map((b, i) => ({
+        type: 'Feature' as const,
+        properties: { r: i + 1 },
+        geometry: { type: 'Point' as const, coordinates: [d.lon[b], d.lat[b]] },
+      })),
+    }),
+  }
+}
+
+/**
+ * Stützstellen, die einen Kulturwert auf seinen Ranganteil abbilden (0 = vorne,
+ * 1 = hinten). Den genauen Kultur-Rang kennt die Kachel nicht, er hängt an der
+ * Sortenwahl. Die Stützstellen liegen vorne dicht (in Zürich alle zwei Häuser)
+ * und hinten weit, denn gesucht sind die besten Adressen, nicht die Reihenfolge
+ * am Stadtrand.
+ */
+function anteilStufen(absteigend: Float64Array): [number, number][] {
+  const n = absteigend.length
+  const schritte = 150
+  const paare: [number, number, number][] = []
+  for (let i = 0; i <= schritte; i++) {
+    const idx = Math.round((i / schritte) ** 2 * (n - 1))
+    if (paare.length && idx === paare[paare.length - 1][2]) continue
+    paare.push([absteigend[idx], (idx + 1) / n, idx])
+  }
+  let vorher = -Infinity
+  return paare.reverse().map(([wert, anteil]): [number, number] => {
+    const w = wert > vorher ? wert : vorher + 1e-4
+    vorher = w
+    return [w, anteil]
+  })
+}
+
+/**
+ * Wertet die Stützstellen genau so aus wie MapLibres `interpolate`. Nur dann
+ * deckt sich die Grenze der Hervorhebung auf der Karte mit dem Rang auf der
+ * Karteikarte.
+ */
+function stueckweise(stufen: [number, number][], x: number) {
+  const letzte = stufen.length - 1
+  if (x <= stufen[0][0]) return stufen[0][1]
+  if (x >= stufen[letzte][0]) return stufen[letzte][1]
+  let lo = 0
+  let hi = letzte
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1
+    if (stufen[mid][0] <= x) lo = mid
+    else hi = mid
+  }
+  const [x0, y0] = stufen[lo]
+  const [x1, y1] = stufen[hi]
+  return y0 + ((x - x0) / (x1 - x0)) * (y1 - y0)
 }
 
 function berechneSicht(
@@ -284,20 +388,6 @@ function berechneSicht(
     anzahl[b] = sa
   }
 
-  const absteigend = Float64Array.from(summe).sort().reverse()
-  const reihenfolge = Array.from(summe.keys()).sort((x, y) => summe[y] - summe[x])
-
-  const rangVon = (wert: number) => {
-    let lo = 0
-    let hi = absteigend.length
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1
-      if (absteigend[mid] > wert) lo = mid + 1
-      else hi = mid
-    }
-    return lo + 1
-  }
-
   const sortiertAnzahl = Int32Array.from(anzahl).sort()
   const q = (f: number) => sortiertAnzahl[Math.round(f * (d.n - 1))]
 
@@ -311,34 +401,57 @@ function berechneSicht(
     name: d.name[b],
   })
 
+  const spalte = (a: number) => ['sqrt', ['get', `${wegModus === 'velo' ? 'i' : 'f'}${a}`]]
+  const ausdruck =
+    gewaehlt.length === 0
+      ? 0
+      : gewaehlt.length === 1
+        ? spalte(gewaehlt[0])
+        : ['+', ...gewaehlt.map(spalte)]
+  const kultur = bildeRangliste(d, summe, ausdruck, extrem)
+
+  // ÖV und Kultur zusammen: es zählt der schwächere der beiden Ranganteile.
+  // Ein Haus steht so nur vorne, wenn es in beidem vorne steht; ein
+  // Spitzenplatz beim einen gleicht einen hinteren beim anderen nicht aus.
+  const stufen = anteilStufen(kultur.absteigend)
+  const wertVon = (r: number, s: number) => 1 - Math.max(r / d.n, stueckweise(stufen, s))
+  const kombiWerte = new Float64Array(d.n)
+  for (let b = 0; b < d.n; b++) kombiWerte[b] = wertVon(d.rang[b], summe[b])
+  const kombiAusdruck = [
+    '-',
+    1,
+    ['max', ['/', ['get', 'r'], d.n], ['interpolate', ['linear'], ausdruck, ...stufen.flat()]],
+  ]
+  const kombi = bildeRangliste(d, kombiWerte, kombiAusdruck, extrem)
+
   return {
+    ...kultur,
     wegModus,
     gewaehlt,
     orte: gewaehlt.reduce((n, a) => n + (proArt[a] ?? 0), 0),
-    ausdruck:
-      gewaehlt.length === 0
-        ? 0
-        : gewaehlt.length === 1
-          ? ['sqrt', ['get', `${wegModus === 'velo' ? 'i' : 'f'}${gewaehlt[0]}`]]
-          : ['+', ...gewaehlt.map((a) => ['sqrt', ['get', `${wegModus === 'velo' ? 'i' : 'f'}${a}`]])],
-    absteigend,
     anzahl,
     // `max` ist das Haus auf Rang 1 (nicht das mit den meisten Orten), passend
     // zur Karten-Beschriftung «Rang 1 · N Orte»; Median und Min sind der Grösse nach.
-    verteilung: { min: q(0), median: q(0.5), max: anzahl[reihenfolge[0]] },
-    bestes: extrem(reihenfolge[0], 1),
-    schlechtestes: extrem(reihenfolge[d.n - 1], d.n),
-    rangVon,
-    schwelle: (n) => absteigend[Math.min(Math.max(n, 1), d.n) - 1],
-    besteAls: (n) => ({
-      type: 'FeatureCollection' as const,
-      features: reihenfolge.slice(0, Math.min(n, d.n)).map((b, i) => ({
-        type: 'Feature' as const,
-        properties: { r: i + 1 },
-        geometry: { type: 'Point' as const, coordinates: [d.lon[b], d.lat[b]] },
-      })),
-    }),
+    verteilung: { min: q(0), median: q(0.5), max: anzahl[kultur.reihenfolge[0]] },
+    summeVon: (ki) => gewaehlt.reduce((w, a) => w + Math.sqrt(ki[a] ?? 0), 0),
+    kombi: { ...kombi, wertVon },
   }
+}
+
+/** Rang eines Hauses in der Kennzahl des Modus, für die gerade gewählten Sorten. */
+function rangIn(modus: Modus, h: NonNullable<Treffer>, sicht: Sicht | null, wegModus: WegModus) {
+  if (modus === 'oev') return h.r
+  if (!sicht) return 0
+  const summe = sicht.summeVon(h.weg[wegModus].ki)
+  return modus === 'kultur'
+    ? sicht.rangVon(summe)
+    : sicht.kombi.rangVon(sicht.kombi.wertVon(h.r, summe))
+}
+
+/** Die Rangliste, nach der der Modus färbt. Beim ÖV steht der Rang in der Kachel. */
+function ranglisteFuer(modus: Modus, sicht: Sicht | null): Rangliste | null {
+  if (modus === 'oev' || !sicht) return null
+  return modus === 'kultur' ? sicht : sicht.kombi
 }
 
 /**
@@ -491,13 +604,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
 
   /** Rang eines Hauses in der gerade aktiven Kennzahl und Sortenwahl. */
   const rangDesHauses = useCallback(
-    (h: NonNullable<Treffer>) => {
-      if (modus !== 'kultur') return h.r
-      const gewaehlt = sicht?.gewaehlt ?? meta.kultur.arten.map((_, i) => i)
-      const summe = gewaehlt.reduce((w, a) => w + Math.sqrt(h.weg[wegModus].ki[a] ?? 0), 0)
-      return sicht?.rangVon(summe) ?? 0
-    },
-    [modus, sicht, meta.kultur.arten, wegModus]
+    (h: NonNullable<Treffer>) => rangIn(modus, h, sicht, wegModus),
+    [modus, sicht, wegModus]
   )
 
   /**
@@ -578,6 +686,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       map.addSource('kulturorte', { type: 'geojson', data: kulturorte })
       map.addSource('top-oev', { type: 'geojson', data: topOev })
       map.addSource('top-kultur', { type: 'geojson', data: topKultur })
+      // Die Kombination hängt an der Sortenwahl, ihre Punkte setzt die Sicht.
+      map.addSource('top-beide', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addSource('extreme', { type: 'geojson', data: extreme })
       map.addSource('gebaeude', { type: 'geojson', data: gebaeude, generateId: true })
 
@@ -716,7 +826,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         },
       })
 
-      for (const m of ['oev', 'kultur'] as const) {
+      for (const m of MODUS_LISTE) {
         map.addLayer({
           id: `top-punkt-${m}`,
           type: 'circle',
@@ -915,9 +1025,9 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     setzeUrl({
       haus: `${treffer.x},${treffer.y}`,
       modus,
-      weg: modus === 'kultur' ? wegModus : undefined,
+      weg: modus !== 'oev' ? wegModus : undefined,
       arten:
-        modus === 'kultur' && gewaehlt.length !== meta.kultur.arten.length
+        modus !== 'oev' && gewaehlt.length !== meta.kultur.arten.length
           ? gewaehlt.join(',')
           : undefined,
     })
@@ -939,13 +1049,12 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [fixiert, treffer, rangFolgt, richteAus])
 
-  // --- Deep-Link beim Start: #haus=lon,lat&modus=oev|kultur&arten=0,2,5
+  // --- Deep-Link beim Start: #haus=lon,lat&modus=oev|kultur|beide&arten=0,2,5
   useEffect(() => {
     if (!bereit) return
     const p = paramsAusUrl()
-    const modusParam = p.get('modus')
-    const startModus: Modus = modusParam === 'kultur' ? 'kultur' : 'oev'
-    if (modusParam) setModus(startModus)
+    const modusParam = MODUS_LISTE.find((m) => m === p.get('modus'))
+    if (modusParam) setModus(modusParam)
 
     if (p.get('weg') === 'fuss') setWegModus('fuss')
 
@@ -1002,8 +1111,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     const p = new URLSearchParams()
     p.set('haus', `${treffer.x},${treffer.y}`)
     p.set('modus', modus)
-    if (modus === 'kultur') p.set('weg', wegModus)
-    if (modus === 'kultur' && gewaehlt.length !== meta.kultur.arten.length)
+    if (modus !== 'oev') p.set('weg', wegModus)
+    if (modus !== 'oev' && gewaehlt.length !== meta.kultur.arten.length)
       p.set('arten', gewaehlt.join(','))
     url.hash = p.toString()
 
@@ -1011,7 +1120,9 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     const text =
       modus === 'kultur'
         ? `Von ${ort} ist mehr Kultur erreichbar als von ${besserAls}% der Häuser in ${stadt.name}. ${orte} Orte in ${meta.kultur.budgets[wegModus]} ${WEG[wegModus].minutenWort}. Wo liegt deins?`
-        : `${ort} ist besser angebunden als ${besserAls}% der Häuser in ${stadt.name}. Im Schnitt ${fmt(treffer.m)} Minuten zu jeder Adresse der Stadt. Wo liegt deins?`
+        : modus === 'beide'
+          ? `${ort} liegt bei ÖV und Kultur zusammen vor ${besserAls}% der Häuser in ${stadt.name}. Im Schnitt ${fmt(treffer.m)} Minuten zu jeder Adresse, ${orte} Orte in ${meta.kultur.budgets[wegModus]} ${WEG[wegModus].minutenWort}. Wo liegt deins?`
+          : `${ort} ist besser angebunden als ${besserAls}% der Häuser in ${stadt.name}. Im Schnitt ${fmt(treffer.m)} Minuten zu jeder Adresse der Stadt. Wo liegt deins?`
 
     return { text, url: url.toString() }
   }
@@ -1082,16 +1193,13 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     map.setFilter('extreme-text', extremFilter as never)
   }, [modus, dunkel, bereit, meta.buildings, sicht, rangHighlight])
 
-  // --- Nebenebene (Haltestellen bzw. Kulturorte)
+  // --- Nebenebene (Haltestellen, Kulturorte oder beides)
   useEffect(() => {
     const map = mapRef.current
     if (!map || !bereit) return
-    for (const m of ['oev', 'kultur'] as const) {
-      map.setLayoutProperty(
-        MODI[m].schalterEbene,
-        'visibility',
-        nebenebene && modus === m ? 'visible' : 'none'
-      )
+    const ebenen: readonly string[] = MODI[modus].ebenen
+    for (const ebene of ['halte', 'kulturorte']) {
+      map.setLayoutProperty(ebene, 'visibility', nebenebene && ebenen.includes(ebene) ? 'visible' : 'none')
     }
   }, [nebenebene, modus, bereit])
 
@@ -1103,20 +1211,30 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     // Die Bestenliste steht nicht mehr fest, sobald Sorten wegfallen – sie wird
     // hier neu gezogen. 10'000 Punkte umzuhängen kostet weniger als eine
     // Zehntelsekunde, die 47'000 Gebäudeflächen bleiben unangetastet.
-    const punkte = map.getSource('top-kultur')
-    if (punkte && 'setData' in punkte)
-      (punkte as { setData: (d: unknown) => void }).setData(sicht.besteAls(TOP_PUNKTE))
+    for (const [quelle, liste] of [['top-kultur', sicht], ['top-beide', sicht.kombi]] as const) {
+      const punkte = map.getSource(quelle)
+      if (punkte && 'setData' in punkte)
+        (punkte as { setData: (d: unknown) => void }).setData(liste.besteAls(TOP_PUNKTE))
+    }
 
-    const extremPunkte = ([sicht.bestes, sicht.schlechtestes] as const).map((e, i) => ({
-      type: 'Feature' as const,
-      properties: {
-        modus: 'kultur',
-        art: i === 0 ? 'best' : 'worst',
-        beschriftung: `Rang ${nf(e.rang)} · ${e.orte} ${e.orte === 1 ? 'Ort' : 'Orte'}`,
-        ...e,
-      },
-      geometry: { type: 'Point' as const, coordinates: [e.lon, e.lat] },
-    }))
+    const orteText = (e: Extrem) => `${e.orte} ${e.orte === 1 ? 'Ort' : 'Orte'}`
+    const extremPunkte = (
+      [
+        ['kultur', sicht, orteText],
+        ['beide', sicht.kombi, (e: Extrem) => `${fmt(e.minuten)} min · ${orteText(e)}`],
+      ] as const
+    ).flatMap(([m, liste, text]) =>
+      [liste.bestes, liste.schlechtestes].map((e, i) => ({
+        type: 'Feature' as const,
+        properties: {
+          modus: m,
+          art: i === 0 ? 'best' : 'worst',
+          beschriftung: `Rang ${nf(e.rang)} · ${text(e)}`,
+          ...e,
+        },
+        geometry: { type: 'Point' as const, coordinates: [e.lon, e.lat] },
+      }))
+    )
     const extreme = map.getSource('extreme')
     if (extreme && 'setData' in extreme)
       (extreme as { setData: (d: unknown) => void }).setData({
@@ -1152,7 +1270,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       geplantRef.current = false
       const { n, modus: m, highlight } = zielRef.current
       // Ohne gewählte Sorte gibt es keine Rangfolge, die man hervorheben könnte.
-      const sichtbar = highlight && n > 0 && (m === 'oev' || (sicht !== null && sicht.gewaehlt.length > 0))
+      const sichtbar =
+        highlight && n > 0 && (m === 'oev' || (sicht !== null && sicht.gewaehlt.length > 0))
       // Punkte nur für die vordersten paar Ränge, wo einzelne Häuser über die
       // ganze Stadt verstreut untergehen. Darüber trägt die Fläche allein.
       const punkteSichtbar = sichtbar && n <= TOP_PUNKTE_ANZEIGE
@@ -1161,7 +1280,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       // liesse MapLibre die Kacheln neu zerlegen, was über 47'000 Gebäuden
       // beim Ziehen ruckelt. Mit betroffen ist die gerade inaktive Kennzahl –
       // ihre Punkte standen vielleicht noch offen, als der Modus wechselte.
-      for (const kandidat of ['oev', 'kultur'] as const) {
+      for (const kandidat of MODUS_LISTE) {
         if (kandidat === m && punkteSichtbar) continue
         map.setPaintProperty(`top-punkt-${kandidat}`, 'circle-opacity', 0)
         map.setPaintProperty(`top-punkt-${kandidat}`, 'circle-stroke-opacity', 0)
@@ -1174,7 +1293,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       } else {
         // Die Fläche kennt bei der Kultur keinen Rang – dort steht der Indexwert
         // in der Kachel, und die Grenze des Regler ist der Wert des n-ten Hauses.
-        const kulturSicht = m === 'kultur' ? sicht : null
+        // Für ÖV und Kultur zusammen gilt dasselbe mit dem kombinierten Wert.
+        const kulturSicht = ranglisteFuer(m, sicht)
         const innerhalb = kulturSicht
           ? ['>=', kulturSicht.ausdruck, kulturSicht.schwelle(n)]
           : ['<=', ['get', 'r'], n]
@@ -1265,7 +1385,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     const map = mapRef.current
     if (!map || !bereit || rangHighlight) return
     map.setPaintProperty('top-flaeche', 'fill-color', 'rgba(0,0,0,0)' as never)
-    for (const m of ['oev', 'kultur'] as const) {
+    for (const m of MODUS_LISTE) {
       map.setPaintProperty(`top-punkt-${m}`, 'circle-opacity', 0)
       map.setPaintProperty(`top-punkt-${m}`, 'circle-stroke-opacity', 0)
     }
@@ -1376,11 +1496,11 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
             className="flex gap-1 rounded-full border p-1 backdrop-blur-md"
             style={{ background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten }}
           >
-            {(['oev', 'kultur'] as const).map((m) => (
+            {MODUS_LISTE.map((m) => (
               <button
                 key={m}
                 onClick={() => setModus(m)}
-                className="rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors"
+                className="whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors"
                 style={modus === m ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted }}
               >
                 {MODI[m].kurz}
@@ -1519,9 +1639,9 @@ function farbAusdruck(modus: Modus, dunkel: boolean, gesamt: number, sicht: Sich
   // Bei der Kultur hängt der Rang an der Sortenwahl und steht deshalb nicht in
   // der Kachel. Gefärbt wird nach dem Indexwert, die Stufen kommen aber aus
   // den Quantilen – das Bild bleibt dasselbe wie beim Färben nach Rang.
-  if (!sicht) return rampe[rampe.length - 1]
-  if (sicht.gewaehlt.length === 0) return rampe[rampe.length - 1]
-  return ['interpolate', ['linear'], sicht.ausdruck, ...quantilStufen(sicht.absteigend, rampe)]
+  const liste = ranglisteFuer(modus, sicht)
+  if (!liste || !sicht || sicht.gewaehlt.length === 0) return rampe[rampe.length - 1]
+  return ['interpolate', ['linear'], liste.ausdruck, ...quantilStufen(liste.absteigend, rampe)]
 }
 
 const uiHell = {
@@ -1647,12 +1767,24 @@ function Panel({
 }) {
   const [offen, setOffen] = useState(false)
   const kultur = modus === 'kultur'
+  const beide = modus === 'beide'
   // Solange die Gebäude noch laden, stehen die Werte aus der Datei da; danach
   // rechnet die Sicht sie für die gewählten Sorten neu.
-  const extreme = kultur ? (sicht ?? meta.kultur.extreme) : meta.extreme
+  const extreme = kultur
+    ? (sicht ?? meta.kultur.extreme)
+    : beide
+      ? (sicht?.kombi ?? meta.extreme)
+      : meta.extreme
   const verteilung = kultur ? (sicht?.verteilung ?? meta.kultur.verteilung) : null
   const orte = sicht?.orte ?? meta.kultur.orte
-  const leer = kultur && sicht !== null && sicht.gewaehlt.length === 0
+  const leer = modus !== 'oev' && sicht !== null && sicht.gewaehlt.length === 0
+  const extremWert = (e: Extrem) =>
+    kultur ? `${e.orte} Orte` : beide ? `${fmt(e.minuten)} min · ${e.orte} Orte` : `${fmt(e.minuten)} min`
+  const skala = kultur
+    ? [`${verteilung!.max} Orte`, `Median ${verteilung!.median} Orte`, `${verteilung!.min} Orte`]
+    : beide
+      ? ['stark in beidem', '', 'schwach in einem']
+      : [`${fmt(meta.minutes.best)} min`, `Median ${fmt(meta.minutes.median)} min`, `${fmt(meta.minutes.worst)} min`]
 
   return (
     <div style={{ color: ui.fg }}>
@@ -1661,15 +1793,18 @@ function Panel({
           {MODI[modus].titel} {stadt.name}
         </h2>
         <p className="mt-1.5 leading-snug" style={{ color: ui.muted }}>
-          {kultur ? (
-            leer ? (
-              <>Keine Sorte gewählt – es gibt nichts zu zählen.</>
-            ) : (
+          {leer ? (
+            <>Keine Sorte gewählt – es gibt nichts zu zählen.</>
+          ) : beide ? (
+            <>
+              Für jedes der {nf(meta.buildings)} Häuser zählt der schwächere seiner beiden Ränge aus
+              ÖV und Kultur. Vorne steht nur, wer in beidem vorne steht.
+            </>
+          ) : kultur ? (
               <>
                 Für jedes der {nf(meta.buildings)} Häuser: Wie viele der {nf(orte)} Orte der
                 gewählten Sorten in {meta.kultur.budgets[wegModus]} {WEG[wegModus].minutenWort} liegen.
               </>
-            )
           ) : (
             <>
               Für jedes der {nf(meta.buildings)} Häuser: Wie lange man mit Tram, Bus und S-Bahn im
@@ -1685,19 +1820,13 @@ function Panel({
           style={{ background: `linear-gradient(to right, ${ui.rampe.join(',')})` }}
         />
         <div className="mt-1 flex justify-between text-[11px]" style={{ color: ui.muted }}>
-          <span>
-            {kultur ? `${verteilung!.max} Orte` : `${fmt(meta.minutes.best)} min`}
-          </span>
-          <span>
-            Median {kultur ? `${verteilung!.median} Orte` : `${fmt(meta.minutes.median)} min`}
-          </span>
-          <span>
-            {kultur ? `${verteilung!.min} Orte` : `${fmt(meta.minutes.worst)} min`}
-          </span>
+          {skala.map((t, i) => (
+            <span key={i}>{t}</span>
+          ))}
         </div>
       </div>
 
-      {kultur && (
+      {modus !== 'oev' && (
         <SortenWahl
           ui={ui}
           arten={meta.kultur.arten}
@@ -1718,7 +1847,7 @@ function Panel({
 
       <div className="flex items-center gap-4 border-t py-2.5" style={{ borderColor: ui.border }}>
         <Schalter ui={ui} checked={nebenebene} onChange={setNebenebene} label={MODI[modus].schalter} />
-        {kultur && (
+        {modus !== 'oev' && (
           <div className="flex rounded-full border p-0.5 text-[11px]" style={{ borderColor: ui.border }}>
             {(['velo', 'fuss'] as const).map((weg) => (
               <button
@@ -1740,14 +1869,14 @@ function Panel({
           ui={ui}
           k="Rang 1"
           e={extreme.bestes}
-          wert={kultur ? `${extreme.bestes.orte} Orte` : `${fmt(extreme.bestes.minuten)} min`}
+          wert={extremWert(extreme.bestes)}
           onWaehlen={() => waehleXY(extreme.bestes.lon, extreme.bestes.lat)}
         />
         <Extrempunkt
           ui={ui}
           k={`Rang ${nf(extreme.schlechtestes.rang)}`}
           e={extreme.schlechtestes}
-          wert={kultur ? `${extreme.schlechtestes.orte} Orte` : `${fmt(extreme.schlechtestes.minuten)} min`}
+          wert={extremWert(extreme.schlechtestes)}
           onWaehlen={() => waehleXY(extreme.schlechtestes.lon, extreme.schlechtestes.lat)}
         />
       </div>
@@ -1765,7 +1894,21 @@ function Panel({
           className="border-t pb-1 pt-3 text-[12px] leading-relaxed"
           style={{ borderColor: ui.border, color: ui.muted }}
         >
-          {kultur ? (
+          {beide ? (
+            <>
+              <p>
+                Jedes Haus hat einen Rang beim ÖV und einen bei der Kultur, beide als Anteil der
+                Stadt: Rang 1 von {nf(meta.buildings)} ist vorne, der letzte Rang hinten. Gezählt
+                wird der schwächere der beiden Anteile. Ein Haus in den besten 5% beim ÖV, aber
+                nur in den besten 40% bei der Kultur, steht deshalb bei 40%.
+              </p>
+              <p className="mt-2">
+                So kann ein Spitzenplatz bei einem die Schwäche beim anderen nicht ausgleichen.
+                Wie die beiden Ränge entstehen, steht in den Tabs ÖV und Kultur. Sortenwahl und
+                Wegart von hier gelten auch dort.
+              </p>
+            </>
+          ) : kultur ? (
             <>
               <p>
                 Gezählt wird, was von einem Haus aus in {meta.kultur.budgets[wegModus]}{' '}
@@ -1807,7 +1950,7 @@ function Panel({
           </p>
           <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
             <Kennzahl ui={ui} k="Häuser" v={nf(meta.buildings)} />
-            <Kennzahl ui={ui} k={kultur ? 'Kulturorte' : 'Adressen'} v={nf(kultur ? orte : meta.addresses)} />
+            <Kennzahl ui={ui} k={modus !== 'oev' ? 'Kulturorte' : 'Adressen'} v={nf(modus !== 'oev' ? orte : meta.addresses)} />
             <Kennzahl ui={ui} k={kultur ? 'Median' : 'Zielzellen'} v={kultur ? `${verteilung!.median} Orte` : nf(meta.cells)} />
             <Kennzahl ui={ui} k="Fahrten/Tag" v={nf(meta.trips)} />
           </dl>
@@ -1868,7 +2011,7 @@ function StadtWechsel({ ui, stadt, modus }: { ui: Ui; stadt: Stadt; modus: Modus
                 </span>
               ) : (
                 <Link
-                  href={modus === 'kultur' ? { pathname: s.pfad, query: { modus: 'kultur' } } : s.pfad}
+                  href={modus !== 'oev' ? { pathname: s.pfad, query: { modus } } : s.pfad}
                   className="underline underline-offset-2"
                 >
                   {s.name}
@@ -1978,14 +2121,16 @@ function MobileRangLeiste({
     wert <= 0 ? 0 : Math.min(gesamt, Math.max(1, Math.round(gesamt * (wert / schritte) ** kurve)))
   const position = topN <= 0 ? 0 : Math.round(schritte * (Math.min(topN, gesamt) / gesamt) ** (1 / kurve))
   const prozent = (position / schritte) * 100
-  const erklaerung =
-    modus === 'oev'
-      ? 'Je dunkler das Rot, desto besser per ÖV an die Stadt angebunden.'
-      : 'Je dunkler das Rot, desto mehr Kulturvielfalt in der Nähe.'
-  const titel =
-    modus === 'oev'
-      ? 'Best angebundene Adressen hervorheben'
-      : 'Adressen mit Kulturvielfalt hervorheben'
+  const erklaerung = {
+    oev: 'Je dunkler das Rot, desto besser per ÖV an die Stadt angebunden.',
+    kultur: 'Je dunkler das Rot, desto mehr Kulturvielfalt in der Nähe.',
+    beide: 'Je dunkler das Rot, desto besser bei ÖV und Kultur zugleich.',
+  }[modus]
+  const titel = {
+    oev: 'Best angebundene Adressen hervorheben',
+    kultur: 'Adressen mit Kulturvielfalt hervorheben',
+    beide: 'Beste Adressen für ÖV und Kultur',
+  }[modus]
 
   return (
     <div
@@ -2229,13 +2374,12 @@ function Karteikarte({
   const [menuOffen, setMenuOffen] = useState(false)
   const kannNativ = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
   const kultur = modus === 'kultur'
+  const beide = modus === 'beide'
   const gewaehlt = sicht?.gewaehlt ?? meta.kultur.arten.map((_, i) => i)
   // Anzahl und Rang gelten für die gewählten Sorten, nicht für alle.
   const reihen = treffer.weg[wegModus]
   const orte = gewaehlt.reduce((n, a) => n + (reihen.kb[a] ?? 0), 0)
-  const rang = kultur
-    ? (sicht?.rangVon(gewaehlt.reduce((w, a) => w + Math.sqrt(reihen.ki[a] ?? 0), 0)) ?? 0)
-    : treffer.r
+  const rang = rangIn(modus, treffer, sicht, wegModus)
   const besserAls = Math.round((1 - rang / meta.buildings) * 100)
 
   return (
@@ -2252,17 +2396,44 @@ function Karteikarte({
               </div>
             </div>
           )}
-          <div className="text-3xl font-semibold tabular-nums leading-none">
-            {kultur ? orte : fmt(treffer.m)}
-            <span className="ml-1 text-base font-normal" style={{ color: ui.muted }}>
-              {kultur ? (orte === 1 ? 'Ort' : 'Orte') : 'min'}
-            </span>
-          </div>
-          <div className="mt-1.5 text-[12px]" style={{ color: ui.muted }}>
-            {kultur
-              ? `in ${meta.kultur.budgets[wegModus]} ${WEG[wegModus].minutenWort}`
-              : 'im Schnitt zu einer Adresse der Stadt'}
-          </div>
+          {beide ? (
+            <div className="flex gap-5">
+              <div>
+                <div className="text-2xl font-semibold tabular-nums leading-none">
+                  {fmt(treffer.m)}
+                  <span className="ml-1 text-sm font-normal" style={{ color: ui.muted }}>min</span>
+                </div>
+                <div className="mt-1.5 text-[11px]" style={{ color: ui.muted }}>
+                  ÖV, Rang {nf(treffer.r)}
+                </div>
+              </div>
+              <div>
+                <div className="text-2xl font-semibold tabular-nums leading-none">
+                  {orte}
+                  <span className="ml-1 text-sm font-normal" style={{ color: ui.muted }}>
+                    {orte === 1 ? 'Ort' : 'Orte'}
+                  </span>
+                </div>
+                <div className="mt-1.5 text-[11px]" style={{ color: ui.muted }}>
+                  Kultur, Rang {nf(rangIn('kultur', treffer, sicht, wegModus))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="text-3xl font-semibold tabular-nums leading-none">
+                {kultur ? orte : fmt(treffer.m)}
+                <span className="ml-1 text-base font-normal" style={{ color: ui.muted }}>
+                  {kultur ? (orte === 1 ? 'Ort' : 'Orte') : 'min'}
+                </span>
+              </div>
+              <div className="mt-1.5 text-[12px]" style={{ color: ui.muted }}>
+                {kultur
+                  ? `in ${meta.kultur.budgets[wegModus]} ${WEG[wegModus].minutenWort}`
+                  : 'im Schnitt zu einer Adresse der Stadt'}
+              </div>
+            </>
+          )}
         </div>
         {fixiert && (
           <button
@@ -2276,7 +2447,7 @@ function Karteikarte({
         )}
       </div>
 
-      {kultur && orte > 0 && (
+      {modus !== 'oev' && orte > 0 && (
         <ul className="mt-3 border-t pt-2.5 text-[12px]" style={{ borderColor: ui.border }}>
           {gewaehlt.map((i) =>
             reihen.kb[i] ? (
@@ -2302,7 +2473,9 @@ function Karteikarte({
         </div>
         <div className="mt-1 text-[12px] leading-relaxed" style={{ color: ui.muted }}>
           Besser als <span style={{ color: ui.fg }}>{besserAls}%</span> der Häuser der Stadt.
-          {kultur
+          {beide
+            ? ' Gezählt ist der schwächere der beiden Ränge.'
+            : kultur
             ? ` Median ${(sicht?.verteilung ?? meta.kultur.verteilung).median} Orte, bestes Haus ${
                 (sicht?.verteilung ?? meta.kultur.verteilung).max
               }.`
@@ -2311,7 +2484,9 @@ function Karteikarte({
 
         {rangFolgt ? (
           <p className="mt-2 text-[12px] leading-relaxed" style={{ color: ui.muted }}>
-            {kultur
+            {beide
+              ? 'Rot heisst bei ÖV und Kultur zusammen besser als dieses Haus, Schwarz schlechter. Je dunkler das Rot, desto besser der Rang.'
+              : kultur
               ? 'Rot heisst mehr Kultur in der Nähe als bei diesem Haus, Schwarz weniger. Je dunkler das Rot, desto besser der Rang.'
               : 'Rot heisst besser angebunden als dieses Haus, Schwarz schlechter. Je dunkler das Rot, desto besser der Rang.'}
           </p>
