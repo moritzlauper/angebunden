@@ -190,16 +190,16 @@ export const VOREINSTELLUNGEN = {
   entspannt: { sicherheit: 0.95, steigung: 0.8, ampeln: 0.6, belag: 1 },
 } as const
 
-/** Tempo in der Ebene, 22 km/h. */
-const V0 = 6.1
+/** Tempo in der Ebene, 23 km/h. */
+const V0 = 6.4
 /**
  * Zeit je Höhenmeter bergauf, zusätzlich zur Zeit in der Ebene. Weil man
  * bergauf langsamer fährt und dabei weniger Luftwiderstand hat, ist sie
  * kleiner als die reine Hubarbeit (90 kg, 150 W wären 5.9 s/m).
  */
-const S_PRO_M = 3.6
-/** Deckel für Abfahrten in der Stadt. */
-const VMAX = 8.5
+const S_PRO_M = 3.2
+/** Deckel für Abfahrten in der Stadt, 34 km/h. */
+const VMAX = 9.4
 /** Tempo zu Fuss mit dem Velo an der Hand. */
 const V_SCHIEBEN = 1.25
 /** Tempofaktor je Belag. */

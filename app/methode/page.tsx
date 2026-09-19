@@ -367,8 +367,8 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           Hauptstrasse ohne Ampel zu queren kostet ebenfalls.
         </p>
         <p className="mt-4">
-          Die Fahrzeit rechnet mit 22 km/h in der Ebene, 3.6 Sekunden zusätzlich je Höhenmeter
-          bergauf und höchstens 30 km/h bergab. Auf Fusswegen und in Begegnungszonen sind es
+          Die Fahrzeit rechnet mit 23 km/h in der Ebene, 3.2 Sekunden zusätzlich je Höhenmeter
+          bergauf und höchstens 34 km/h bergab. Auf Fusswegen und in Begegnungszonen sind es
           höchstens 15 km/h. Kopfsteinpflaster und Kies bremsen.
           Grobes Pflaster kostet zusätzlich: Es drückt das Tempo auf zwei Drittel und wiegt in der
           Bewertung so schwer wie ein Umweg von gut einem Drittel der Strecke. Die beiden Varianten

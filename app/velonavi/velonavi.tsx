@@ -130,7 +130,7 @@ const koordText = (lon: number, lat: number) => `Punkt ${lat.toFixed(4)}, ${lon.
  * Speicher erlaubt (privates Fenster), merkt davon nur, dass nichts bleibt.
  */
 const SCHLUESSEL = { verlauf: 'velonavi.verlauf', zuhause: 'velonavi.zuhause', letzte: 'velonavi.letzte' }
-const VERLAUF_MAX = 8
+const VERLAUF_MAX = 10
 
 function lies<T>(schluessel: string, vorgabe: T): T {
   try {
@@ -817,9 +817,10 @@ export default function Velonavi() {
 
   const treffer = useCallback(
     (text: string, gewaehlt: Punkt | null) => {
-      // Leeres Feld oder eines, in dem noch die getroffene Wahl steht: Vorschläge.
-      // Wer weitertippt, sucht.
-      if (text.length < 2 || text === gewaehlt?.titel) return vorschlaege.filter((v) => v.titel !== gewaehlt?.titel)
+      // Leeres Feld oder eines, in dem noch die getroffene Wahl steht: den
+      // ganzen Verlauf zeigen, auch den Ort, der schon im Feld steht. Wer
+      // weitertippt, sucht.
+      if (text.length < 2 || text === gewaehlt?.titel) return vorschlaege
       return indexBereit ? suchen(indexRef.current!, text) : []
     },
     [indexBereit, vorschlaege]
