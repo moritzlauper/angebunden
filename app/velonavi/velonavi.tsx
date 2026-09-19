@@ -659,7 +659,8 @@ export default function Velonavi() {
     const mk = new Marker({ element: el, draggable: true }).setLngLat([p.lon, p.lat]).addTo(map)
     mk.on('dragend', () => {
       const { lng, lat } = mk.getLngLat()
-      const neu = { lon: lng, lat, titel: koordText(lng, lat) }
+      const neu = ortBeimRef.current(lng, lat, map.getZoom())
+      mk.setLngLat([neu.lon, neu.lat])
       if (art === 'start') setStart(neu), setStartText(neu.titel)
       else setZiel(neu), setZielText(neu.titel)
     })
@@ -672,6 +673,38 @@ export default function Velonavi() {
   useEffect(() => {
     if (kartenBereit) setzeMarke('ziel', ziel)
   }, [kartenBereit, ziel, setzeMarke])
+
+  /**
+   * Zum Klick den nächsten bekannten Ort suchen: Hausadresse, Kulturort oder
+   * Haltestelle. So wird aus dem Tippen auf ein Haus die «Nussbaumstrasse 4»
+   * statt einer blossen Koordinate. Der Fangradius hängt am Zoom, damit man in
+   * der Übersicht nicht ein Haus drei Strassen weiter erwischt.
+   */
+  const ortBeim = useCallback((lon: number, lat: number, zoom: number): Punkt => {
+    const index = indexRef.current
+    const grenze = Math.max(12, 260 / 2 ** (zoom - 14))
+    if (index) {
+      const mx = 111320 * Math.cos((lat * Math.PI) / 180)
+      let beste: Eintrag | null = null
+      let besteD = grenze
+      for (const e of index) {
+        // Adressen liegen im Hausinneren, Haltestellen und Kulturorte am Weg:
+        // ein kleiner Zuschlag lässt bei gleicher Nähe die Adresse gewinnen.
+        const d = Math.hypot((e.x - lon) * mx, (e.y - lat) * 111133) + (e.art === 'adresse' ? 0 : 8)
+        if (d < besteD) {
+          besteD = d
+          beste = e
+        }
+      }
+      if (beste) return { lon: beste.x, lat: beste.y, titel: beste.titel }
+    }
+    return { lon, lat, titel: koordText(lon, lat) }
+  }, [])
+
+  // Das Einrasten steht in einem Ref, damit die Marken nicht bei jeder
+  // Zustandsänderung neu gebaut werden müssen.
+  const ortBeimRef = useRef(ortBeim)
+  ortBeimRef.current = ortBeim
 
   // --- Klick auf die Karte: erst Start, dann Ziel, danach wird das Ziel versetzt
   const startRef = useRef(start)
@@ -687,9 +720,10 @@ export default function Velonavi() {
         setWahl(f.properties.id as Variante)
         return
       }
-      const p = { lon: e.lngLat.lng, lat: e.lngLat.lat, titel: koordText(e.lngLat.lng, e.lngLat.lat) }
+      const p = ortBeim(e.lngLat.lng, e.lngLat.lat, map.getZoom())
       if (!startRef.current) setStart(p), setStartText(p.titel)
       else setZiel(p), setZielText(p.titel)
+      merken(p)
       setOffenFeld(null)
       setBlattOffen(true)
     }
@@ -697,7 +731,7 @@ export default function Velonavi() {
     return () => {
       map.off('click', klick)
     }
-  }, [kartenBereit])
+  }, [kartenBereit, ortBeim, merken])
 
   const setzeGewicht = (id: (typeof REGLER)[number]['id'], v: number) => {
     setWahl('ideal')
@@ -793,7 +827,7 @@ export default function Velonavi() {
             setStart(p)
             merken(p)
           }}
-          platzhalter="Start: Adresse oder Klick in die Karte"
+          platzhalter="Start: Adresse oder Haus in der Karte"
           links={<Marke farbe="#18181b" />}
           rechts={
             <button
@@ -1089,6 +1123,7 @@ function Variantenwahl({
     <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${karten.length}, minmax(0, 1fr))` }}>
       {karten.map((k) => {
         const an = k.id === aktiv
+        // «Angenehm» heisst Stufe 1 und 2: ruhig und höchstens leicht ruppig.
         const ruhig = k.r.meterNachStufe[1] + k.r.meterNachStufe[2]
         return (
           <button
@@ -1110,7 +1145,7 @@ function Variantenwahl({
             <div className="mt-0.5 text-[11px] leading-snug tabular-nums" style={{ color: ui.muted }}>
               {km(k.r.distanz)} · ↑{Math.round(k.r.hoch)} m
               <br />
-              {prozent(ruhig, k.r.distanz)} ruhig · {k.r.ampeln.geradeaus} Ampeln
+              {prozent(ruhig, k.r.distanz)} angenehm · {k.r.ampeln.geradeaus} Ampeln
             </div>
           </button>
         )
