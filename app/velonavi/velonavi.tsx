@@ -180,7 +180,9 @@ export default function Velonavi() {
   const [gewichte, setGewichte] = useState<{ sicherheit: number; steigung: number; ampeln: number; belag: number }>({
     ...VOREINSTELLUNGEN.ausgewogen,
   })
-  const [schieben, setSchieben] = useState(true)
+  // Schieben ist aus: Wer eine Veloroute sucht, will fahren. Wo es ohne
+  // Schiebestück gar nicht geht, sagt das der Hinweis bei «keine Verbindung».
+  const [schieben, setSchieben] = useState(false)
   const [netzFarbig, setNetzFarbig] = useState(false)
   const [feinOffen, setFeinOffen] = useState(false)
   const [hover, setHover] = useState<number | null>(null)
@@ -275,18 +277,35 @@ export default function Velonavi() {
   // --- Die drei Varianten rechnen
   type Ergebnis =
     | { fehler: string }
-    | { routen: Record<Variante, Route | null>; gleichWie: Record<Variante, Variante | null>; ms: number }
+    | { routen: Record<Variante, Route | null>; gleichWie: Record<Variante, Variante | null>; ms: number; notSchieben: boolean }
   const ergebnis = useMemo((): Ergebnis | null => {
     const g = graphRef.current
     if (!graphBereit || !g || !start || !ziel) return null
-    const s = einrasten(g, start.lon, start.lat, schieben)
-    const z = einrasten(g, ziel.lon, ziel.lat, schieben)
-    if (!s || !z) return { fehler: 'Start oder Ziel liegt ausserhalb des Velonetzes der Stadt Zürich.' }
     const t0 = performance.now()
-    const routen = {} as Record<Variante, Route | null>
-    for (const v of VARIANTEN) routen[v.id] = route(g, profile[v.id], s, z, kantenKosten(g, profile[v.id]))
+    /** Alle drei Varianten mit einer Einstellung durchrechnen. */
+    const rechne = (mitSchieben: boolean) => {
+      const s = einrasten(g, start.lon, start.lat, mitSchieben)
+      const z = einrasten(g, ziel.lon, ziel.lat, mitSchieben)
+      if (!s || !z) return null
+      const out = {} as Record<Variante, Route | null>
+      for (const v of VARIANTEN) {
+        const pr = { ...profile[v.id], schieben: mitSchieben }
+        out[v.id] = route(g, pr, s, z, kantenKosten(g, pr))
+      }
+      return out.ideal ? out : null
+    }
+    // Erst fahren. Nur wenn es so keine Verbindung gibt, ein Schiebestück
+    // zulassen: manche Ziele, etwa der Vorplatz von Bahnhof Stettbach, hängen
+    // ausschliesslich an Fusswegen.
+    let routen = rechne(schieben)
+    let notSchieben = false
+    if (!routen && !schieben) {
+      routen = rechne(true)
+      notSchieben = !!routen
+    }
     const ms = performance.now() - t0
-    if (!routen.ideal) return { fehler: 'Keine Verbindung gefunden. Mit «Schieben erlauben» klappt es vielleicht.' }
+    if (!routen)
+      return { fehler: 'Keine Verbindung gefunden. Start oder Ziel liegt ausserhalb des Velonetzes der Stadt Zürich.' }
     // Varianten, die (fast) gleich verlaufen, zusammenlegen: die spätere zeigt
     // auf die frühere. Verglichen wird die befahrene Kantenmenge.
     const gleichWie = {} as Record<Variante, Variante | null>
@@ -308,7 +327,7 @@ export default function Velonavi() {
         }
       }
     })
-    return { routen, gleichWie, ms }
+    return { routen, gleichWie, ms, notSchieben }
   }, [graphBereit, start, ziel, profile, schieben])
   const routen = ergebnis && 'routen' in ergebnis ? ergebnis : null
   // Die gewählte Variante, bei Zusammenlegung die, auf die sie zeigt.
@@ -915,6 +934,11 @@ export default function Velonavi() {
     <div className="flex flex-col gap-4" style={{ color: ui.fg }}>
       {fehler && <Hinweis>{fehler}</Hinweis>}
       {ergebnis && 'fehler' in ergebnis && <Hinweis>{ergebnis.fehler}</Hinweis>}
+      {routen?.notSchieben && (
+        <p className="rounded-2xl px-3 py-2 text-[12.5px] leading-snug" style={{ background: ui.weich, color: ui.muted }}>
+          Fahrend gibt es keinen Weg. Diese Route enthält ein kurzes Stück, auf dem du das Velo schiebst.
+        </p>
+      )}
       {routen && r && aktiv ? (
         <Ergebnis
           r={r}
