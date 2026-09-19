@@ -211,12 +211,18 @@ const BELAG_TEMPO = [1, 0.9, 0.62, 0.8, 0.62]
  * rüttelt, bei Nässe rutscht es, und bergauf verliert man den Tritt.
  */
 const BELAG_KOSTEN = [0, 0.15, 1.3, 0.4, 0.8]
-/** Zusätzliche gefühlte Zeit je Stressstufe (Index 1–4), bei voller Gewichtung. */
-const STRESS_KOSTEN = [0, 0, 0.3, 1.1, 2.2]
+/**
+ * Zusätzliche gefühlte Zeit je Stufe (Index 1–4), bei voller Gewichtung.
+ * Stufe 2 ist ein Velostreifen an Tempo 30 oder etwas ruppiger Belag: spürbar,
+ * aber kein Grund für einen Umweg.
+ */
+const STRESS_KOSTEN = [0, 0, 0.15, 1.1, 2.2]
+/** Rabatt für einen abgetrennten Veloweg: den nimmt man gerne, auch mit Umweg. */
+const GETRENNT_RABATT = 0.93
 /** Rabatt auf Vorzugsrouten und Hauptnetz der städtischen Velonetzplanung. */
 const NETZ_RABATT = [1, 1, 0.95, 0.85]
 /** Kleinster Kostenfaktor, den es gibt: begrenzt die A*-Schätzung nach unten. */
-const MIN_FAKTOR = 0.85
+const MIN_FAKTOR = 0.79
 
 /**
  * Erwartete Wartezeit an einem Lichtsignal in Sekunden, je Manöver.
@@ -268,6 +274,7 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
         // entspannt durch, unabhängig davon, wie man die Regler stellt.
         (fuss ? 0.4 : 0)
       faktor *= NETZ_RABATT[netzVon(g, e)]
+      if (infraVon(g, a) === INFRA.getrennt) faktor *= GETRENNT_RABATT
       // Poller, Tore, Bahnübergänge und ungesicherte Querungen: feste
       // Sekunden, unabhängig von der Länge der Kante.
       const huerde = g.huerde[e]
