@@ -77,15 +77,13 @@ const ui = {
 type Punkt = { lon: number; lat: number; titel: string }
 
 /**
- * Drei Varianten, immer alle gerechnet: die schnellste, die ideale (kleine
- * Umwege für deutlich ruhigere Strassen) und die komfortable. Die ideale
- * lässt sich in der Feineinstellung selbst gewichten.
+ * Zwei Varianten, beide immer gerechnet: die schnellste und die komfortable.
+ * Die komfortable lässt sich in der Feineinstellung selbst gewichten.
  */
-type Variante = 'schnell' | 'ideal' | 'komfort'
+type Variante = 'schnell' | 'komfort'
 const VARIANTEN: { id: Variante; titel: string; hilfe: string }[] = [
   { id: 'schnell', titel: 'Schnell', hilfe: 'Kürzeste Fahrzeit, Verkehr zählt kaum' },
-  { id: 'ideal', titel: 'Ideal', hilfe: 'Kleine Umwege für ruhigere Strassen und weniger Ampeln' },
-  { id: 'komfort', titel: 'Komfort', hilfe: 'Meidet Verkehr, Tramgleise und Steigungen deutlich' },
+  { id: 'komfort', titel: 'Komfort', hilfe: 'Meidet Verkehr, Tramgleise, Pflaster und Steigungen' },
 ]
 
 const REGLER: { id: 'sicherheit' | 'steigung' | 'ampeln' | 'belag'; titel: string }[] = [
@@ -108,7 +106,8 @@ function leseUrl() {
   return {
     start: punkt(p.get('von'), p.get('vn')),
     ziel: punkt(p.get('nach'), p.get('nn')),
-    wahl: (['schnell', 'ideal', 'komfort'].includes(p.get('wahl') ?? '') ? p.get('wahl') : null) as Variante | null,
+    // «ideal» stammt aus der Zeit mit drei Varianten und zeigt jetzt auf Komfort.
+    wahl: ((w) => (w === 'schnell' ? 'schnell' : w === 'komfort' || w === 'ideal' ? 'komfort' : null))(p.get('wahl')) as Variante | null,
   }
 }
 
@@ -116,7 +115,7 @@ function schreibeUrl(start: Punkt | null, ziel: Punkt | null, wahl: Variante) {
   const p = new URLSearchParams()
   if (start) p.set('von', `${start.lon.toFixed(5)},${start.lat.toFixed(5)}`), p.set('vn', start.titel)
   if (ziel) p.set('nach', `${ziel.lon.toFixed(5)},${ziel.lat.toFixed(5)}`), p.set('nn', ziel.titel)
-  if (wahl !== 'ideal') p.set('wahl', wahl)
+  if (wahl !== 'komfort') p.set('wahl', wahl)
   const s = p.toString()
   window.history.replaceState(null, '', window.location.pathname + (s ? `#${s}` : ''))
 }
@@ -176,9 +175,9 @@ export default function Velonavi() {
   const [fehler, setFehler] = useState<string | null>(null)
   const [start, setStart] = useState<Punkt | null>(null)
   const [ziel, setZiel] = useState<Punkt | null>(null)
-  const [wahl, setWahl] = useState<Variante>('ideal')
+  const [wahl, setWahl] = useState<Variante>('komfort')
   const [gewichte, setGewichte] = useState<{ sicherheit: number; steigung: number; ampeln: number; belag: number }>({
-    ...VOREINSTELLUNGEN.ausgewogen,
+    ...VOREINSTELLUNGEN.entspannt,
   })
   // Schieben ist aus: Wer eine Veloroute sucht, will fahren. Wo es ohne
   // Schiebestück gar nicht geht, sagt das der Hinweis bei «keine Verbindung».
@@ -203,8 +202,7 @@ export default function Velonavi() {
   const profile: Record<Variante, Profil> = useMemo(
     () => ({
       schnell: { schieben, ...VOREINSTELLUNGEN.schnell },
-      ideal: { schieben, ...gewichte },
-      komfort: { schieben, ...VOREINSTELLUNGEN.entspannt },
+      komfort: { schieben, ...gewichte },
     }),
     [schieben, gewichte]
   )
@@ -292,7 +290,7 @@ export default function Velonavi() {
         const pr = { ...profile[v.id], schieben: mitSchieben }
         out[v.id] = route(g, pr, s, z, kantenKosten(g, pr))
       }
-      return out.ideal ? out : null
+      return out.komfort ? out : null
     }
     // Erst fahren. Nur wenn es so keine Verbindung gibt, ein Schiebestück
     // zulassen: manche Ziele, etwa der Vorplatz von Bahnhof Stettbach, hängen
@@ -331,7 +329,7 @@ export default function Velonavi() {
   }, [graphBereit, start, ziel, profile, schieben])
   const routen = ergebnis && 'routen' in ergebnis ? ergebnis : null
   // Die gewählte Variante, bei Zusammenlegung die, auf die sie zeigt.
-  const aktiv: Variante | null = routen ? (routen.gleichWie[wahl] ?? (routen.routen[wahl] ? wahl : 'ideal')) : null
+  const aktiv: Variante | null = routen ? (routen.gleichWie[wahl] ?? (routen.routen[wahl] ? wahl : 'komfort')) : null
   const r = routen && aktiv ? routen.routen[aktiv] : null
   const andere = useMemo(
     () =>
@@ -757,7 +755,7 @@ export default function Velonavi() {
   }, [kartenBereit, ortBeim, merken])
 
   const setzeGewicht = (id: (typeof REGLER)[number]['id'], v: number) => {
-    setWahl('ideal')
+    setWahl('komfort')
     setGewichte((g) => ({ ...g, [id]: v }))
   }
 
@@ -1014,7 +1012,7 @@ export default function Velonavi() {
                 </h1>
                 {routen && (
                   <span className="text-[11px] tabular-nums" style={{ color: ui.muted }}>
-                    3 Routen in {Math.round(routen.ms)} ms
+                    2 Routen in {Math.round(routen.ms)} ms
                   </span>
                 )}
               </div>
@@ -1329,12 +1327,12 @@ function Einstellungen({
   return (
     <section className="flex flex-col gap-2.5">
       <button onClick={() => setFeinOffen(!feinOffen)} className="self-start text-[12.5px] font-medium" style={{ color: AKZENT }}>
-        {feinOffen ? 'Feineinstellung ausblenden' : 'Ideale Route selbst gewichten'}
+        {feinOffen ? 'Feineinstellung ausblenden' : 'Komfort-Route selbst gewichten'}
       </button>
       {feinOffen && (
         <div className="flex flex-col gap-2.5">
           <p className="text-[11.5px]" style={{ color: ui.muted }}>
-            Gilt für die Variante «Ideal». Schnell und Komfort bleiben fest.
+            Gilt für die Variante «Komfort». «Schnell» bleibt fest.
           </p>
           {REGLER.map((rg) => (
             <label key={rg.id} className="block text-[12.5px]">

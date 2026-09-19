@@ -371,12 +371,12 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           bergauf und höchstens 30 km/h bergab. Auf Fusswegen und in Begegnungszonen sind es
           höchstens 15 km/h. Kopfsteinpflaster und Kies bremsen.
           Grobes Pflaster kostet zusätzlich: Es drückt das Tempo auf zwei Drittel und wiegt in der
-          Bewertung so schwer wie ein Umweg von gut einem Drittel der Strecke. Die drei Varianten
+          Bewertung so schwer wie ein Umweg von gut einem Drittel der Strecke. Die beiden Varianten
           unterscheiden sich nur darin, wie stark Verkehr, Steigung, Ampeln und Belag zusätzlich zur
-          Zeit zählen. «Schnell» achtet fast nur auf die Zeit. «Ideal» nimmt im
-          Mittel rund 2% mehr Fahrzeit in Kauf und fährt dafür deutlich mehr auf ruhigen Strassen.
-          «Komfort» meidet Verkehr und Steigungen stark. Vorzugsrouten bekommen 15% Rabatt, das
-          Hauptnetz 5%.
+          Zeit zählen. «Schnell» achtet fast nur auf die Zeit. «Komfort» meidet Verkehr, Gleise und
+          Pflaster deutlich und nimmt dafür rund 7% mehr Fahrzeit in Kauf. Über acht Testrouten quer
+          durch die Stadt fährt «Schnell» 32% der Strecke auf Stufe 3 oder 4, «Komfort» 12%.
+          Vorzugsrouten bekommen 15% Rabatt, das Hauptnetz 5%.
         </p>
         <p className="mt-4">
           Die Grundkarte des Velonavi ist die Basiskarte der Stadt Zürich. Sie kommt direkt vom
