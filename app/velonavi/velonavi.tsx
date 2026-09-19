@@ -771,7 +771,7 @@ export default function Velonavi() {
             className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-2 px-3"
             style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
           >
-            <Hauptwahl ui={ui} aktiv="velonavi" oevHref="/" />
+            <Hauptwahl ui={ui} aktiv="velonavi" />
             <div className="pointer-events-auto">{felder}</div>
           </div>
           <Blatt ui={ui} offen={blattOffen} onSchliessen={() => setBlattOffen(false)} onHoehe={setDeckung}>
@@ -790,7 +790,7 @@ export default function Velonavi() {
       ) : (
         <>
           <div className="pointer-events-none absolute left-[26rem] right-3 top-3 z-20 flex justify-center">
-            <Hauptwahl ui={ui} aktiv="velonavi" oevHref="/" />
+            <Hauptwahl ui={ui} aktiv="velonavi" />
           </div>
           <div
             className="absolute bottom-3 left-3 top-3 z-30 flex w-[24rem] flex-col overflow-hidden rounded-3xl border backdrop-blur-md"

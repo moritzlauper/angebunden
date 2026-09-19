@@ -1492,27 +1492,39 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           />
         </div>
 
-        {/* ÖV und Velonavi gleich gross, die beiden Kulturmodi klein darunter. */}
+        {/* Vergleich und Velonavi gleich gross. Darunter ÖV und Kultur, einzeln
+            oder beide zusammen an; einer bleibt immer an. */}
         <Hauptwahl
           ui={ui}
-          aktiv={modus === 'oev' ? 'oev' : null}
-          onOev={() => setModus('oev')}
+          aktiv="vergleich"
+          vergleichHref={stadt.pfad}
           velonavi={stadt.schluessel === 'zuerich'}
           unten={
             <div
               className="flex gap-0.5 rounded-full border p-0.5 backdrop-blur-md"
               style={{ background: ui.panel, borderColor: ui.border }}
             >
-              {MODUS_LISTE.filter((m) => m !== 'oev').map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setModus(m)}
-                  className="whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11.5px] font-medium transition-colors"
-                  style={modus === m ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted }}
-                >
-                  {MODI[m].kurz}
-                </button>
-              ))}
+              {(['oev', 'kultur'] as const).map((teil) => {
+                const an = modus === teil || modus === 'beide'
+                const umschalten = () => {
+                  const oev = teil === 'oev' ? !an : modus !== 'kultur'
+                  const kultur = teil === 'kultur' ? !an : modus !== 'oev'
+                  if (oev && kultur) setModus('beide')
+                  else if (oev) setModus('oev')
+                  else if (kultur) setModus('kultur')
+                }
+                return (
+                  <button
+                    key={teil}
+                    onClick={umschalten}
+                    aria-pressed={an}
+                    className="whitespace-nowrap rounded-full px-3 py-0.5 text-[11.5px] font-medium transition-colors"
+                    style={an ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted }}
+                  >
+                    {MODI[teil].kurz}
+                  </button>
+                )
+              })}
             </div>
           }
         />

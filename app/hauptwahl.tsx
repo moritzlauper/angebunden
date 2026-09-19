@@ -4,18 +4,17 @@ import type { ReactNode } from 'react'
 type Ui = { fg: string; muted: string; panel: string; border: string; aktiv: string; schatten: string }
 
 /**
- * Der Umschalter oben in der Mitte: ÖV-Karte oder Velonavi, beides gleich
- * gross. Der Velonavi ist eine eigene Seite, sein Knopf deshalb ein Link.
- * `unten` nimmt kleinere Unterknöpfe auf (Kultur, ÖV + Kultur auf der Karte).
+ * Der Umschalter oben in der Mitte: Vergleichskarte oder Velonavi, beides
+ * gleich gross. Beide sind eigene Seiten, die Knöpfe deshalb Links.
+ * `unten` nimmt kleinere Unterknöpfe auf (ÖV und Kultur auf der Karte).
  */
 export function Hauptwahl({
-  ui, aktiv, onOev, oevHref, velonavi = true, unten,
+  ui, aktiv, vergleichHref = '/', velonavi = true, unten,
 }: {
   ui: Ui
-  aktiv: 'oev' | 'velonavi' | null
-  /** Auf der Karte: Modus umschalten. Sonst führt `oevHref` zurück. */
-  onOev?: () => void
-  oevHref?: string
+  aktiv: 'vergleich' | 'velonavi'
+  /** Die Vergleichskarte der aktuellen Stadt. */
+  vergleichHref?: string
   /** Nur Zürich hat einen Velonavi. */
   velonavi?: boolean
   unten?: ReactNode
@@ -28,13 +27,14 @@ export function Hauptwahl({
         className="flex gap-1 rounded-full border p-1 backdrop-blur-md"
         style={{ background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten }}
       >
-        {onOev ? (
-          <button onClick={onOev} className={knopf} style={stil(aktiv === 'oev')}>
-            ÖV
-          </button>
+        {/* Auf der Karte selbst kein Link: er würde das gewählte Haus aus dem Fragment werfen. */}
+        {aktiv === 'vergleich' ? (
+          <span className={knopf} style={stil(true)} aria-current="page">
+            Vergleich
+          </span>
         ) : (
-          <Link href={oevHref ?? '/'} className={knopf} style={stil(aktiv === 'oev')}>
-            ÖV
+          <Link href={vergleichHref} className={knopf} style={stil(false)}>
+            Vergleich
           </Link>
         )}
         {velonavi && (
