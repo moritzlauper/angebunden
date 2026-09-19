@@ -22,6 +22,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staedte,
     {
+      url: `${SITE_URL}/velonavi`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
       url: `${SITE_URL}/methode`,
       lastModified: new Date(),
       changeFrequency: 'yearly',

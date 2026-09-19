@@ -328,6 +328,47 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           ))}
         </ul>
 
+        <H2 id="velonavi">Velonavi</H2>
+        <p className="mt-4">
+          Der <Link href="/velonavi" className="underline underline-offset-2">Velonavi</Link> rechnet
+          auf dem Fuss- und Velowegnetz der Stadt Zürich. Das sind rund 38&apos;700 Wegstücke mit
+          Angaben dazu, ob Velos fahren dürfen, in welche Richtung eine Einbahn gilt und auf welcher
+          Seite ein Velostreifen liegt. Dazu kommen 1&apos;015 Abbiegeverbote. Jedes Wegstück bekommt
+          aus weiteren Quellen das signalisierte Tempo, die Strassenklasse, den Belag, Brücken und
+          Tunnels, Tramgleise in der Fahrbahn, die Zugehörigkeit zu Vorzugsroute oder Hauptnetz der
+          städtischen Velonetzplanung, die Höhenmeter und die polizeilich registrierten Velounfälle
+          seit 2016.
+        </p>
+        <p className="mt-4">
+          Aus Tempo, Strassenklasse, Velostreifen und Tramgleisen ergibt sich je Fahrtrichtung eine
+          Stressstufe von 1 bis 4, angelehnt an das Schema «Level of Traffic Stress». Stufe 1 ist ein
+          abgetrennter Veloweg, eine Tempo-30-Nebenstrasse oder eine Begegnungszone. Stufe 4 ist
+          Mischverkehr auf Tempo 50 und mehr. Die Farben der Route auf der Karte zeigen diese Stufen.
+        </p>
+        <p className="mt-4">
+          Gesucht wird im Browser mit A* über gerichtete Wegstücke statt über Kreuzungen. Nur so
+          kennt der Router an jeder Kreuzung die Richtung, aus der man kommt. Bei den 419
+          städtischen Signalknoten und den übrigen Ampeln aus OpenStreetMap kostet geradeaus im
+          Mittel 24 Sekunden Warten, links abbiegen 7 und rechts abbiegen 2. Wer nur abbiegt,
+          kommt an den meisten Ampeln ohne Halt vorbei. Jedes Abbiegen kostet zusätzlich einige
+          Sekunden, sonst führt der Weg in Rasterquartieren im Zickzack durch die Blöcke. Eine
+          Hauptstrasse ohne Ampel zu queren kostet ebenfalls.
+        </p>
+        <p className="mt-4">
+          Die Fahrzeit rechnet mit 19 km/h in der Ebene (E-Bike 24 km/h), 3.6 Sekunden je Höhenmeter
+          bergauf (E-Bike 1.2) und höchstens 30 km/h bergab. Kopfsteinpflaster und Kies bremsen.
+          Die drei Varianten unterscheiden sich nur darin, wie stark Verkehr, Steigung, Ampeln und
+          Belag zusätzlich zur Zeit zählen. «Schnell» achtet fast nur auf die Zeit. «Ideal» nimmt im
+          Mittel rund 2% mehr Fahrzeit in Kauf und fährt dafür deutlich mehr auf ruhigen Strassen.
+          «Komfort» meidet Verkehr und Steigungen stark. Vorzugsrouten bekommen 15% Rabatt, das
+          Hauptnetz 5%.
+        </p>
+        <p className="mt-4">
+          Die Grundkarte des Velonavi ist die Basiskarte der Stadt Zürich. Sie kommt direkt vom
+          Kartendienst der Stadt, dein Browser fragt dort also die Kartenausschnitte ab. Start und
+          Ziel bleiben im Browser.
+        </p>
+
         <H2>Was gespeichert wird</H2>
         <p className="mt-4">
           Kein Konto, keine Cookies. Die Adresssuche rechnet im Browser, und welches Haus du dir

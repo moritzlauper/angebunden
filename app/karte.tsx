@@ -15,6 +15,7 @@ import { STADT_LISTE, type Stadt } from './staedte'
 import { Blatt, useMedienabfrage } from './blatt'
 import { Suchleiste, bauIndex, suchen, type Eintrag } from './suche'
 import { Wortmarke } from './marke'
+import { Hauptwahl } from './hauptwahl'
 import { SITE_URL } from './site'
 
 /** Die Grundkarte bleibt schwarzweiss: dunkel = gut, hell = schlecht. */
@@ -1491,23 +1492,30 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           />
         </div>
 
-        <div className="pointer-events-auto mx-auto flex w-full max-w-[26rem] justify-center">
-          <div
-            className="flex gap-1 rounded-full border p-1 backdrop-blur-md"
-            style={{ background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten }}
-          >
-            {MODUS_LISTE.map((m) => (
-              <button
-                key={m}
-                onClick={() => setModus(m)}
-                className="whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors"
-                style={modus === m ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted }}
-              >
-                {MODI[m].kurz}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* ÖV und Velonavi gleich gross, die beiden Kulturmodi klein darunter. */}
+        <Hauptwahl
+          ui={ui}
+          aktiv={modus === 'oev' ? 'oev' : null}
+          onOev={() => setModus('oev')}
+          velonavi={stadt.schluessel === 'zuerich'}
+          unten={
+            <div
+              className="flex gap-0.5 rounded-full border p-0.5 backdrop-blur-md"
+              style={{ background: ui.panel, borderColor: ui.border }}
+            >
+              {MODUS_LISTE.filter((m) => m !== 'oev').map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setModus(m)}
+                  className="whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11.5px] font-medium transition-colors"
+                  style={modus === m ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted }}
+                >
+                  {MODI[m].kurz}
+                </button>
+              ))}
+            </div>
+          }
+        />
       </div>
 
       {mobil && blatt === null && (

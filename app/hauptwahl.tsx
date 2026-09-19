@@ -1,0 +1,60 @@
+import Link from 'next/link'
+import type { ReactNode } from 'react'
+
+type Ui = { fg: string; muted: string; panel: string; border: string; aktiv: string; schatten: string }
+
+/**
+ * Der Umschalter oben in der Mitte: ÖV-Karte oder Velonavi, beides gleich
+ * gross. Der Velonavi ist eine eigene Seite, sein Knopf deshalb ein Link.
+ * `unten` nimmt kleinere Unterknöpfe auf (Kultur, ÖV + Kultur auf der Karte).
+ */
+export function Hauptwahl({
+  ui, aktiv, onOev, oevHref, velonavi = true, unten,
+}: {
+  ui: Ui
+  aktiv: 'oev' | 'velonavi' | null
+  /** Auf der Karte: Modus umschalten. Sonst führt `oevHref` zurück. */
+  onOev?: () => void
+  oevHref?: string
+  /** Nur Zürich hat einen Velonavi. */
+  velonavi?: boolean
+  unten?: ReactNode
+}) {
+  const knopf = 'flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors'
+  const stil = (an: boolean) => (an ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted })
+  return (
+    <div className="pointer-events-auto mx-auto flex w-full max-w-[26rem] flex-col items-center gap-1.5">
+      <div
+        className="flex gap-1 rounded-full border p-1 backdrop-blur-md"
+        style={{ background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten }}
+      >
+        {onOev ? (
+          <button onClick={onOev} className={knopf} style={stil(aktiv === 'oev')}>
+            ÖV
+          </button>
+        ) : (
+          <Link href={oevHref ?? '/'} className={knopf} style={stil(aktiv === 'oev')}>
+            ÖV
+          </Link>
+        )}
+        {velonavi && (
+          <Link href="/velonavi" className={knopf} style={stil(aktiv === 'velonavi')}>
+            <VeloSymbol />
+            Velonavi
+          </Link>
+        )}
+      </div>
+      {unten}
+    </div>
+  )
+}
+
+export function VeloSymbol({ groesse = 15 }: { groesse?: number }) {
+  return (
+    <svg width={groesse} height={groesse} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <circle cx="5.5" cy="16.5" r="3.5" />
+      <circle cx="18.5" cy="16.5" r="3.5" />
+      <path d="M5.5 16.5 9 9h6l3.5 7.5M9 9l3 7.5L15 9M13.5 6H16" />
+    </svg>
+  )
+}

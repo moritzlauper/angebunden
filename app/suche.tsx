@@ -207,7 +207,7 @@ function hausnummer(adresse?: string) {
 // ---------------------------------------------------------------- Suchleiste
 
 export function Suchleiste({
-  ui, wert, setWert, treffer, offen, setOffen, onWaehlen, rechts,
+  ui, wert, setWert, treffer, offen, setOffen, onWaehlen, rechts, links, platzhalter = 'Adresse, Ort oder Haltestelle',
 }: {
   ui: Ui
   wert: string
@@ -217,6 +217,9 @@ export function Suchleiste({
   setOffen: (o: boolean) => void
   onWaehlen: (e: Eintrag) => void
   rechts?: ReactNode
+  /** Ersetzt die Lupe, etwa durch eine Start- oder Zielmarke. */
+  links?: ReactNode
+  platzhalter?: string
 }) {
   const feldRef = useRef<HTMLInputElement>(null)
   const [aktiv, setAktiv] = useState(0)
@@ -255,7 +258,7 @@ export function Suchleiste({
           className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border pl-4 pr-2 backdrop-blur-md"
           style={{ background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten }}
         >
-          <Lupe farbe={ui.muted} />
+          {links ?? <Lupe farbe={ui.muted} />}
           <input
             ref={feldRef}
             value={wert}
@@ -271,8 +274,8 @@ export function Suchleiste({
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
-            placeholder="Adresse, Ort oder Haltestelle"
-            aria-label="Adresse suchen"
+            placeholder={platzhalter}
+            aria-label={platzhalter}
             // 16 px, sonst zoomt iOS beim Antippen in die Seite hinein.
             className="min-w-0 flex-1 bg-transparent text-[16px] outline-none [&::-webkit-search-cancel-button]:appearance-none"
             style={{ color: ui.fg }}
