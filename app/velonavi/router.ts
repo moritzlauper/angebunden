@@ -63,6 +63,7 @@ export function ladeGraph(meta: VeloMeta, puffer: ArrayBuffer) {
   const unfall = feld('unfall', Uint8Array)
   const unfallAnzahl = feld('unfallAnzahl', Uint8Array)
   const huerde = feld('huerde', Uint8Array)
+  const spuren = feld('spuren', Uint8Array)
   const kanteName = feld('kanteName', Uint16Array)
   const ampelArt = feld('ampelArt', Uint8Array)
   const verboteRoh = feld('verbote', Uint32Array)
@@ -145,7 +146,7 @@ export function ladeGraph(meta: VeloMeta, puffer: ArrayBuffer) {
 
   return {
     meta, N, E, knotenKoord, knotenAmpel, kanteVon, kanteNach, kantePunkte, punkte, punktHoehe,
-    laenge, hoch, runter, merkmale, unfall, unfallAnzahl, huerde, kanteName, ampelArt, verbote,
+    laenge, hoch, runter, merkmale, unfall, unfallAnzahl, huerde, spuren, kanteName, ampelArt, verbote,
     ausgehend, grad, peilStart, peilEnde, hauptKnoten, raster, ZELLE, punktKante,
     kopf, fuss, px, py, MX, MY, LAT0,
   }
@@ -255,9 +256,13 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
       const t = eben + auf * sProM - gewinn
       const steil = auf / Math.max(L, 1)
       const stress = stressVon(g, a)
+      // Jede zusätzliche Fahrspur über zwei hinaus: mehr Verkehr, schnellere
+      // Spurwechsel neben einem, Abbiegespuren, die man queren muss.
+      const spurig = Math.max(0, g.spuren[e] - 2)
       let faktor =
         1 +
         STRESS_KOSTEN[stress] * p.sicherheit +
+        (infraVon(g, a) === INFRA.getrennt ? 0 : spurig * 0.35 * p.sicherheit) +
         BELAG_KOSTEN[belag] * p.belag +
         // Auf Plätzen und in Fussgängerzonen kommt man weder zügig noch
         // entspannt durch, unabhängig davon, wie man die Regler stellt.
@@ -384,13 +389,20 @@ export type Einrastung = { kante: number; t: number; lon: number; lat: number; d
 /**
  * Nächster Punkt auf einer befahrbaren (oder, wenn erlaubt, schiebbaren)
  * Kante. `t` ist der Längenanteil ab `von`.
+ *
+ * `strasse` ist der Strassenname der Adresse. Er entscheidet bei Eckhäusern:
+ * Die Werdstrasse 21 liegt 20 m vom Stauffacherquai und 25 m von der
+ * Werdstrasse entfernt, gemeint ist aber die Werdstrasse. Ohne diesen Hinweis
+ * führt die Route einmal um den Block.
  */
-export function einrasten(g: Graph, lon: number, lat: number, schieben: boolean): Einrastung | null {
+export function einrasten(g: Graph, lon: number, lat: number, schieben: boolean, strasse?: string): Einrastung | null {
   const x = (lon - 8.54) * g.MX
   const y = (lat - g.LAT0) * g.MY
   const cx = Math.floor(x / g.ZELLE)
   const cy = Math.floor(y / g.ZELLE)
   let beste = null as Einrastung | null
+  let passend = null as Einrastung | null
+  const gesucht = strasse?.toLowerCase()
   for (let r = 0; r <= 8; r++) {
     for (let dx = -r; dx <= r; dx++)
       for (let dy = -r; dy <= r; dy++) {
@@ -409,18 +421,25 @@ export function einrasten(g: Graph, lon: number, lat: number, schieben: boolean)
           // Velokanten leicht bevorzugt: wer neben einer Strasse klickt, meint
           // selten den Fussweg dahinter.
           const d = Math.hypot(qx - x, qy - y) + (veloErlaubt(g, 2 * e) || veloErlaubt(g, 2 * e + 1) ? 0 : 15)
-          if (!beste || d < beste.d) {
+          const gleicheStrasse =
+            gesucht !== undefined && (g.meta.namen[g.kanteName[e]] ?? '').toLowerCase() === gesucht
+          if ((!beste || d < beste.d) || (gleicheStrasse && (!passend || d < passend.d))) {
             // Anteil der Kantenlänge bis zum Fusspunkt.
             let bis = 0
             for (let j = g.kantePunkte[e]; j < i; j++) bis += Math.hypot(g.px(j + 1) - g.px(j), g.py(j + 1) - g.py(j))
             bis += Math.sqrt(l2) * s
-            beste = { kante: e, t: Math.min(1, bis / Math.max(g.laenge[e], 1e-6)), lon: qx / g.MX + 8.54, lat: qy / g.MY + g.LAT0, d }
+            const treffer = { kante: e, t: Math.min(1, bis / Math.max(g.laenge[e], 1e-6)), lon: qx / g.MX + 8.54, lat: qy / g.MY + g.LAT0, d }
+            if (!beste || d < beste.d) beste = treffer
+            if (gleicheStrasse && (!passend || d < passend.d)) passend = treffer
           }
         }
       }
     // Der Ring r deckt garantiert alles bis (r·ZELLE) ab.
     if (beste && beste.d <= r * g.ZELLE) break
   }
+  // Die Kante mit dem Strassennamen der Adresse gewinnt, solange sie nicht
+  // unverhältnismässig weiter weg liegt.
+  if (passend && (!beste || passend.d < beste.d + 60)) return passend
   return beste
 }
 

@@ -294,6 +294,12 @@ type Kante = {
   fussgaenger: boolean
   /** Bahnhofshalle, Perron, Ladenpassage, Lift: mit dem Velo tabu. */
   innen: boolean
+  /** Fahrspuren für den Autoverkehr, 0 wenn unbekannt. */
+  spuren: number
+  /** Einbahn, die für Velos in Gegenrichtung offen ist. */
+  gegenverkehr: boolean
+  /** Ob die Gegenrichtung einen eigenen Streifen hat. */
+  gegenStreifen: boolean
   hoehen: number[] // je Geometriepunkt, Meter
   hoch: number
   runter: number
@@ -343,6 +349,9 @@ for (const f of netz) {
     huerde: 0,
     fussgaenger: false,
     innen: INNEN.test((p.name ?? '').trim()),
+    spuren: 0,
+    gegenverkehr: false,
+    gegenStreifen: false,
     hoehen: [],
     hoch: 0,
     runter: 0,
@@ -365,6 +374,7 @@ for (const w of osmWege) {
 
 function klasseAusOsm(t: Record<string, string>): number {
   switch (t.highway) {
+    case 'motorway': case 'motorway_link': case 'trunk': case 'trunk_link':
     case 'primary': case 'primary_link': case 'secondary': case 'secondary_link':
       return KLASSE.haupt
     case 'tertiary': case 'tertiary_link':
@@ -421,6 +431,14 @@ for (const [i, k] of kanten.entries()) {
   osmTempo[i] = tempoAusOsm(t)
   if (t.embedded_rails === 'tram') k.tram = true
   if ((t.indoor && t.indoor !== 'no') || t.highway === 'corridor' || t.highway === 'elevator') k.innen = true
+  // In Zürich sind viele Einbahnen für Velos in Gegenrichtung offen. Das Netz
+  // der Stadt führt sie trotzdem als Einbahn, OSM hält es fest.
+  const gegen = [t.cycleway, t['cycleway:left'], t['cycleway:right'], t['cycleway:both']].join(' ')
+  if (t['oneway:bicycle'] === 'no' || /opposite/.test(gegen)) {
+    k.gegenverkehr = true
+    k.gegenStreifen = /opposite_lane|opposite_track/.test(gegen)
+  }
+  k.spuren = Math.min(9, parseInt(t.lanes ?? '', 10) || 0)
   k.fussgaenger = t.highway === 'pedestrian' || t.highway === 'footway' || t.highway === 'steps'
   // Wo OSM «absteigen» sagt, wird geschoben, auch wenn die Stadt Velo erlaubt.
   if (t.bicycle === 'dismount') k.velo = false
@@ -667,6 +685,8 @@ function infra(k: Kante, vorwaerts: boolean): number {
   if (k.veloweg || k.klasse === KLASSE.veloweg || k.osmVelo === 'weg') return INFRA.getrennt
   if (k.streifen === 'BOTH' || k.streifen === (vorwaerts ? 'FT' : 'TF')) return INFRA.streifen
   if (!k.streifen && k.osmVelo === 'streifen') return INFRA.streifen
+  // Gegen die Einbahn: nur mit eigenem Streifen, sonst fährt man auf der Fahrbahn.
+  if (k.gegenverkehr && k.einbahn === (vorwaerts ? 'TF' : 'FT')) return k.gegenStreifen ? INFRA.streifen : INFRA.keine
   return INFRA.keine
 }
 
@@ -695,6 +715,9 @@ function stress(k: Kante, vorwaerts: boolean): number {
     else s = k.klasse === KLASSE.neben ? 3 : 4
   } else s = i === INFRA.streifen ? 3 : 4
 
+  // Drei Spuren und mehr: mehrspurige Hauptachsen mit Abbiegespuren, oft mit
+  // Autobahnzufahrt. Dort fährt man im Verkehr, auch wenn ein Streifen da ist.
+  if (k.spuren >= 3 && i !== INFRA.getrennt) s = Math.max(s, i === INFRA.streifen ? 3 : 4)
   // Tramgleise ohne eigene Spur: das Vorderrad im Rillengleis ist der
   // häufigste Sturzgrund in der Stadt.
   if (k.tram && i !== INFRA.getrennt) s = Math.min(4, s + (i === INFRA.keine ? 2 : 1))
@@ -855,6 +878,7 @@ const laenge = new Float32Array(E)
 const hochDm = new Uint16Array(E)
 const runterDm = new Uint16Array(E)
 const merkmale = new Uint32Array(E)
+const spuren = new Uint8Array(E)
 const unfall = new Uint8Array(E)
 const unfallAnzahl = new Uint8Array(E)
 const huerde = new Uint8Array(E)
@@ -877,10 +901,11 @@ kanten.forEach((k, i) => {
   unfall[i] = Math.min(255, k.unfall)
   unfallAnzahl[i] = Math.min(255, k.unfallAnzahl)
   huerde[i] = Math.min(255, Math.round(k.huerde))
+  spuren[i] = k.spuren
   kanteName[i] = nameVon(k.name)
 
-  const veloVor = k.velo && !k.innen && k.einbahn !== 'TF'
-  const veloRueck = k.velo && !k.innen && k.einbahn !== 'FT'
+  const veloVor = k.velo && !k.innen && (k.gegenverkehr || k.einbahn !== 'TF')
+  const veloRueck = k.velo && !k.innen && (k.gegenverkehr || k.einbahn !== 'FT')
   // Schieben geht, wo Fussgänger dürfen. Gegen die Einbahn auf dem Trottoir
   // ebenso, das ist der Normalfall für kurze Stücke.
   const schiebenVor = !veloVor && !k.innen && (k.fuss || k.velo)
@@ -925,6 +950,7 @@ const abschnitte: [string, ArrayBufferView][] = [
   ['unfall', unfall],
   ['unfallAnzahl', unfallAnzahl],
   ['huerde', huerde],
+  ['spuren', spuren],
   ['kanteName', kanteName],
   ['ampelArt', ampelArt],
   ['verbote', verbotArr],
@@ -960,6 +986,8 @@ writeFileSync(
       veloKm: Math.round(kanten.filter((k) => k.velo).reduce((s, k) => s + k.laenge, 0) / 1000),
       stressKm: stressMeter.slice(1).map((m) => Math.round(m / 1000)),
       ampelKnoten: genutzt.size,
+      gegenverkehr: kanten.filter((k) => k.gegenverkehr && k.einbahn).length,
+      mehrspurigKm: Math.round(kanten.filter((k) => k.velo && k.spuren >= 3).reduce((s, k) => s + k.laenge, 0) / 1000),
       innen: kanten.filter((k) => k.innen).length,
       huerden: huerdenZugeordnet,
       fussgaengerKm: Math.round(kanten.filter((k) => k.fussgaenger && k.velo).reduce((s, k) => s + k.laenge, 0) / 1000),

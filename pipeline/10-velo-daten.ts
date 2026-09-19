@@ -97,7 +97,7 @@ console.log('OpenStreetMap')
 await hole(
   'osm-wege.json',
   overpass(`[out:json][timeout:600];
-    way["highway"~"^(primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|living_street|pedestrian|service|track|path|footway|cycleway|bridleway|steps|road)$"]["area"!="yes"](${b});
+    way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|unclassified|residential|living_street|pedestrian|service|track|path|footway|cycleway|bridleway|steps|road)$"]["area"!="yes"](${b});
     out tags geom;`)
 )
 await hole(

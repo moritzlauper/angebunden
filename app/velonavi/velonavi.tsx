@@ -122,6 +122,12 @@ function schreibeUrl(start: Punkt | null, ziel: Punkt | null, wahl: Variante) {
 
 const koordText = (lon: number, lat: number) => `Punkt ${lat.toFixed(4)}, ${lon.toFixed(4)}`
 
+/** «Werdstrasse 21» → «Werdstrasse». Ohne Hausnummer bleibt der Titel stehen. */
+function strasseVon(titel: string) {
+  const m = titel.match(/^(.+?)\s+\d+[a-zA-Z]?$/)
+  return m ? m[1] : undefined
+}
+
 // ---------------------------------------------------------------- Gedächtnis
 
 /**
@@ -282,8 +288,8 @@ export default function Velonavi() {
     const t0 = performance.now()
     /** Alle drei Varianten mit einer Einstellung durchrechnen. */
     const rechne = (mitSchieben: boolean) => {
-      const s = einrasten(g, start.lon, start.lat, mitSchieben)
-      const z = einrasten(g, ziel.lon, ziel.lat, mitSchieben)
+      const s = einrasten(g, start.lon, start.lat, mitSchieben, strasseVon(start.titel))
+      const z = einrasten(g, ziel.lon, ziel.lat, mitSchieben, strasseVon(ziel.titel))
       if (!s || !z) return null
       const out = {} as Record<Variante, Route | null>
       for (const v of VARIANTEN) {
