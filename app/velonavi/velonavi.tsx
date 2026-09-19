@@ -13,7 +13,6 @@ import {
 } from 'maplibre-gl'
 import { Blatt, useMedienabfrage } from '../blatt'
 import { Suchleiste, bauIndex, suchen, type Eintrag } from '../suche'
-import { Hauptwahl } from '../hauptwahl'
 import { Wortmarke } from '../marke'
 import { STAEDTE } from '../staedte'
 import { nf } from '../site'
@@ -34,6 +33,10 @@ const STADT = STAEDTE.zuerich
 const BASISKARTE =
   'https://www.ogd.stadt-zuerich.ch/wms/geoportal/Basiskarte_Zuerich_Raster?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap' +
   '&LAYERS=Basiskarte%20Z%C3%BCrich%20Raster&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=512&HEIGHT=512&FORMAT=image/png'
+/** Die schräg gezeichneten Gebäude aus dem Züriplan, liefert die Stadt ab etwa 1:10'000. */
+const GEBAEUDE =
+  'https://www.ogd.stadt-zuerich.ch/wms/geoportal/Gebaeude_verkippt?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap' +
+  '&LAYERS=Geb%C3%A4ude%20verkippt&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=512&HEIGHT=512&FORMAT=image/png&TRANSPARENT=true'
 
 /** Stressstufen 1–4 in den Statusfarben, Index 0 für geschobene Stücke. */
 export const STUFEN = [
@@ -93,16 +96,14 @@ function leseUrl() {
     start: punkt(p.get('von'), p.get('vn')),
     ziel: punkt(p.get('nach'), p.get('nn')),
     wahl: (['schnell', 'ideal', 'komfort'].includes(p.get('wahl') ?? '') ? p.get('wahl') : null) as Variante | null,
-    typ: p.get('typ') === 'ebike' ? ('ebike' as const) : null,
   }
 }
 
-function schreibeUrl(start: Punkt | null, ziel: Punkt | null, wahl: Variante, typ: Profil['velotyp']) {
+function schreibeUrl(start: Punkt | null, ziel: Punkt | null, wahl: Variante) {
   const p = new URLSearchParams()
   if (start) p.set('von', `${start.lon.toFixed(5)},${start.lat.toFixed(5)}`), p.set('vn', start.titel)
   if (ziel) p.set('nach', `${ziel.lon.toFixed(5)},${ziel.lat.toFixed(5)}`), p.set('nn', ziel.titel)
   if (wahl !== 'ideal') p.set('wahl', wahl)
-  if (typ !== 'velo') p.set('typ', typ)
   const s = p.toString()
   window.history.replaceState(null, '', window.location.pathname + (s ? `#${s}` : ''))
 }
@@ -139,7 +140,6 @@ export default function Velonavi() {
   const [gewichte, setGewichte] = useState<{ sicherheit: number; steigung: number; ampeln: number; belag: number }>({
     ...VOREINSTELLUNGEN.ausgewogen,
   })
-  const [velotyp, setVelotyp] = useState<Profil['velotyp']>('velo')
   const [schieben, setSchieben] = useState(true)
   const [netzFarbig, setNetzFarbig] = useState(false)
   const [feinOffen, setFeinOffen] = useState(false)
@@ -158,11 +158,11 @@ export default function Velonavi() {
 
   const profile: Record<Variante, Profil> = useMemo(
     () => ({
-      schnell: { velotyp, schieben, ...VOREINSTELLUNGEN.schnell },
-      ideal: { velotyp, schieben, ...gewichte },
-      komfort: { velotyp, schieben, ...VOREINSTELLUNGEN.entspannt },
+      schnell: { schieben, ...VOREINSTELLUNGEN.schnell },
+      ideal: { schieben, ...gewichte },
+      komfort: { schieben, ...VOREINSTELLUNGEN.entspannt },
     }),
-    [velotyp, schieben, gewichte]
+    [schieben, gewichte]
   )
 
   // --- Zustand aus dem Link übernehmen
@@ -170,13 +170,12 @@ export default function Velonavi() {
     const u = leseUrl()
     if (u.start) setStart(u.start), setStartText(u.start.titel)
     if (u.ziel) setZiel(u.ziel), setZielText(u.ziel.titel)
-    if (u.typ) setVelotyp(u.typ)
     if (u.wahl) setWahl(u.wahl)
   }, [])
 
   useEffect(() => {
-    schreibeUrl(start, ziel, wahl, velotyp)
-  }, [start, ziel, wahl, velotyp])
+    schreibeUrl(start, ziel, wahl)
+  }, [start, ziel, wahl])
 
   // --- Graph und Suchindex laden
   useEffect(() => {
@@ -277,10 +276,12 @@ export default function Velonavi() {
             tileSize: 512,
             attribution: 'Basiskarte © Stadt Zürich',
           },
+          gebaeude: { type: 'raster', tiles: [GEBAEUDE], tileSize: 512, minzoom: 15 },
         },
         layers: [
           { id: 'grund', type: 'background', paint: { 'background-color': ui.bg } },
           { id: 'basiskarte', type: 'raster', source: 'basiskarte', paint: { 'raster-fade-duration': 150 } },
+          { id: 'gebaeude', type: 'raster', source: 'gebaeude', minzoom: 15, paint: { 'raster-fade-duration': 150 } },
         ],
       },
       center: STADT.center,
@@ -716,8 +717,6 @@ export default function Velonavi() {
     <Einstellungen
       gewichte={gewichte}
       setzeGewicht={setzeGewicht}
-      velotyp={velotyp}
-      setVelotyp={setVelotyp}
       schieben={schieben}
       setSchieben={setSchieben}
       netzFarbig={netzFarbig}
@@ -757,6 +756,10 @@ export default function Velonavi() {
         <Link href="/methode#velonavi" className="underline underline-offset-2">
           Wie das gerechnet ist
         </Link>
+        {' · '}
+        <Link href="/" className="underline underline-offset-2">
+          Zur Vergleichskarte
+        </Link>
       </p>
     </div>
   )
@@ -771,7 +774,6 @@ export default function Velonavi() {
             className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-2 px-3"
             style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
           >
-            <Hauptwahl ui={ui} aktiv="velonavi" />
             <div className="pointer-events-auto">{felder}</div>
           </div>
           <Blatt ui={ui} offen={blattOffen} onSchliessen={() => setBlattOffen(false)} onHoehe={setDeckung}>
@@ -789,9 +791,6 @@ export default function Velonavi() {
         </>
       ) : (
         <>
-          <div className="pointer-events-none absolute left-[26rem] right-3 top-3 z-20 flex justify-center">
-            <Hauptwahl ui={ui} aktiv="velonavi" />
-          </div>
           <div
             className="absolute bottom-3 left-3 top-3 z-30 flex w-[24rem] flex-col overflow-hidden rounded-3xl border backdrop-blur-md"
             style={{ background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten }}
@@ -1099,13 +1098,11 @@ function Wegbeschreibung({ r }: { r: Route }) {
 }
 
 function Einstellungen({
-  gewichte, setzeGewicht, velotyp, setVelotyp, schieben, setSchieben,
+  gewichte, setzeGewicht, schieben, setSchieben,
   netzFarbig, setNetzFarbig, feinOffen, setFeinOffen,
 }: {
   gewichte: Record<(typeof REGLER)[number]['id'], number>
   setzeGewicht: (id: (typeof REGLER)[number]['id'], v: number) => void
-  velotyp: Profil['velotyp']
-  setVelotyp: (v: Profil['velotyp']) => void
   schieben: boolean
   setSchieben: (v: boolean) => void
   netzFarbig: boolean
@@ -1115,14 +1112,6 @@ function Einstellungen({
 }) {
   return (
     <section className="flex flex-col gap-2.5">
-      <Segmente
-        werte={[
-          { id: 'velo', titel: 'Velo' },
-          { id: 'ebike', titel: 'E-Bike' },
-        ]}
-        aktiv={velotyp}
-        onWahl={(id) => setVelotyp(id as Profil['velotyp'])}
-      />
       <button onClick={() => setFeinOffen(!feinOffen)} className="self-start text-[12.5px] font-medium" style={{ color: AKZENT }}>
         {feinOffen ? 'Feineinstellung ausblenden' : 'Ideale Route selbst gewichten'}
       </button>

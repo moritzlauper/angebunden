@@ -170,8 +170,6 @@ const istStrasse = (g: Graph, e: number) => {
 // ------------------------------------------------------------ Profil
 
 export type Profil = {
-  /** Velo mit eigener Kraft oder mit Motor bis 25 km/h. */
-  velotyp: 'velo' | 'ebike'
   /** 0–1: wie stark Verkehr, Tramgleise und Unfallstellen gemieden werden. */
   sicherheit: number
   /** 0–1: wie stark Steigungen über die reine Mehrzeit hinaus gemieden werden. */
@@ -190,14 +188,14 @@ export const VOREINSTELLUNGEN = {
   entspannt: { sicherheit: 0.95, steigung: 0.8, ampeln: 0.6, belag: 0.8 },
 } as const
 
-/** Tempo in der Ebene (m/s) und Zeit je Höhenmeter bergauf (s/m). */
-const ANTRIEB = {
-  // Die Zeit je Höhenmeter kommt zur Zeit in der Ebene dazu. Weil man bergauf
-  // langsamer fährt und dabei weniger Luftwiderstand hat, ist sie kleiner als
-  // die reine Hubarbeit (90 kg, 150 W wären 5.9 s/m).
-  velo: { v0: 5.3, sProM: 3.6 }, // 19 km/h
-  ebike: { v0: 6.7, sProM: 1.2 }, // 24 km/h; der Motor übernimmt den Grossteil
-}
+/** Tempo in der Ebene, 22 km/h. */
+const V0 = 6.1
+/**
+ * Zeit je Höhenmeter bergauf, zusätzlich zur Zeit in der Ebene. Weil man
+ * bergauf langsamer fährt und dabei weniger Luftwiderstand hat, ist sie
+ * kleiner als die reine Hubarbeit (90 kg, 150 W wären 5.9 s/m).
+ */
+const S_PRO_M = 3.6
 /** Deckel für Abfahrten in der Stadt. */
 const VMAX = 8.5
 /** Tempo zu Fuss mit dem Velo an der Hand. */
@@ -231,7 +229,8 @@ type Kosten = { zeit: Float32Array; kosten: Float32Array }
 export function kantenKosten(g: Graph, p: Profil): Kosten {
   const zeit = new Float32Array(2 * g.E).fill(Infinity)
   const kosten = new Float32Array(2 * g.E).fill(Infinity)
-  const { v0, sProM } = ANTRIEB[p.velotyp]
+  const v0 = V0
+  const sProM = S_PRO_M
   for (let a = 0; a < 2 * g.E; a++) {
     const e = a >> 1
     const L = g.laenge[e]

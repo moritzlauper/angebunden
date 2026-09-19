@@ -355,8 +355,9 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           Hauptstrasse ohne Ampel zu queren kostet ebenfalls.
         </p>
         <p className="mt-4">
-          Die Fahrzeit rechnet mit 19 km/h in der Ebene (E-Bike 24 km/h), 3.6 Sekunden je Höhenmeter
-          bergauf (E-Bike 1.2) und höchstens 30 km/h bergab. Kopfsteinpflaster und Kies bremsen.
+          Die Fahrzeit rechnet mit 22 km/h in der Ebene, 3.6 Sekunden zusätzlich je Höhenmeter
+          bergauf und höchstens 30 km/h bergab. Auf Fusswegen und in Begegnungszonen sind es
+          höchstens 15 km/h. Kopfsteinpflaster und Kies bremsen.
           Die drei Varianten unterscheiden sich nur darin, wie stark Verkehr, Steigung, Ampeln und
           Belag zusätzlich zur Zeit zählen. «Schnell» achtet fast nur auf die Zeit. «Ideal» nimmt im
           Mittel rund 2% mehr Fahrzeit in Kauf und fährt dafür deutlich mehr auf ruhigen Strassen.
