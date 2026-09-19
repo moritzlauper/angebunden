@@ -706,9 +706,12 @@ export default function Velonavi() {
   const ortBeimRef = useRef(ortBeim)
   ortBeimRef.current = ortBeim
 
-  // --- Klick auf die Karte: erst Start, dann Ziel, danach wird das Ziel versetzt
+  // --- Klick auf die Karte: in das Feld, in dem man gerade steht. Sonst erst
+  // Start, dann Ziel, danach wird das Ziel versetzt.
   const startRef = useRef(start)
   startRef.current = start
+  const feldRef = useRef(offenFeld)
+  feldRef.current = offenFeld
   useEffect(() => {
     const map = mapRef.current
     if (!kartenBereit || !map) return
@@ -721,7 +724,8 @@ export default function Velonavi() {
         return
       }
       const p = ortBeim(e.lngLat.lng, e.lngLat.lat, map.getZoom())
-      if (!startRef.current) setStart(p), setStartText(p.titel)
+      const feld = feldRef.current ?? (startRef.current ? 'ziel' : 'start')
+      if (feld === 'start') setStart(p), setStartText(p.titel)
       else setZiel(p), setZielText(p.titel)
       merken(p)
       setOffenFeld(null)
