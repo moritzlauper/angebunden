@@ -12,7 +12,7 @@ import {
   type MapMouseEvent,
 } from 'maplibre-gl'
 import { Blatt, useMedienabfrage } from '../blatt'
-import { Suchleiste, bauIndex, suchen, type Eintrag } from '../suche'
+import { Suchleiste, bauIndex, suchen, Sternsymbol, type Eintrag } from '../suche'
 import { Wortmarke } from '../marke'
 import { STAEDTE } from '../staedte'
 import { nf } from '../site'
@@ -30,13 +30,21 @@ const STADT = STAEDTE.zuerich
  * LV95 an, der WMS rechnet aber auf Anfrage in Web Mercator um. Anders als
  * die ÖV-Karte lädt der Velonavi damit Bilder von einem fremden Server.
  */
-const BASISKARTE =
-  'https://www.ogd.stadt-zuerich.ch/wms/geoportal/Basiskarte_Zuerich_Raster?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap' +
-  '&LAYERS=Basiskarte%20Z%C3%BCrich%20Raster&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=512&HEIGHT=512&FORMAT=image/png'
-/** Die schräg gezeichneten Gebäude aus dem Züriplan, liefert die Stadt ab etwa 1:10'000. */
-const GEBAEUDE =
-  'https://www.ogd.stadt-zuerich.ch/wms/geoportal/Gebaeude_verkippt?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap' +
-  '&LAYERS=Geb%C3%A4ude%20verkippt&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=512&HEIGHT=512&FORMAT=image/png&TRANSPARENT=true'
+/**
+ * Eine Kachel ist 512 Punkte gross. Auf Bildschirmen mit doppelter Pixeldichte
+ * holt sie 1024 Pixel, sonst wäre das Bild sichtbar hochgezogen. `DPI=192`
+ * sagt dem Server, dass er dafür auch Schrift und Linien doppelt so dick
+ * zeichnen soll; ohne das wären die Strassennamen halb so gross.
+ */
+function wms(dienst: string, layer: string, transparent = false) {
+  const dicht = typeof window !== 'undefined' && window.devicePixelRatio > 1.5
+  const px = dicht ? 1024 : 512
+  return (
+    `https://www.ogd.stadt-zuerich.ch/wms/geoportal/${dienst}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
+    `&LAYERS=${layer}&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=${px}&HEIGHT=${px}` +
+    `&FORMAT=image/png${dicht ? '&DPI=192' : ''}${transparent ? '&TRANSPARENT=true' : ''}`
+  )
+}
 
 /** Stressstufen 1–4 in den Statusfarben, Index 0 für geschobene Stücke. */
 export const STUFEN = [
@@ -110,6 +118,33 @@ function schreibeUrl(start: Punkt | null, ziel: Punkt | null, wahl: Variante) {
 
 const koordText = (lon: number, lat: number) => `Punkt ${lat.toFixed(4)}, ${lon.toFixed(4)}`
 
+// ---------------------------------------------------------------- Gedächtnis
+
+/**
+ * Zuletzt gesuchte Orte, das Zuhause und die letzte Strecke liegen im
+ * localStorage des Browsers. Sie verlassen das Gerät nie, und wer keinen
+ * Speicher erlaubt (privates Fenster), merkt davon nur, dass nichts bleibt.
+ */
+const SCHLUESSEL = { verlauf: 'velonavi.verlauf', zuhause: 'velonavi.zuhause', letzte: 'velonavi.letzte' }
+const VERLAUF_MAX = 8
+
+function lies<T>(schluessel: string, vorgabe: T): T {
+  try {
+    const roh = window.localStorage.getItem(schluessel)
+    return roh ? (JSON.parse(roh) as T) : vorgabe
+  } catch {
+    return vorgabe
+  }
+}
+function schreib(schluessel: string, wert: unknown) {
+  try {
+    if (wert === null) window.localStorage.removeItem(schluessel)
+    else window.localStorage.setItem(schluessel, JSON.stringify(wert))
+  } catch {
+    /* privates Fenster oder voller Speicher */
+  }
+}
+
 // ---------------------------------------------------------------- Formatierung
 
 function minuten(s: number) {
@@ -153,6 +188,8 @@ export default function Velonavi() {
   const [zielText, setZielText] = useState('')
   const [offenFeld, setOffenFeld] = useState<'start' | 'ziel' | null>(null)
   const [indexBereit, setIndexBereit] = useState(false)
+  const [verlauf, setVerlauf] = useState<Punkt[]>([])
+  const [zuhause, setZuhause] = useState<Punkt | null>(null)
 
   const mobil = !useMedienabfrage('(min-width: 768px)')
 
@@ -167,15 +204,35 @@ export default function Velonavi() {
 
   // --- Zustand aus dem Link übernehmen
   useEffect(() => {
+    setVerlauf(lies<Punkt[]>(SCHLUESSEL.verlauf, []))
+    setZuhause(lies<Punkt | null>(SCHLUESSEL.zuhause, null))
     const u = leseUrl()
-    if (u.start) setStart(u.start), setStartText(u.start.titel)
-    if (u.ziel) setZiel(u.ziel), setZielText(u.ziel.titel)
+    // Ohne Angaben im Link die letzte Strecke wieder aufnehmen.
+    const letzte = u.start || u.ziel ? null : lies<{ start: Punkt | null; ziel: Punkt | null } | null>(SCHLUESSEL.letzte, null)
+    const s = u.start ?? letzte?.start ?? null
+    const z = u.ziel ?? letzte?.ziel ?? null
+    if (s) setStart(s), setStartText(s.titel)
+    if (z) setZiel(z), setZielText(z.titel)
     if (u.wahl) setWahl(u.wahl)
   }, [])
 
   useEffect(() => {
     schreibeUrl(start, ziel, wahl)
+    if (start || ziel) schreib(SCHLUESSEL.letzte, { start, ziel })
   }, [start, ziel, wahl])
+
+  /**
+   * Was gesucht oder angetippt wurde, kommt oben in den Verlauf. Punkte ohne
+   * Namen (Klick in die Karte) nicht: «Punkt 47.3721, 8.5150» hilft später niemandem.
+   */
+  const merken = useCallback((p: Punkt) => {
+    if (p.titel.startsWith('Punkt ')) return
+    setVerlauf((alt) => {
+      const neu = [p, ...alt.filter((o) => o.titel !== p.titel)].slice(0, VERLAUF_MAX)
+      schreib(SCHLUESSEL.verlauf, neu)
+      return neu
+    })
+  }, [])
 
   // --- Graph und Suchindex laden
   useEffect(() => {
@@ -272,11 +329,16 @@ export default function Velonavi() {
         sources: {
           basiskarte: {
             type: 'raster',
-            tiles: [BASISKARTE],
+            tiles: [wms('Basiskarte_Zuerich_Raster', 'Basiskarte%20Z%C3%BCrich%20Raster')],
             tileSize: 512,
             attribution: 'Basiskarte © Stadt Zürich',
           },
-          gebaeude: { type: 'raster', tiles: [GEBAEUDE], tileSize: 512, minzoom: 15 },
+          gebaeude: {
+            type: 'raster',
+            tiles: [wms('Gebaeude_verkippt', 'Geb%C3%A4ude%20verkippt', true)],
+            tileSize: 512,
+            minzoom: 15,
+          },
         },
         layers: [
           { id: 'grund', type: 'background', paint: { 'background-color': ui.bg } },
@@ -651,13 +713,33 @@ export default function Velonavi() {
   }
 
   // --- Suche
+  /** Zuhause und Verlauf, solange nichts getippt ist. */
+  const vorschlaege: Eintrag[] = useMemo(() => {
+    const aus = (p: Punkt, symbol: 'stern' | 'uhr', unter: string): Eintrag => ({
+      art: 'adresse', titel: p.titel, unter, x: p.lon, y: p.lat, nr: 0, norm: '', symbol,
+    })
+    return [
+      ...(zuhause ? [aus(zuhause, 'stern', 'Zuhause')] : []),
+      ...verlauf.filter((p) => p.titel !== zuhause?.titel).map((p) => aus(p, 'uhr', 'Zuletzt gesucht')),
+    ]
+  }, [zuhause, verlauf])
+
+  const treffer = useCallback(
+    (text: string, gewaehlt: Punkt | null) => {
+      // Leeres Feld oder eines, in dem noch die getroffene Wahl steht: Vorschläge.
+      // Wer weitertippt, sucht.
+      if (text.length < 2 || text === gewaehlt?.titel) return vorschlaege.filter((v) => v.titel !== gewaehlt?.titel)
+      return indexBereit ? suchen(indexRef.current!, text) : []
+    },
+    [indexBereit, vorschlaege]
+  )
   const trefferStart = useMemo(
-    () => (indexBereit && offenFeld === 'start' && startText !== start?.titel ? suchen(indexRef.current!, startText) : []),
-    [indexBereit, offenFeld, startText, start]
+    () => (offenFeld === 'start' ? treffer(startText, start) : []),
+    [offenFeld, startText, start, treffer]
   )
   const trefferZiel = useMemo(
-    () => (indexBereit && offenFeld === 'ziel' && zielText !== ziel?.titel ? suchen(indexRef.current!, zielText) : []),
-    [indexBereit, offenFeld, zielText, ziel]
+    () => (offenFeld === 'ziel' ? treffer(zielText, ziel) : []),
+    [offenFeld, zielText, ziel, treffer]
   )
 
   const felder = (
@@ -670,7 +752,11 @@ export default function Velonavi() {
           treffer={trefferStart}
           offen={offenFeld === 'start'}
           setOffen={(o) => setOffenFeld(o ? 'start' : null)}
-          onWaehlen={(e) => setStart({ lon: e.x, lat: e.y, titel: e.titel })}
+          onWaehlen={(e) => {
+            const p = { lon: e.x, lat: e.y, titel: e.titel }
+            setStart(p)
+            merken(p)
+          }}
           platzhalter="Start: Adresse oder Klick in die Karte"
           links={<Marke farbe="#18181b" />}
           rechts={
@@ -694,7 +780,11 @@ export default function Velonavi() {
           treffer={trefferZiel}
           offen={offenFeld === 'ziel'}
           setOffen={(o) => setOffenFeld(o ? 'ziel' : null)}
-          onWaehlen={(e) => setZiel({ lon: e.x, lat: e.y, titel: e.titel })}
+          onWaehlen={(e) => {
+            const p = { lon: e.x, lat: e.y, titel: e.titel }
+            setZiel(p)
+            merken(p)
+          }}
           platzhalter="Ziel"
           links={<Marke farbe={AKZENT} />}
           rechts={
@@ -710,6 +800,26 @@ export default function Velonavi() {
           }
         />
       </div>
+      <Zuhausezeile
+        zuhause={zuhause}
+        setzen={() => {
+          const p = ziel ?? start
+          if (!p) return
+          setZuhause(p)
+          schreib(SCHLUESSEL.zuhause, p)
+        }}
+        loeschen={() => {
+          setZuhause(null)
+          schreib(SCHLUESSEL.zuhause, null)
+        }}
+        waehlen={() => {
+          if (!zuhause) return
+          // Ohne Start wird das Zuhause der Start, sonst das Ziel.
+          if (!start) setStart(zuhause), setStartText(zuhause.titel)
+          else setZiel(zuhause), setZielText(zuhause.titel)
+        }}
+        kannSetzen={!!(ziel ?? start)}
+      />
     </div>
   )
 
@@ -1151,6 +1261,45 @@ function Einstellungen({
       )}
       <Schalter an={netzFarbig} setAn={setNetzFarbig} titel="Velonetz nach Verkehr einfärben" />
     </section>
+  )
+}
+
+/** Zuhause als Ein-Klick-Ziel, dazu der Stern zum Setzen und Entfernen. */
+function Zuhausezeile({
+  zuhause, setzen, loeschen, waehlen, kannSetzen,
+}: {
+  zuhause: Punkt | null
+  setzen: () => void
+  loeschen: () => void
+  waehlen: () => void
+  kannSetzen: boolean
+}) {
+  if (!zuhause)
+    return kannSetzen ? (
+      <button
+        onClick={setzen}
+        className="flex items-center gap-1.5 self-start rounded-full border px-3 py-1 text-[12px] backdrop-blur-md"
+        style={{ background: ui.panel, borderColor: ui.border, color: ui.muted, boxShadow: ui.schatten }}
+      >
+        <Sternsymbol gefuellt={false} />
+        Als Zuhause merken
+      </button>
+    ) : null
+  return (
+    <div
+      className="flex items-center gap-1 self-start rounded-full border pl-2.5 pr-1 backdrop-blur-md"
+      style={{ background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten }}
+    >
+      <button onClick={waehlen} className="flex items-center gap-1.5 py-1 text-[12px]" style={{ color: ui.fg }}>
+        <span style={{ color: '#eab308' }}>
+          <Sternsymbol />
+        </span>
+        <span className="max-w-[12rem] truncate">{zuhause.titel}</span>
+      </button>
+      <button onClick={loeschen} aria-label="Zuhause entfernen" className="px-1.5 text-[14px] leading-none" style={{ color: ui.muted }}>
+        ×
+      </button>
+    </div>
   )
 }
 

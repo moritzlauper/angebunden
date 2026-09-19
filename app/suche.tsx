@@ -16,6 +16,8 @@ export type Eintrag = {
   norm: string
   /** Nur bei Adressen: der Index in der Gebäude-Quelle, zugleich die MapLibre-Feature-Id. */
   haus?: number
+  /** Ersetzt das Symbol in der Trefferliste, für Zuhause und Verlauf. */
+  symbol?: 'stern' | 'uhr'
 }
 
 type Merkmale = Record<string, unknown>
@@ -318,7 +320,17 @@ export function Suchleiste({
                   className="grid h-8 w-8 shrink-0 place-items-center rounded-full"
                   style={{ background: ui.weich, color: ui.muted }}
                 >
-                  {e.art === 'adresse' ? <Haussymbol /> : e.art === 'halt' ? <Haltsymbol /> : <Ortsymbol />}
+                  {e.symbol === 'stern' ? (
+                    <Sternsymbol />
+                  ) : e.symbol === 'uhr' ? (
+                    <Uhrsymbol />
+                  ) : e.art === 'adresse' ? (
+                    <Haussymbol />
+                  ) : e.art === 'halt' ? (
+                    <Haltsymbol />
+                  ) : (
+                    <Ortsymbol />
+                  )}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[14px]" style={{ color: ui.fg }}>
@@ -380,6 +392,23 @@ function Haltsymbol() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <rect x="6" y="3.5" width="12" height="13" rx="2.5" />
       <path d="M6 11h12M9 20l1.5-3.5M15 20l-1.5-3.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function Sternsymbol({ gefuellt = true }: { gefuellt?: boolean }) {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill={gefuellt ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden>
+      <path d="M12 3.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8L3.5 9.7l5.9-.9z" />
+    </svg>
+  )
+}
+
+function Uhrsymbol() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.5V12l3 2" />
     </svg>
   )
 }
