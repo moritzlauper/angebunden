@@ -8,6 +8,7 @@ import {
   NavigationControl,
   AttributionControl,
   setWorkerUrl,
+  config,
   type GeoJSONSource,
   type MapMouseEvent,
 } from 'maplibre-gl'
@@ -321,6 +322,11 @@ export default function Velonavi() {
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
     setWorkerUrl('/maplibre/maplibre-gl-worker.mjs')
+    // Der Kartendienst der Stadt rendert jedes Bild einzeln und weist unter
+    // Last Verbindungen ab. Sechs gleichzeitige Anfragen kommen durch,
+    // sechzehn nicht. Den Rest übernimmt der Zwischenspeicher im Service Worker.
+    config.MAX_PARALLEL_IMAGE_REQUESTS = 6
+    navigator.serviceWorker?.register('/velonavi-sw.js').catch(() => {})
     const map = new MapLibreMap({
       container: containerRef.current,
       style: {
@@ -333,6 +339,8 @@ export default function Velonavi() {
             tileSize: 512,
             attribution: 'Basiskarte © Stadt Zürich',
           },
+          // Die schräg gezeichneten Gebäude wie im Züriplan. Die Stadt liefert
+          // sie erst ab etwa 1:10'000, darunter bleibt die Ebene leer.
           gebaeude: {
             type: 'raster',
             tiles: [wms('Gebaeude_verkippt', 'Geb%C3%A4ude%20verkippt', true)],
@@ -503,11 +511,31 @@ export default function Velonavi() {
     }
   }, [])
 
-  // --- Netz und Ampeln zeichnen, sobald Karte und Graph da sind
+  // --- Ampeln zeichnen, sobald Karte und Graph da sind
   useEffect(() => {
     const map = mapRef.current
     const g = graphRef.current
     if (!kartenBereit || !graphBereit || !map || !g) return
+    ;(map.getSource('ampeln') as GeoJSONSource).setData({
+      type: 'FeatureCollection',
+      features: g.meta.ampeln.map(([lon, lat, art]) => ({
+        type: 'Feature' as const,
+        properties: { art },
+        geometry: { type: 'Point' as const, coordinates: [lon, lat] },
+      })),
+    })
+  }, [kartenBereit, graphBereit])
+
+  // Die 38'000 Kanten des Velonetzes kommen erst in die Karte, wenn man sie
+  // einfärbt. Als stille Quelle würden sie bei jedem Zoom neu zerlegt.
+  const netzGezeichnet = useRef(false)
+  useEffect(() => {
+    const map = mapRef.current
+    const g = graphRef.current
+    if (!kartenBereit || !map) return
+    map.setLayoutProperty('netz', 'visibility', netzFarbig ? 'visible' : 'none')
+    if (!netzFarbig || !graphBereit || !g || netzGezeichnet.current) return
+    netzGezeichnet.current = true
     const features = []
     for (let e = 0; e < g.E; e++) {
       const vor = veloErlaubt(g, 2 * e)
@@ -520,25 +548,11 @@ export default function Velonavi() {
       features.push({ type: 'Feature' as const, properties: { s: stufe, v: netzVon(g, e) === NETZ.vorzug ? 1 : 0 }, geometry: { type: 'LineString' as const, coordinates: coords } })
     }
     ;(map.getSource('netz') as GeoJSONSource).setData({ type: 'FeatureCollection', features })
-    ;(map.getSource('ampeln') as GeoJSONSource).setData({
-      type: 'FeatureCollection',
-      features: g.meta.ampeln.map(([lon, lat, art]) => ({
-        type: 'Feature' as const,
-        properties: { art },
-        geometry: { type: 'Point' as const, coordinates: [lon, lat] },
-      })),
-    })
-  }, [kartenBereit, graphBereit])
-
-  useEffect(() => {
-    const map = mapRef.current
-    if (!kartenBereit || !map) return
-    map.setLayoutProperty('netz', 'visibility', netzFarbig ? 'visible' : 'none')
     map.setPaintProperty('netz', 'line-color', [
       'match', ['get', 's'], 1, STUFEN[1].farbe, 2, STUFEN[2].farbe, 3, STUFEN[3].farbe, STUFEN[4].farbe,
     ])
     map.setPaintProperty('netz', 'line-opacity', 0.8)
-  }, [kartenBereit, netzFarbig])
+  }, [kartenBereit, graphBereit, netzFarbig])
 
   // --- Route zeichnen
   useEffect(() => {
@@ -803,7 +817,8 @@ export default function Velonavi() {
       <Zuhausezeile
         zuhause={zuhause}
         setzen={() => {
-          const p = ziel ?? start
+          // Das Zuhause ist der Ort, von dem man losfährt.
+          const p = start ?? ziel
           if (!p) return
           setZuhause(p)
           schreib(SCHLUESSEL.zuhause, p)
@@ -818,7 +833,7 @@ export default function Velonavi() {
           if (!start) setStart(zuhause), setStartText(zuhause.titel)
           else setZiel(zuhause), setZielText(zuhause.titel)
         }}
-        kannSetzen={!!(ziel ?? start)}
+        kannSetzen={!!(start ?? ziel)}
       />
     </div>
   )
@@ -921,7 +936,7 @@ export default function Velonavi() {
               </div>
               {felder}
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">{inhalt}</div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-1.5">{inhalt}</div>
           </div>
         </>
       )}
