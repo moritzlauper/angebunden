@@ -106,6 +106,17 @@ await hole(
     way["railway"="tram"](${b});
     out geom;`)
 )
+// Was ein Velo zum Halten oder Absteigen zwingt: Poller, Tore, Drängelgitter,
+// Treppen am Weg, Bahnübergänge, dazu Wege mit «bicycle=dismount».
+await hole(
+  'osm-huerden.json',
+  overpass(`[out:json][timeout:300];
+    (node["barrier"](${b});
+     node["railway"="level_crossing"](${b});
+     node["railway"="crossing"](${b});
+     node["highway"="crossing"]["crossing"!="traffic_signals"](${b}););
+    out;`)
+)
 await hole(
   'osm-ampeln.json',
   overpass(`[out:json][timeout:300];

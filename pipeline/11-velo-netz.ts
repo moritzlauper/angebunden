@@ -63,6 +63,21 @@ const TEMPO = { keins: 0, fahrverbot: 1, t20: 2, t30: 3, t50: 4, t60plus: 5 } as
 /** Velonetzplanung, 2 Bit. */
 const NETZ = { keins: 0, basis: 1, haupt: 2, vorzug: 3 } as const
 
+/**
+ * Sekunden, die eine Hürde kostet. Ein Poller zwingt zum Ausweichen und
+ * Abbremsen, ein Drängelgitter zum Schritttempo, ein Umlaufgitter praktisch
+ * zum Absteigen und Anheben.
+ */
+const HUERDE: Record<string, number> = {
+  bollard: 3, block: 4, chain: 5, bar: 4, log: 6, swing_gate: 6, entrance: 2,
+  gate: 8, lift_gate: 8, cycle_barrier: 15,
+  stile: 60, kissing_gate: 45, turnstile: 60, 'full-height_turnstile': 60,
+  // Bahnübergänge: Schienen queren, oft im spitzen Winkel.
+  level_crossing: 6, railway_crossing: 5,
+  // Fahrbahn ohne Ampel queren oder eine Trottoirkante hinauf.
+  crossing: 3, kerb: 2,
+}
+
 /** Infrastruktur je Richtung, 2 Bit. */
 const INFRA = { keine: 0, streifen: 1, getrennt: 2 } as const
 
@@ -273,10 +288,24 @@ type Kante = {
   netz: number
   unfall: number
   unfallAnzahl: number
+  /** Sekunden für Poller, Tore, Bahnübergänge und Querungen auf dieser Kante. */
+  huerde: number
+  /** Fussgängerzone: fahren erlaubt, aber im Schritttempo zwischen Leuten. */
+  fussgaenger: boolean
+  /** Bahnhofshalle, Perron, Ladenpassage, Lift: mit dem Velo tabu. */
+  innen: boolean
   hoehen: number[] // je Geometriepunkt, Meter
   hoch: number
   runter: number
 }
+
+/**
+ * Wege, die durch Gebäude führen. Das Netz der Stadt enthält Bahnhofshallen,
+ * Perrons, Ladenpassagen, Lifte und Rolltreppen, weil es auch dem Fussverkehr
+ * dient. Mit dem Velo fährt und schiebt dort niemand, deshalb fliegen sie
+ * ganz aus dem Routinggraphen.
+ */
+const INNEN = /Bahnhofshalle|Perron|Rail City|Ladenpassage|Bahnhofpassage|Passage |Shopville|Lift|Aufzug|Rolltreppe/i
 
 const kanten: Kante[] = []
 for (const f of netz) {
@@ -311,6 +340,9 @@ for (const f of netz) {
     netz: NETZ.keins,
     unfall: 0,
     unfallAnzahl: 0,
+    huerde: 0,
+    fussgaenger: false,
+    innen: INNEN.test((p.name ?? '').trim()),
     hoehen: [],
     hoch: 0,
     runter: 0,
@@ -388,6 +420,10 @@ for (const [i, k] of kanten.entries()) {
   k.tunnel = (!!t.tunnel && t.tunnel !== 'no') || t.covered === 'yes'
   osmTempo[i] = tempoAusOsm(t)
   if (t.embedded_rails === 'tram') k.tram = true
+  if ((t.indoor && t.indoor !== 'no') || t.highway === 'corridor' || t.highway === 'elevator') k.innen = true
+  k.fussgaenger = t.highway === 'pedestrian' || t.highway === 'footway' || t.highway === 'steps'
+  // Wo OSM «absteigen» sagt, wird geschoben, auch wenn die Stadt Velo erlaubt.
+  if (t.bicycle === 'dismount') k.velo = false
   const spur = [t.cycleway, t['cycleway:both'], t['cycleway:right'], t['cycleway:left']]
   if (spur.includes('track') || spur.includes('separate')) k.osmVelo = 'weg'
   else if (spur.includes('lane')) k.osmVelo = 'streifen'
@@ -594,6 +630,36 @@ function lv95NachWgs(e: number, n: number): [number, number] {
   return [(lon * 100) / 36, (lat * 100) / 36]
 }
 
+// ------------------------------------------------------------ Hürden
+
+console.log('Hürden')
+/** Alle Kanten im Raster, für Hürden und Abbiegeverbote. */
+const alleKanten = new LinienIndex(25)
+kanten.forEach((k, i) => alleKanten.add(k.xy, i))
+type OsmKnoten = { lat: number; lon: number; tags?: Record<string, string> }
+let huerdenZugeordnet = 0
+for (const el of json('osm-huerden.json').elements as OsmKnoten[]) {
+  const t = el.tags ?? {}
+  let sek = 0
+  if (t.barrier) {
+    if (t.barrier === 'kerb') {
+      // Abgesenkte Kanten sind keine Hürde, hohe schon.
+      sek = t.kerb === 'lowered' || t.kerb === 'flush' ? 0 : HUERDE.kerb
+    } else sek = HUERDE[t.barrier] ?? 3
+    // Was ausdrücklich für Velos offen ist, hält niemanden auf.
+    if (t.bicycle === 'yes' || t['bicycle:physical'] === 'no') sek = Math.min(sek, 2)
+  } else if (t.railway === 'level_crossing') sek = HUERDE.level_crossing
+  else if (t.railway === 'crossing' || t.railway === 'tram_crossing') sek = HUERDE.railway_crossing
+  else if (t.highway === 'crossing') sek = HUERDE.crossing
+  if (!sek) continue
+  const [x, y] = toXY(el.lon, el.lat)
+  const treffer = alleKanten.naechstes(x, y, -1, 8, 90)
+  if (!treffer) continue
+  kanten[treffer.linie.id].huerde += sek
+  huerdenZugeordnet++
+}
+console.log(`  ${huerdenZugeordnet} Hindernisse einer Kante zugeordnet`)
+
 // ------------------------------------------------------------ Stress
 
 /** Infrastruktur in Fahrtrichtung, `vorwaerts` = von `von` nach `nach`. */
@@ -605,27 +671,39 @@ function infra(k: Kante, vorwaerts: boolean): number {
 }
 
 /**
- * Level of Traffic Stress, vereinfacht auf das, was die Daten hergeben:
- * Verkehrsmenge steckt nur indirekt in Klasse und Tempo.
+ * Wie unangenehm eine Kante zu fahren ist, Stufe 1 bis 4.
+ *
+ * Der Kern ist das Level-of-Traffic-Stress-Schema aus Tempo, Strassenklasse
+ * und Velostreifen; die Verkehrsmenge steckt nur indirekt darin. Dazu kommt,
+ * was in Zürich den Unterschied macht und mit Autoverkehr nichts zu tun hat:
+ * Kopfsteinpflaster, Tramgleise in der Fahrbahn und Fussgängerzonen, in denen
+ * man zwischen Leuten hindurchkurvt. Die Gassen um das Grossmünster sind
+ * autofrei und trotzdem keine Strecke, auf der man gerne fährt.
  */
 function stress(k: Kante, vorwaerts: boolean): number {
   if (!k.velo) return 1
   const i = infra(k, vorwaerts)
-  if (i === INFRA.getrennt) return 1
   const strasse = k.klasse >= KLASSE.wohnstrasse && k.klasse <= KLASSE.haupt
-  if (!strasse) return 1
-  if (k.tempo === TEMPO.fahrverbot || k.tempo === TEMPO.t20 || k.klasse === KLASSE.wohnstrasse) return 1
   let s: number
-  if (k.tempo === TEMPO.t30 || k.tempo === TEMPO.keins) {
+  if (i === INFRA.getrennt || !strasse) s = 1
+  else if (k.tempo === TEMPO.fahrverbot || k.tempo === TEMPO.t20 || k.klasse === KLASSE.wohnstrasse) s = 1
+  else if (k.tempo === TEMPO.t30 || k.tempo === TEMPO.keins) {
     s = k.klasse === KLASSE.haupt ? 3 : k.klasse === KLASSE.sammel ? 2 : 1
     if (i === INFRA.streifen) s = Math.max(1, s - 1)
   } else if (k.tempo === TEMPO.t50) {
     if (i === INFRA.streifen) s = k.klasse === KLASSE.neben ? 2 : 3
     else s = k.klasse === KLASSE.neben ? 3 : 4
-  } else {
-    s = i === INFRA.streifen ? 3 : 4
-  }
-  if (k.tram && i === INFRA.keine) s = Math.min(4, s + 1)
+  } else s = i === INFRA.streifen ? 3 : 4
+
+  // Tramgleise ohne eigene Spur: das Vorderrad im Rillengleis ist der
+  // häufigste Sturzgrund in der Stadt.
+  if (k.tram && i !== INFRA.getrennt) s = Math.min(4, s + (i === INFRA.keine ? 2 : 1))
+  // Kopfsteinpflaster rüttelt so stark, dass eine ruhige Gasse trotzdem
+  // unangenehm ist. Feines Plaster und Kies zählen halb.
+  if (k.belag === BELAG.kopfstein) s = Math.min(4, s + 2)
+  else if (k.belag === BELAG.platten || k.belag === BELAG.kies || k.belag === BELAG.naturweg) s = Math.min(4, s + 1)
+  // Fussgängerzonen und Plätze: fahren erlaubt, aber im Schritttempo.
+  if (k.fussgaenger && k.klasse !== KLASSE.veloweg) s = Math.max(s, 2)
   return s
 }
 
@@ -722,8 +800,6 @@ function naechsteInzidente(n: number, lon: number, lat: number) {
   }
   return beste
 }
-const alleKanten = new LinienIndex(25)
-kanten.forEach((k, i) => alleKanten.add(k.xy, i))
 const verbote: [number, number, number][] = []
 for (const f of json('abbiegeverbote.geojson').features) {
   const c: number[][] = f.geometry.coordinates
@@ -781,6 +857,7 @@ const runterDm = new Uint16Array(E)
 const merkmale = new Uint32Array(E)
 const unfall = new Uint8Array(E)
 const unfallAnzahl = new Uint8Array(E)
+const huerde = new Uint8Array(E)
 const kanteName = new Uint16Array(E)
 
 let p = 0
@@ -799,14 +876,15 @@ kanten.forEach((k, i) => {
   runterDm[i] = Math.min(65535, Math.round(k.runter * 10))
   unfall[i] = Math.min(255, k.unfall)
   unfallAnzahl[i] = Math.min(255, k.unfallAnzahl)
+  huerde[i] = Math.min(255, Math.round(k.huerde))
   kanteName[i] = nameVon(k.name)
 
-  const veloVor = k.velo && k.einbahn !== 'TF'
-  const veloRueck = k.velo && k.einbahn !== 'FT'
+  const veloVor = k.velo && !k.innen && k.einbahn !== 'TF'
+  const veloRueck = k.velo && !k.innen && k.einbahn !== 'FT'
   // Schieben geht, wo Fussgänger dürfen. Gegen die Einbahn auf dem Trottoir
   // ebenso, das ist der Normalfall für kurze Stücke.
-  const schiebenVor = !veloVor && (k.fuss || k.velo)
-  const schiebenRueck = !veloRueck && (k.fuss || k.velo)
+  const schiebenVor = !veloVor && !k.innen && (k.fuss || k.velo)
+  const schiebenRueck = !veloRueck && !k.innen && (k.fuss || k.velo)
   merkmale[i] =
     (veloVor ? 1 : 0) |
     (veloRueck ? 2 : 0) |
@@ -822,7 +900,8 @@ kanten.forEach((k, i) => {
     ((k.tunnel ? 1 : 0) << 19) |
     (k.netz << 20) |
     (stress(k, true) << 22) |
-    (stress(k, false) << 25)
+    (stress(k, false) << 25) |
+    ((k.fussgaenger ? 1 : 0) << 28)
 })
 kantePunkte[E] = p
 
@@ -845,6 +924,7 @@ const abschnitte: [string, ArrayBufferView][] = [
   ['merkmale', merkmale],
   ['unfall', unfall],
   ['unfallAnzahl', unfallAnzahl],
+  ['huerde', huerde],
   ['kanteName', kanteName],
   ['ampelArt', ampelArt],
   ['verbote', verbotArr],
@@ -880,6 +960,9 @@ writeFileSync(
       veloKm: Math.round(kanten.filter((k) => k.velo).reduce((s, k) => s + k.laenge, 0) / 1000),
       stressKm: stressMeter.slice(1).map((m) => Math.round(m / 1000)),
       ampelKnoten: genutzt.size,
+      innen: kanten.filter((k) => k.innen).length,
+      huerden: huerdenZugeordnet,
+      fussgaengerKm: Math.round(kanten.filter((k) => k.fussgaenger && k.velo).reduce((s, k) => s + k.laenge, 0) / 1000),
       verbote: verbote.length,
       unfaelle,
       tramKanten,

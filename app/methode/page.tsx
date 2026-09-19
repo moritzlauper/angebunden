@@ -340,10 +340,22 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           seit 2016.
         </p>
         <p className="mt-4">
-          Aus Tempo, Strassenklasse, Velostreifen und Tramgleisen ergibt sich je Fahrtrichtung eine
-          Stressstufe von 1 bis 4, angelehnt an das Schema «Level of Traffic Stress». Stufe 1 ist ein
-          abgetrennter Veloweg, eine Tempo-30-Nebenstrasse oder eine Begegnungszone. Stufe 4 ist
-          Mischverkehr auf Tempo 50 und mehr. Die Farben der Route auf der Karte zeigen diese Stufen.
+          Aus Tempo, Strassenklasse und Velostreifen ergibt sich je Fahrtrichtung eine Stufe von 1 bis
+          4, angelehnt an das Schema «Level of Traffic Stress». Dazu kommt, was in Zürich den
+          Unterschied macht und mit Autoverkehr nichts zu tun hat: Kopfsteinpflaster hebt eine Strecke
+          um zwei Stufen, Tramgleise in der Fahrbahn um eine bis zwei, Fussgängerzonen mindestens auf
+          Stufe 2. Die Gassen um das Grossmünster sind autofrei und trotzdem keine Strecke, auf der man
+          gerne fährt. Stufe 1 ist ein abgetrennter Veloweg oder eine glatte Tempo-30-Nebenstrasse,
+          Stufe 4 Mischverkehr auf Tempo 50, Gleise ohne eigene Spur oder grobes Pflaster. Die Farben
+          der Route auf der Karte zeigen diese Stufen.
+        </p>
+        <p className="mt-4">
+          Was ein Velo aufhält, zählt in Sekunden: Poller 3, Tore 8, Drängelgitter 15, Umlaufgitter
+          und Drehkreuze 45 bis 60, Bahnübergänge 6, eine Fahrbahn ohne Ampel queren 3. Die Standorte
+          kommen aus OpenStreetMap, 9&apos;877 davon liegen auf einer Kante des Netzes. Wege durch
+          Gebäude fallen ganz aus dem Netz: Das Netz der Stadt enthält Bahnhofshallen, Perrons,
+          Ladenpassagen und Lifte, weil es auch dem Fussverkehr dient. Mit dem Velo schiebt dort niemand
+          durch.
         </p>
         <p className="mt-4">
           Gesucht wird im Browser mit A* über gerichtete Wegstücke statt über Kreuzungen. Nur so
@@ -358,8 +370,10 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           Die Fahrzeit rechnet mit 22 km/h in der Ebene, 3.6 Sekunden zusätzlich je Höhenmeter
           bergauf und höchstens 30 km/h bergab. Auf Fusswegen und in Begegnungszonen sind es
           höchstens 15 km/h. Kopfsteinpflaster und Kies bremsen.
-          Die drei Varianten unterscheiden sich nur darin, wie stark Verkehr, Steigung, Ampeln und
-          Belag zusätzlich zur Zeit zählen. «Schnell» achtet fast nur auf die Zeit. «Ideal» nimmt im
+          Grobes Pflaster kostet zusätzlich: Es drückt das Tempo auf zwei Drittel und wiegt in der
+          Bewertung so schwer wie ein Umweg von gut einem Drittel der Strecke. Die drei Varianten
+          unterscheiden sich nur darin, wie stark Verkehr, Steigung, Ampeln und Belag zusätzlich zur
+          Zeit zählen. «Schnell» achtet fast nur auf die Zeit. «Ideal» nimmt im
           Mittel rund 2% mehr Fahrzeit in Kauf und fährt dafür deutlich mehr auf ruhigen Strassen.
           «Komfort» meidet Verkehr und Steigungen stark. Vorzugsrouten bekommen 15% Rabatt, das
           Hauptnetz 5%.

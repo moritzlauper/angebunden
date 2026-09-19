@@ -62,6 +62,7 @@ export function ladeGraph(meta: VeloMeta, puffer: ArrayBuffer) {
   const merkmale = feld('merkmale', Uint32Array)
   const unfall = feld('unfall', Uint8Array)
   const unfallAnzahl = feld('unfallAnzahl', Uint8Array)
+  const huerde = feld('huerde', Uint8Array)
   const kanteName = feld('kanteName', Uint16Array)
   const ampelArt = feld('ampelArt', Uint8Array)
   const verboteRoh = feld('verbote', Uint32Array)
@@ -144,7 +145,7 @@ export function ladeGraph(meta: VeloMeta, puffer: ArrayBuffer) {
 
   return {
     meta, N, E, knotenKoord, knotenAmpel, kanteVon, kanteNach, kantePunkte, punkte, punktHoehe,
-    laenge, hoch, runter, merkmale, unfall, unfallAnzahl, kanteName, ampelArt, verbote,
+    laenge, hoch, runter, merkmale, unfall, unfallAnzahl, huerde, kanteName, ampelArt, verbote,
     ausgehend, grad, peilStart, peilEnde, hauptKnoten, raster, ZELLE, punktKante,
     kopf, fuss, px, py, MX, MY, LAT0,
   }
@@ -162,6 +163,7 @@ export const belagVon = (g: Graph, e: number) => (m(g, e) >> 14) & 7
 export const tramVon = (g: Graph, e: number) => ((m(g, e) >> 17) & 1) === 1
 export const netzVon = (g: Graph, e: number) => (m(g, e) >> 20) & 3
 export const stressVon = (g: Graph, a: number) => (m(g, a >> 1) >> (a & 1 ? 25 : 22)) & 7
+export const fussgaengerVon = (g: Graph, e: number) => ((m(g, e) >> 28) & 1) === 1
 const istStrasse = (g: Graph, e: number) => {
   const k = klasseVon(g, e)
   return k >= KLASSE.wohnstrasse && k <= KLASSE.haupt
@@ -183,9 +185,9 @@ export type Profil = {
 }
 
 export const VOREINSTELLUNGEN = {
-  schnell: { sicherheit: 0.1, steigung: 0.1, ampeln: 0.4, belag: 0.2 },
-  ausgewogen: { sicherheit: 0.5, steigung: 0.3, ampeln: 0.5, belag: 0.4 },
-  entspannt: { sicherheit: 0.95, steigung: 0.8, ampeln: 0.6, belag: 0.8 },
+  schnell: { sicherheit: 0.1, steigung: 0.1, ampeln: 0.4, belag: 0.3 },
+  ausgewogen: { sicherheit: 0.5, steigung: 0.3, ampeln: 0.5, belag: 0.6 },
+  entspannt: { sicherheit: 0.95, steigung: 0.8, ampeln: 0.6, belag: 1 },
 } as const
 
 /** Tempo in der Ebene, 22 km/h. */
@@ -201,9 +203,13 @@ const VMAX = 8.5
 /** Tempo zu Fuss mit dem Velo an der Hand. */
 const V_SCHIEBEN = 1.25
 /** Tempofaktor je Belag. */
-const BELAG_TEMPO = [1, 0.93, 0.72, 0.82, 0.65]
-/** Zusätzliche gefühlte Zeit je Belag, bei voller Gewichtung. */
-const BELAG_KOSTEN = [0, 0.1, 0.7, 0.35, 0.7]
+const BELAG_TEMPO = [1, 0.9, 0.62, 0.8, 0.62]
+/**
+ * Zusätzliche gefühlte Zeit je Belag, bei voller Gewichtung. Das grobe
+ * Pflaster der Altstadtgassen ist der unangenehmste Belag der Stadt: es
+ * rüttelt, bei Nässe rutscht es, und bergauf verliert man den Tritt.
+ */
+const BELAG_KOSTEN = [0, 0.15, 1.3, 0.4, 0.8]
 /** Zusätzliche gefühlte Zeit je Stressstufe (Index 1–4), bei voller Gewichtung. */
 const STRESS_KOSTEN = [0, 0, 0.3, 1.1, 2.2]
 /** Rabatt auf Vorzugsrouten und Hauptnetz der städtischen Velonetzplanung. */
@@ -239,9 +245,11 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
     const klasse = klasseVon(g, e)
     if (veloErlaubt(g, a)) {
       const belag = belagVon(g, e)
+      const fuss = fussgaengerVon(g, e)
       let v = v0 * BELAG_TEMPO[belag]
       // Wo man Fussgängern ausweichen muss, fährt man langsamer.
       if (klasse === KLASSE.weg || klasse === KLASSE.wohnstrasse) v = Math.min(v, 4.2)
+      if (fuss) v = Math.min(v, 3.3)
       const eben = L / v
       const gewinn = Math.max(0, Math.min(ab * 3, eben - L / VMAX))
       const t = eben + auf * sProM - gewinn
@@ -250,11 +258,18 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
       let faktor =
         1 +
         STRESS_KOSTEN[stress] * p.sicherheit +
-        BELAG_KOSTEN[belag] * p.belag
+        BELAG_KOSTEN[belag] * p.belag +
+        // Auf Plätzen und in Fussgängerzonen kommt man weder zügig noch
+        // entspannt durch, unabhängig davon, wie man die Regler stellt.
+        (fuss ? 0.4 : 0)
       faktor *= NETZ_RABATT[netzVon(g, e)]
-      zeit[a] = t
+      // Poller, Tore, Bahnübergänge und ungesicherte Querungen: feste
+      // Sekunden, unabhängig von der Länge der Kante.
+      const huerde = g.huerde[e]
+      zeit[a] = t + huerde
       kosten[a] =
         t * faktor +
+        huerde * 1.6 +
         auf * sProM * p.steigung * (1.2 + 12 * Math.max(0, steil - 0.05)) +
         g.unfall[e] * 3 * p.sicherheit
     } else if (p.schieben && schiebenErlaubt(g, a)) {
@@ -480,6 +495,8 @@ export type Route = {
   kiesM: number
   treppen: number
   unfaelle: number
+  /** Sekunden für Poller, Tore, Bahnübergänge und Querungen. */
+  huerden: number
   ampeln: { geradeaus: number; abbiegen: number; wartezeit: number; orte: [number, number, Manoever][] }
   /** Höhenprofil: [Distanz ab Start in m, Höhe in m]. */
   profil: [number, number][]
@@ -635,7 +652,7 @@ function auswerten(g: Graph, p: Profil, stuecke: Stueck[], kostenSumme: number):
   const { zeit } = kantenKosten(g, p)
   const r: Route = {
     stuecke, koordinaten: [], stufen: [], distanz: 0, zeit: 0, kosten: kostenSumme, hoch: 0, runter: 0,
-    meterNachStufe: [0, 0, 0, 0, 0], vorzugM: 0, tramM: 0, kopfsteinM: 0, kiesM: 0, treppen: 0, unfaelle: 0,
+    meterNachStufe: [0, 0, 0, 0, 0], vorzugM: 0, tramM: 0, kopfsteinM: 0, kiesM: 0, treppen: 0, unfaelle: 0, huerden: 0,
     ampeln: { geradeaus: 0, abbiegen: 0, wartezeit: 0, orte: [] }, profil: [], strassen: [],
   }
   const ue: Uebergang = { kosten: 0, zeit: 0, ampel: -1, manoever: null, eintritt: NaN }
@@ -660,6 +677,7 @@ function auswerten(g: Graph, p: Profil, stuecke: Stueck[], kostenSumme: number):
     if (!gesehen.has(e)) {
       gesehen.add(e)
       r.unfaelle += g.unfallAnzahl[e] * Math.min(1, anteil * 1.5)
+      r.huerden += g.huerde[e]
     }
 
     const pts = ausschnitt(g, s.a, s.von, s.bis)

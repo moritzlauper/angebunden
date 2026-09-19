@@ -47,13 +47,17 @@ function wms(dienst: string, layer: string, transparent = false) {
   )
 }
 
-/** Stressstufen 1–4 in den Statusfarben, Index 0 für geschobene Stücke. */
+/**
+ * Wie angenehm ein Abschnitt zu fahren ist, Stufe 1 bis 4 in den Statusfarben,
+ * Index 0 für geschobene Stücke. Es zählt nicht nur der Autoverkehr: auch
+ * Kopfsteinpflaster, Tramgleise und Fussgängerzonen ziehen eine Strecke nach unten.
+ */
 export const STUFEN = [
   { farbe: '#8a8a86', name: 'Geschoben', kurz: 'Schieben' },
-  { farbe: '#0ca30c', name: 'Ruhig oder abgetrennt', kurz: 'Ruhig' },
-  { farbe: '#fab219', name: 'Wenig Verkehr', kurz: 'Wenig Verkehr' },
-  { farbe: '#ec835a', name: 'Velostreifen an Tempo 50', kurz: 'Velostreifen' },
-  { farbe: '#d03b3b', name: 'Mischverkehr an Tempo 50', kurz: 'Mischverkehr' },
+  { farbe: '#0ca30c', name: 'Angenehm: ruhig und glatt', kurz: 'Angenehm' },
+  { farbe: '#fab219', name: 'Mässig: etwas Verkehr oder ruppig', kurz: 'Mässig' },
+  { farbe: '#ec835a', name: 'Unangenehm: Velostreifen, Pflaster', kurz: 'Unangenehm' },
+  { farbe: '#d03b3b', name: 'Hart: Mischverkehr, Gleise, grobes Pflaster', kurz: 'Hart' },
 ] as const
 const VORZUG = '#7c5cd6'
 const AKZENT = '#2563eb'
@@ -350,7 +354,9 @@ export default function Velonavi() {
         },
         layers: [
           { id: 'grund', type: 'background', paint: { 'background-color': ui.bg } },
-          { id: 'basiskarte', type: 'raster', source: 'basiskarte', paint: { 'raster-fade-duration': 150 } },
+          // Erst ab Zoomstufe 13: In der Übersicht wechselt die Stadtkarte
+          // sonst mehrfach die Detailstufe, was beim Zoomen unruhig wirkt.
+          { id: 'basiskarte', type: 'raster', source: 'basiskarte', minzoom: 13, paint: { 'raster-fade-duration': 150 } },
           { id: 'gebaeude', type: 'raster', source: 'gebaeude', minzoom: 15, paint: { 'raster-fade-duration': 150 } },
         ],
       },
@@ -380,8 +386,13 @@ export default function Velonavi() {
     attrib?.removeAttribute('open')
 
     map.on('load', async () => {
-      const vorzug = await fetch(`${STADT.daten}/velo-vorzug.geojson`).then((r) => r.json())
+      const [vorzug, stadtGeo, wasser] = await Promise.all(
+        ['velo-vorzug', 'city', 'water'].map((n) => fetch(`${STADT.daten}/${n}.geojson`).then((r) => r.json()))
+      )
       const leer = { type: 'FeatureCollection' as const, features: [] }
+      // Unterhalb von Zoom 13 eine ruhige eigene Übersicht statt der Stadtkarte.
+      map.addSource('stadt', { type: 'geojson', data: stadtGeo })
+      map.addSource('wasser', { type: 'geojson', data: wasser })
       map.addSource('vorzug', { type: 'geojson', data: vorzug })
       map.addSource('netz', { type: 'geojson', data: leer })
       map.addSource('ampeln', { type: 'geojson', data: leer })
@@ -391,6 +402,17 @@ export default function Velonavi() {
       map.addSource('zeiger', { type: 'geojson', data: leer })
 
       // Das Velonetz, nur eingeblendet, wenn es nach Stress eingefärbt wird.
+      map.addLayer({ id: 'stadt-flaeche', type: 'fill', source: 'stadt', maxzoom: 13.3, paint: { 'fill-color': '#ffffff' } })
+      map.addLayer({
+        id: 'wasser-flaeche', type: 'fill', source: 'wasser', maxzoom: 13.3,
+        filter: ['==', ['get', 'kind'], 'area'], paint: { 'fill-color': '#dcdcd6' },
+      })
+      map.addLayer({
+        id: 'wasser-linie', type: 'line', source: 'wasser', maxzoom: 13.3,
+        filter: ['==', ['get', 'kind'], 'line'],
+        paint: { 'line-color': '#dcdcd6', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 13, 8] },
+      })
+      map.addLayer({ id: 'stadt-rand', type: 'line', source: 'stadt', maxzoom: 13.3, paint: { 'line-color': '#c9c9c4', 'line-width': 1 } })
       map.addLayer({
         id: 'netz',
         type: 'line',
@@ -994,6 +1016,12 @@ function Ergebnis({
   if (r.kopfsteinM > 30) fakten.push({ titel: 'Kopfsteinpflaster', wert: km(r.kopfsteinM) })
   if (r.kiesM > 50) fakten.push({ titel: 'Kies oder Naturweg', wert: km(r.kiesM) })
   if (r.meterNachStufe[0] > 10) fakten.push({ titel: 'Schieben', wert: km(r.meterNachStufe[0]), hilfe: r.treppen ? `inkl. ${r.treppen} Treppe${r.treppen > 1 ? 'n' : ''}` : 'Fussweg, Velofahren nicht erlaubt' })
+  if (r.huerden > 4)
+    fakten.push({
+      titel: 'Poller, Tore, Querungen',
+      wert: `rund ${Math.round(r.huerden)} s`,
+      hilfe: 'Abbremsen an Hindernissen und ungesicherten Übergängen',
+    })
   fakten.push({ titel: 'Velounfälle entlang der Route', wert: nf(r.unfaelle), hilfe: 'seit 2016, polizeilich registriert' })
 
   return (
@@ -1096,7 +1124,7 @@ function StressBalken({ r }: { r: Route }) {
   const teile = reihenfolge.map((i) => ({ i, m: r.meterNachStufe[i] })).filter((t) => t.m > 0.5)
   return (
     <div>
-      <div className="flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full" role="img" aria-label="Anteile der Strecke nach Verkehrsbelastung">
+      <div className="flex h-2.5 w-full gap-[2px] overflow-hidden rounded-full" role="img" aria-label="Anteile der Strecke danach, wie angenehm sie zu fahren ist">
         {teile.map((t) => (
           <div
             key={t.i}
@@ -1274,7 +1302,7 @@ function Einstellungen({
           <Schalter an={schieben} setAn={setSchieben} titel="Schieben erlauben" hilfe="Kurze Stücke zu Fuss, wo Velos nicht fahren dürfen" />
         </div>
       )}
-      <Schalter an={netzFarbig} setAn={setNetzFarbig} titel="Velonetz nach Verkehr einfärben" />
+      <Schalter an={netzFarbig} setAn={setNetzFarbig} titel="Ganzes Velonetz einfärben" />
     </section>
   )
 }
@@ -1394,7 +1422,8 @@ function Leerzustand({ geladen, statistik }: { geladen: boolean; statistik?: Vel
     <section className="text-[13px] leading-snug">
       <p>
         Start und Ziel eingeben oder in die Karte tippen. Die Route berücksichtigt Verkehr, Velostreifen,
-        Tramgleise, Steigung, Belag und bei Lichtsignalen, ob man geradeaus über die Kreuzung muss oder nur abbiegt.
+        Tramgleise, Kopfsteinpflaster, Steigung, Poller und Tore, und bei Lichtsignalen, ob man geradeaus
+        über die Kreuzung muss oder nur abbiegt.
       </p>
       <p className="mt-2 text-[12px]" style={{ color: ui.muted }}>
         {geladen && statistik
