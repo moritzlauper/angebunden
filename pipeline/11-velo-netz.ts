@@ -450,6 +450,11 @@ function tempoAusOsm(t: Record<string, string>): number {
 }
 
 let osmTreffer = 0
+// Mitzählen, was die einzelnen OSM-Angaben tatsächlich bewirken. Ohne diese
+// Zahlen sieht man einem Lauf nicht an, ob ein Tag je greift.
+let nVelostrasse = 0
+let nRauh = 0
+let nGetrennt = 0
 const osmTempo = new Int8Array(kanten.length)
 for (const [i, k] of kanten.entries()) {
   const id = abgleich(osmIndex, k.xy, 9, 35, 0.4)
@@ -474,10 +479,12 @@ for (const [i, k] of kanten.entries()) {
   k.spuren = Math.min(9, parseInt(t.lanes ?? '', 10) || 0)
   // Auf einem Weg mit `segregated=yes` läuft der Fussverkehr auf einer eigenen
   // Spur daneben, man kurvt nicht zwischen Leuten hindurch.
-  k.fussgaenger =
-    (t.highway === 'pedestrian' || t.highway === 'footway' || t.highway === 'steps') && t.segregated !== 'yes'
+  const fussweg = t.highway === 'pedestrian' || t.highway === 'footway' || t.highway === 'steps'
+  k.fussgaenger = fussweg && t.segregated !== 'yes'
+  if (fussweg && t.segregated === 'yes') nGetrennt++
+  if (/^(bad|very_bad|horrible|very_horrible|impassable)$/.test(t.smoothness ?? '')) nRauh++
   // Velostrasse: das Velo gibt den Takt vor, Autos sind zu Gast.
-  if (t.bicycle_road === 'yes' || t.cyclestreet === 'yes') k.velostrasse = true
+  if (t.bicycle_road === 'yes' || t.cyclestreet === 'yes') (k.velostrasse = true), nVelostrasse++
   // Wo OSM «absteigen» sagt, wird geschoben, auch wenn die Stadt Velo erlaubt.
   if (t.bicycle === 'dismount') k.velo = false
   const spur = [t.cycleway, t['cycleway:both'], t['cycleway:right'], t['cycleway:left']]
@@ -486,6 +493,7 @@ for (const [i, k] of kanten.entries()) {
   if (spur.includes('shared_lane')) k.piktogramm = true
 }
 console.log(`  ${osmTreffer} von ${kanten.length} Kanten mit OSM-Partner`)
+console.log(`  davon ${nVelostrasse} Velostrasse, ${nRauh} mit schlechtem Belagszustand, ${nGetrennt} Fussweg mit eigener Velospur`)
 
 // ------------------------------------------------------------ Tempo
 
