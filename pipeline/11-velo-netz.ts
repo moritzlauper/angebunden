@@ -322,6 +322,13 @@ type Kante = {
  */
 const INNEN = /Bahnhofshalle|Perron|Rail City|Ladenpassage|Bahnhofpassage|Passage |Shopville|Lift|Aufzug|Rolltreppe/i
 
+/**
+ * Das Trassee selbst, im Netz der Stadt als «Tram <Haltestelle>» geführt. Ein
+ * Teil davon ist dort für Velos freigegeben, gemeint ist aber das Gleisfeld
+ * neben dem Perron. Querungen darüber bleiben erlaubt.
+ */
+const TRAMKOERPER = /^Tram .*(?<!Überquerung)$/i
+
 const kanten: Kante[] = []
 for (const f of netz) {
   const p = f.properties
@@ -359,7 +366,7 @@ for (const f of netz) {
     fussgaenger: false,
     velokarte: Math.min(3, Number(p.map_velo) || 0),
     piktogramm: false,
-    innen: INNEN.test((p.name ?? '').trim()),
+    innen: INNEN.test((p.name ?? '').trim()) || TRAMKOERPER.test((p.name ?? '').trim()),
     spuren: 0,
     einbahnStreng: false,
     gegenverkehr: false,
@@ -1160,6 +1167,7 @@ writeFileSync(
       velokarteKm: Math.round(kanten.filter((k) => k.velo && k.velokarte > 0).reduce((s, k) => s + k.laenge, 0) / 1000),
       mehrspurigKm: Math.round(kanten.filter((k) => k.velo && k.spuren >= 3).reduce((s, k) => s + k.laenge, 0) / 1000),
       innen: kanten.filter((k) => k.innen).length,
+      tramkoerper: kanten.filter((k) => TRAMKOERPER.test(k.name)).length,
       huerden: huerdenZugeordnet,
       fussgaengerKm: Math.round(kanten.filter((k) => k.fussgaenger && k.velo).reduce((s, k) => s + k.laenge, 0) / 1000),
       verbote: verbote.length,
