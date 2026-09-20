@@ -250,11 +250,13 @@ const MIN_FAKTOR = 0.45
 /**
  * Erwartete Wartezeit an einem Lichtsignal in Sekunden, je Manöver.
  * Geradeaus über die Kreuzung wartet man im Mittel eine halbe Rotphase.
- * Rechts abbiegen geht fast immer ohne Halt, links meist indirekt über den
- * Velosack oder den Fussgängerstreifen, was selten lange dauert.
+ * Rechts abbiegen geht praktisch nie mit Halt: Velos biegen dort in der
+ * Praxis unabhängig von der Ampelphase ab, ein kurzer Blick reicht.
+ * Links meist indirekt über den Velosack oder den Fussgängerstreifen, was
+ * selten lange dauert.
  */
 const WARTEN = {
-  knoten: { geradeaus: 24, links: 7, rechts: 2 },
+  knoten: { geradeaus: 24, links: 7, rechts: 1 },
   // Einzelne Fussgängerampeln: entlang der Strasse meist grün, beim Queren rot.
   einzeln: { entlang: 5, queren: 18, abbiegen: 2 },
 }
