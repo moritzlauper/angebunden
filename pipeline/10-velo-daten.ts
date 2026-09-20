@@ -117,6 +117,16 @@ await hole(
      node["highway"="crossing"]["crossing"!="traffic_signals"](${b}););
     out;`)
 )
+// Abbiegeverbote, die in OSM ausdrücklich nicht fürs Velo gelten: die Tafel
+// «ausser Velo» als Datenfeld. Geholt werden die Via-Knoten der Relationen,
+// über die sie sich in `11-velo-netz.ts` den Verboten der Stadt zuordnen lassen.
+await hole(
+  'osm-abbiegeverbote.json',
+  overpass(`[out:json][timeout:300];
+    relation["type"="restriction"]["except"~"bicycle"](${b});
+    node(r:"via");
+    out;`)
+)
 await hole(
   'osm-ampeln.json',
   overpass(`[out:json][timeout:300];

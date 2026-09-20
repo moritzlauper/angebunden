@@ -297,6 +297,8 @@ type Kante = {
   velokarte: number
   /** OSM `cycleway=shared_lane`: Velopiktogramme auf der Fahrbahn, kein eigener Streifen. */
   piktogramm: boolean
+  /** OSM `bicycle_road`/`cyclestreet`: Velostrasse, das Velo gibt den Takt vor. */
+  velostrasse: boolean
   /** Fest vorgegebene Stufe aus den eigenen Korrekturen. */
   stressFest?: number
   /** Explizit gesperrte Kante, auch vor dem automatischen Lückenschluss. */
@@ -368,6 +370,7 @@ for (const f of netz) {
     fussgaenger: false,
     velokarte: Math.min(3, Number(p.map_velo) || 0),
     piktogramm: false,
+    velostrasse: false,
     innen: INNEN.test((p.name ?? '').trim()) || TRAMKOERPER.test((p.name ?? '').trim()),
     spuren: 0,
     einbahnStreng: false,
@@ -418,15 +421,23 @@ function klasseAusOsm(t: Record<string, string>): number {
 
 function belagAusOsm(t: Record<string, string>, klasse: number): number {
   const s = t.surface ?? ''
-  if (/^(sett|cobblestone|unhewn_cobblestone|cobblestone:flattened)$/.test(s)) return BELAG.kopfstein
-  if (/^(paving_stones|concrete:plates|concrete:lanes|grass_paver|metal|wood)$/.test(s)) return BELAG.platten
-  if (/^(compacted|fine_gravel|gravel|pebblestone)$/.test(s)) return BELAG.kies
-  if (/^(ground|dirt|earth|grass|mud|sand|unpaved|woodchips|rock)$/.test(s)) return BELAG.naturweg
-  if (s) return BELAG.gut
-  // Ohne Angabe: Strassen sind asphaltiert, Feld- und Waldwege eher nicht.
-  if (klasse === KLASSE.feldweg) return t.tracktype === 'grade1' ? BELAG.gut : BELAG.kies
-  if (klasse === KLASSE.weg && t.highway === 'path') return BELAG.kies
-  return BELAG.gut
+  const belag = () => {
+    if (/^(sett|cobblestone|unhewn_cobblestone|cobblestone:flattened)$/.test(s)) return BELAG.kopfstein
+    if (/^(paving_stones|concrete:plates|concrete:lanes|grass_paver|metal|wood)$/.test(s)) return BELAG.platten
+    if (/^(compacted|fine_gravel|gravel|pebblestone)$/.test(s)) return BELAG.kies
+    if (/^(ground|dirt|earth|grass|mud|sand|unpaved|woodchips|rock)$/.test(s)) return BELAG.naturweg
+    if (s) return BELAG.gut
+    // Ohne Angabe: Strassen sind asphaltiert, Feld- und Waldwege eher nicht.
+    if (klasse === KLASSE.feldweg) return t.tracktype === 'grade1' ? BELAG.gut : BELAG.kies
+    if (klasse === KLASSE.weg && t.highway === 'path') return BELAG.kies
+    return BELAG.gut
+  }
+  const b = belag()
+  // `smoothness` beschreibt den Zustand, nicht das Material: Ein Asphaltweg
+  // voller Flicken und Wurzelaufbrüche steht als surface=asphalt in den Daten
+  // und fährt sich trotzdem wie Kies.
+  if (b === BELAG.gut && /^(bad|very_bad|horrible|very_horrible|impassable)$/.test(t.smoothness ?? '')) return BELAG.kies
+  return b
 }
 
 function tempoAusOsm(t: Record<string, string>): number {
@@ -461,7 +472,12 @@ for (const [i, k] of kanten.entries()) {
     k.gegenStreifen = /opposite_lane|opposite_track/.test(gegen)
   }
   k.spuren = Math.min(9, parseInt(t.lanes ?? '', 10) || 0)
-  k.fussgaenger = t.highway === 'pedestrian' || t.highway === 'footway' || t.highway === 'steps'
+  // Auf einem Weg mit `segregated=yes` läuft der Fussverkehr auf einer eigenen
+  // Spur daneben, man kurvt nicht zwischen Leuten hindurch.
+  k.fussgaenger =
+    (t.highway === 'pedestrian' || t.highway === 'footway' || t.highway === 'steps') && t.segregated !== 'yes'
+  // Velostrasse: das Velo gibt den Takt vor, Autos sind zu Gast.
+  if (t.bicycle_road === 'yes' || t.cyclestreet === 'yes') k.velostrasse = true
   // Wo OSM «absteigen» sagt, wird geschoben, auch wenn die Stadt Velo erlaubt.
   if (t.bicycle === 'dismount') k.velo = false
   const spur = [t.cycleway, t['cycleway:both'], t['cycleway:right'], t['cycleway:left']]
@@ -759,7 +775,7 @@ console.log('Verbindungen von Hand')
       klasse: KLASSE.neben, belag: BELAG.gut, tempo: TEMPO.t30,
       tram: false, bruecke: false, tunnel: false, osmVelo: null, netz: NETZ.keins,
       unfall: 0, unfallAnzahl: 0, huerde: 0, fussgaenger: false, velokarte: 0,
-      piktogramm: false, innen: false, spuren: 0, einbahnStreng: false,
+      piktogramm: false, velostrasse: false, innen: false, spuren: 0, einbahnStreng: false,
       gegenverkehr: true, gegenStreifen: false, hoehen: [], hoch: 0, runter: 0,
       stressFest: v.stress ?? 1,
     })
@@ -950,7 +966,7 @@ function stress(k: Kante, vorwaerts: boolean): number {
   // Eine Strasse, die in der Velokarte der Stadt steht, ist eine ausgeschilderte
   // Route. Sie kann unangenehm sein, aber sie ist keine Achse, die man meidet.
   // Dasselbe gilt für Velopiktogramme auf der Fahrbahn.
-  const gefuehrt = k.velokarte > 0 || k.piktogramm
+  const gefuehrt = k.velokarte > 0 || k.piktogramm || k.velostrasse
 
   // Drei Spuren und mehr ohne eigenen Streifen: Hauptachsen mit Abbiegespuren,
   // oft mit Autobahnzufahrt. Abbiegespuren an einer Tempo-30-Kreuzung sind
@@ -1105,6 +1121,35 @@ for (const f of json('abbiegeverbote.geojson').features) {
   verbote.push([a, b, via])
 }
 console.log(`  ${verbote.length} Abbiegeverbote zugeordnet`)
+
+/**
+ * OSM hält fest, wo ein Abbiegeverbot ausdrücklich nicht fürs Velo gilt
+ * (`except=bicycle`) - die Tafel «ausser Velo» als Datenfeld. Das ist die
+ * belastbarste Quelle dafür; die Faustregel weiter unten greift nur dort,
+ * wo OSM nichts sagt. Zugeordnet wird über den Via-Knoten: Liegt an derselben
+ * Kreuzung ein OSM-Verbot mit Velo-Ausnahme, gilt das Verbot der Stadt dort
+ * auch bei uns nicht fürs Velo.
+ */
+{
+  let knotenMitAusnahme: { lon: number; lat: number }[] = []
+  try {
+    knotenMitAusnahme = json('osm-abbiegeverbote.json').elements.filter((e: { type: string }) => e.type === 'node')
+  } catch {
+    console.log('  osm-abbiegeverbote.json fehlt (ältere Daten), übersprungen')
+  }
+  if (knotenMitAusnahme.length) {
+    const xy = knotenMitAusnahme.map((a) => toXY(a.lon, a.lat))
+    const vorher = verbote.length
+    for (let i = verbote.length - 1; i >= 0; i--) {
+      const via = verbote[i][2]
+      const [vx, vy] = toXY(knotenLonLat[2 * via], knotenLonLat[2 * via + 1])
+      if (xy.some(([ax, ay]) => Math.hypot(ax - vx, ay - vy) < 12)) verbote.splice(i, 1)
+    }
+    console.log(
+      `  ${knotenMitAusnahme.length} Kreuzungen mit «ausser Velo» in OSM, ${vorher - verbote.length} Abbiegeverbote aufgehoben`
+    )
+  }
+}
 
 /**
  * Ein Abbiegeverbot zwischen zwei ruhigen Quartierstrassen ist keine
