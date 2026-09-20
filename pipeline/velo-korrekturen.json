@@ -172,6 +172,14 @@
       "grund": "Die Herterbrücke hat Treppen ohne fahrbare Velorampe und ist mit dem Velo nicht befahrbar."
     }
   ],
+  "verbindungen": [
+    {
+      "von": [8.54589, 47.37467],
+      "nach": [8.5458, 47.37506],
+      "name": "Hirschengraben",
+      "grund": "Beim Lichtsignal Mühlegasse/Seilergraben fährt man mit dem Velo einfach geradeaus weiter auf den Hirschengraben und von dort hoch auf Auf der Mauer. Im Datensatz sind Fahrbahn- und Fusswegnetz an dieser Kreuzung nicht zusammengeheftet: Die beiden Knoten liegen 44 m auseinander, ohne Kante dazwischen. Der Router musste deshalb 212 m nach Süden ausholen und wieder zurück. Ortskenntnis des Betreibers."
+    }
+  ],
   "abbiegeverbotAusnahmen": [
     {
       "von": "Seilergraben",

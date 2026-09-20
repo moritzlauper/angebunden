@@ -718,6 +718,56 @@ console.log('Eigene Korrekturen')
 }
 
 /**
+ * Von Hand ergänzte Verbindungen. An manchen Kreuzungen sind Fahrbahn- und
+ * Fusswegnetz der Stadt nicht zusammengeheftet: Zwei Knoten liegen wenige
+ * Meter auseinander, ohne Kante dazwischen. Der Router merkt davon nichts und
+ * fährt einen Bogen. Am Lichtsignal Mühlegasse/Seilergraben sind das über
+ * 200 Meter Umweg für eine Fahrt, die geradeaus auf den Hirschengraben führt.
+ */
+console.log('Verbindungen von Hand')
+{
+  const datei = new URL('./velo-korrekturen.json', import.meta.url).pathname
+  type Verbindung = { von: [number, number]; nach: [number, number]; name?: string; stress?: number; grund?: string }
+  const liste: Verbindung[] = JSON.parse(readFileSync(datei, 'utf8')).verbindungen ?? []
+  const naechster = (c: [number, number]) => {
+    const [x, y] = toXY(c[0], c[1])
+    let best = -1
+    let bestD = 20
+    for (let n = 0; n < N; n++) {
+      const [nx, ny] = toXY(knotenLonLat[2 * n], knotenLonLat[2 * n + 1])
+      const d = Math.hypot(nx - x, ny - y)
+      if (d < bestD) (bestD = d), (best = n)
+    }
+    return best
+  }
+  for (const v of liste) {
+    const von = naechster(v.von)
+    const nach = naechster(v.nach)
+    if (von < 0 || nach < 0 || von === nach) {
+      console.log(`  übersprungen: kein Knoten in der Nähe von ${JSON.stringify(v.von)} / ${JSON.stringify(v.nach)}`)
+      continue
+    }
+    const coords = [
+      [knotenLonLat[2 * von], knotenLonLat[2 * von + 1]],
+      [knotenLonLat[2 * nach], knotenLonLat[2 * nach + 1]],
+    ]
+    const xy = projiziere(coords)
+    kanten.push({
+      von, nach, coords, xy, laenge: laengeVon(xy),
+      name: v.name ?? '', velo: true, fuss: false,
+      einbahn: null, streifen: null, veloweg: false,
+      klasse: KLASSE.neben, belag: BELAG.gut, tempo: TEMPO.t30,
+      tram: false, bruecke: false, tunnel: false, osmVelo: null, netz: NETZ.keins,
+      unfall: 0, unfallAnzahl: 0, huerde: 0, fussgaenger: false, velokarte: 0,
+      piktogramm: false, innen: false, spuren: 0, einbahnStreng: false,
+      gegenverkehr: true, gegenStreifen: false, hoehen: [], hoch: 0, runter: 0,
+      stressFest: v.stress ?? 1,
+    })
+    console.log(`  ${v.name ?? 'Verbindung'}: Knoten ${von} -> ${nach}, ${laengeVon(xy).toFixed(0)} m`)
+  }
+}
+
+/**
  * Eine Vorzugsroute ist immer befahrbar. Das Fuss- und Velowegnetz der Stadt
  * führt einzelne Stücke einer Vorzugsroute manchmal nur als Fussweg (z. B.
  * ein Kirchplatz, über den die Velonetzplanung trotzdem eine Vorzugsroute
