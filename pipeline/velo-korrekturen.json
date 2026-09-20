@@ -2,6 +2,39 @@
   "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat). Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, stress (1-4), netz (keins/basis/haupt/vorzug).",
   "regeln": [
     {
+      "strasse": "Lehenstrasse",
+      "bbox": [8.5195, 47.3965, 8.5275, 47.3975],
+      "netz": "vorzug",
+      "grund": "Der Abschnitt beim Kirchplatz Wipkingen ist im Basisdatensatz nur als Fussweg ohne Velofreigabe erfasst, gehört aber zur Vorzugsroute 30 (Höngg - Wipkingen) und ist mit dem Velo durchfahrbar. netz=vorzug reicht als Korrektur, weil eine Vorzugsroute laut eigener Regel immer für Velos freigegeben wird (siehe weiter unten in 11-velo-netz.ts). Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Wunderlistrasse",
+      "bbox": [8.5195, 47.3965, 8.5275, 47.3975],
+      "netz": "vorzug",
+      "grund": "Gleicher Kirchplatz-Abschnitt wie die Lehenstrasse, Teil derselben Vorzugsroute 30. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Lehenstrasse Überquerung",
+      "netz": "vorzug",
+      "grund": "Kurze Querungsstücke zwischen den Lehenstrasse-Abschnitten beim Kirchplatz, ohne die das Quartier trotz freigegebener Lehenstrasse eine Velo-Insel ohne Anschluss ans übrige Netz bliebe. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Wunderlistrasse Überquerung",
+      "netz": "vorzug",
+      "grund": "Gleicher Grund wie Lehenstrasse Überquerung, nur für die Wunderlistrasse-Seite des Kirchplatzes."
+    },
+    {
+      "strasse": "Corrodisteig",
+      "netz": "vorzug",
+      "grund": "Verbindungsstück zwischen Wunderlistrasse und Lehenstrasse beim Kirchplatz Wipkingen, sonst bliebe das freigegebene Stück eine Velo-Insel."
+    },
+    {
+      "strasse": "Waidstrasse",
+      "bbox": [8.5226, 47.3966, 8.523, 47.397],
+      "netz": "vorzug",
+      "grund": "Kurzes Verbindungsstück zum Kirchplatz Wipkingen (nicht die übrige Waidstrasse, die bereits befahrbar ist)."
+    },
+    {
       "strasse": "Sihlfeldstrasse",
       "bbox": [8.5148, 47.3725, 8.5178, 47.3825],
       "netz": "vorzug",

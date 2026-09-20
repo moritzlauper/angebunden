@@ -715,6 +715,26 @@ console.log('Eigene Korrekturen')
   }
 }
 
+/**
+ * Eine Vorzugsroute ist immer befahrbar. Das Fuss- und Velowegnetz der Stadt
+ * führt einzelne Stücke einer Vorzugsroute manchmal nur als Fussweg (z. B.
+ * ein Kirchplatz, über den die Velonetzplanung trotzdem eine Vorzugsroute
+ * legt) - das übersteuert die Sperre. Stufe 1, weil eine ausgeschilderte
+ * Vorzugsroute keine Strecke ist, die man meidet, selbst dort, wo man
+ * zwischen Fussgängern hindurchfährt. Ortskenntnis des Betreibers.
+ */
+console.log('Vorzugsrouten immer befahrbar')
+{
+  let n = 0
+  for (const k of kanten) {
+    if (k.netz !== NETZ.vorzug || k.velo || k.gesperrt) continue
+    k.velo = true
+    k.stressFest = 1
+    n++
+  }
+  console.log(`  ${n} Kanten auf Vorzugsrouten fürs Velo freigegeben, die im Basisdatensatz nur Fussweg waren`)
+}
+
 // ------------------------------------------------------------ Lücken im Velonetz
 
 /**
