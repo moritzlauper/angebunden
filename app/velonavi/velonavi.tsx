@@ -1208,12 +1208,13 @@ export default function Velonavi() {
           >
             <div className="px-4 pb-3 pt-4">
               <div className="mb-3 flex items-baseline justify-between">
-                <h1 className="flex items-baseline gap-2 text-[15px] font-semibold">
+                {/* Die <h1> der Seite steht in seo-inhalt.tsx, hier deshalb <h2>. */}
+                <h2 className="flex items-baseline gap-2 text-[15px] font-semibold">
                   <Link href="/" aria-label="Zur Startseite">
                     <Wortmarke size={15} />
                   </Link>
                   <span style={{ color: ui.muted }}>Velonavi Zürich</span>
-                </h1>
+                </h2>
                 {routen && (
                   <span className="text-[11px] tabular-nums" style={{ color: ui.muted }}>
                     2 Routen in {Math.round(routen.ms)} ms

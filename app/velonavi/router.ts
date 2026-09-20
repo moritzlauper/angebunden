@@ -228,9 +228,15 @@ const GETRENNT_RABATT = 0.85
  * Korridore, sie sind durchgehend, direkt und meist besser ausgebaut. Ohne ihn
  * zieht die Bewertung auf ruhige Quartierstrassen, auch wenn sie Umwege sind.
  */
-const NETZ_RABATT = [1, 0.94, 0.86, 0.8]
+const NETZ_RABATT = [1, 0.9, 0.72, 0.62]
+/**
+ * Zuschlag fürs Verlassen einer Achse des städtischen Velonetzes. Er hält die
+ * Route auf dem Korridor, statt sie zwischen Netzstücken und Nebenstrassen
+ * hin- und herspringen zu lassen.
+ */
+const NETZ_VERLASSEN = 8
 /** Kleinster Kostenfaktor, den es gibt: begrenzt die A*-Schätzung nach unten. */
-const MIN_FAKTOR = 0.6
+const MIN_FAKTOR = 0.5
 
 /**
  * Erwartete Wartezeit an einem Lichtsignal in Sekunden, je Manöver.
@@ -337,6 +343,9 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
   out.ampel = -1
   out.manoever = null
   out.eintritt = NaN
+  // Vom Velonetz der Stadt herunter: hält die Route auf dem Korridor.
+  if (netzVon(g, a >> 1) > 0 && netzVon(g, b >> 1) === 0) out.kosten += NETZ_VERLASSEN
+
   // Jedes Abbiegen kostet: Abbremsen, Schulterblick, Handzeichen. Ohne
   // diesen Zuschlag nimmt der Router in Rasterquartieren eine Treppe durch die
   // Blöcke, weil viele Wege dort fast gleich lang sind.

@@ -5,10 +5,14 @@ import { SITE_TAGLINE, SITE_URL } from '../site'
 import { PUNKT } from '../marke'
 
 /**
- * Das feste Vorschaubild einer Stadtseite für WhatsApp, Google und die sozialen
- * Netze: die Wortmarke gross, darunter die Frage. Ein Bild pro Stadt, ohne
+ * Das feste Vorschaubild einer Seite für WhatsApp, Google und die sozialen
+ * Netze: die Wortmarke gross, darunter eine Zeile. Ein Bild pro Route, ohne
  * Serveranteil beim Bauen gerendert. Die Haus-Werte eines geteilten Links stehen
  * im mitgeschickten Text, nicht im Bild.
+ *
+ * Das Bild gilt nur für das Segment, in dem die Datei liegt: `opengraph-image`
+ * vererbt sich nicht an Unterordner. Jede Route, die geteilt werden soll,
+ * braucht deshalb eine eigene Datei.
  */
 
 export const size = { width: 1200, height: 630 }
@@ -23,7 +27,12 @@ export function altText(stadtName: string) {
   return `angebunden · ${SITE_TAGLINE} in ${stadtName}`
 }
 
-export function vorschaubild(stadtName: string) {
+/** Die Zeile unter der Wortmarke auf den Stadtseiten. */
+export function stadtZeile(stadtName: string) {
+  return `Wie gut ist dein Haus in ${stadtName} angebunden?`
+}
+
+export function vorschaubild(zeile: string) {
   return new ImageResponse(
     (
       <div
@@ -75,7 +84,7 @@ export function vorschaubild(stadtName: string) {
             lineHeight: 1.3,
           }}
         >
-          {`Wie gut ist dein Haus in ${stadtName} angebunden?`}
+          {zeile}
         </div>
 
         <div
