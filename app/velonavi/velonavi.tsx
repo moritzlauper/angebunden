@@ -406,9 +406,10 @@ export default function Velonavi() {
         },
         layers: [
           { id: 'grund', type: 'background', paint: { 'background-color': ui.bg } },
-          // Erst ab Zoomstufe 13: In der Übersicht wechselt die Stadtkarte
-          // sonst mehrfach die Detailstufe, was beim Zoomen unruhig wirkt.
-          { id: 'basiskarte', type: 'raster', source: 'basiskarte', minzoom: 13, paint: { 'raster-fade-duration': 150 } },
+          // Auf allen Zoomstufen: Die Stadtkarte zeigt Gebäude und Strassennamen,
+          // die eigene Übersicht darunter bliebe zu grob. Dass die Stadt dabei
+          // ihre Detailstufe mehrmals wechselt, nehmen wir in Kauf.
+          { id: 'basiskarte', type: 'raster', source: 'basiskarte', paint: { 'raster-fade-duration': 150 } },
           // Die schrägen Gebäude liegen über der Basiskarte und verdecken deren
           // Hausnummern. Ab Zoom 17 blenden sie deshalb aus.
           {
@@ -449,13 +450,14 @@ export default function Velonavi() {
     attrib?.removeAttribute('open')
 
     map.on('load', async () => {
-      const [vorzug, stadtGeo, wasser] = await Promise.all(
-        ['velo-vorzug', 'city', 'water'].map((n) => fetch(`${STADT.daten}/${n}.geojson`).then((r) => r.json()))
+      const [vorzug, stadtGeo, wasser, strassen] = await Promise.all(
+        ['velo-vorzug', 'city', 'water', 'streets'].map((n) => fetch(`${STADT.daten}/${n}.geojson`).then((r) => r.json()))
       )
       const leer = { type: 'FeatureCollection' as const, features: [] }
       // Unterhalb von Zoom 13 eine ruhige eigene Übersicht statt der Stadtkarte.
       map.addSource('stadt', { type: 'geojson', data: stadtGeo })
       map.addSource('wasser', { type: 'geojson', data: wasser })
+      map.addSource('strassen', { type: 'geojson', data: strassen })
       map.addSource('vorzug', { type: 'geojson', data: vorzug })
       map.addSource('netz', { type: 'geojson', data: leer })
       map.addSource('ampeln', { type: 'geojson', data: leer })
@@ -465,17 +467,28 @@ export default function Velonavi() {
       map.addSource('zeiger', { type: 'geojson', data: leer })
 
       // Das Velonetz, nur eingeblendet, wenn es nach Stress eingefärbt wird.
-      map.addLayer({ id: 'stadt-flaeche', type: 'fill', source: 'stadt', maxzoom: 13.3, paint: { 'fill-color': '#ffffff' } })
+      map.addLayer({ id: 'stadt-flaeche', type: 'fill', source: 'stadt', maxzoom: 12, paint: { 'fill-color': '#ffffff' } })
       map.addLayer({
-        id: 'wasser-flaeche', type: 'fill', source: 'wasser', maxzoom: 13.3,
+        id: 'wasser-flaeche', type: 'fill', source: 'wasser', maxzoom: 12,
         filter: ['==', ['get', 'kind'], 'area'], paint: { 'fill-color': '#dcdcd6' },
       })
       map.addLayer({
-        id: 'wasser-linie', type: 'line', source: 'wasser', maxzoom: 13.3,
+        id: 'wasser-linie', type: 'line', source: 'wasser', maxzoom: 12,
         filter: ['==', ['get', 'kind'], 'line'],
         paint: { 'line-color': '#dcdcd6', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 13, 8] },
       })
-      map.addLayer({ id: 'stadt-rand', type: 'line', source: 'stadt', maxzoom: 13.3, paint: { 'line-color': '#c9c9c4', 'line-width': 1 } })
+      // In der Übersicht die Strassen als Orientierung, bis die Stadtkarte übernimmt.
+      map.addLayer({
+        id: 'strassen-neben', type: 'line', source: 'strassen', maxzoom: 12,
+        filter: ['==', ['get', 'k'], 'neben'],
+        paint: { 'line-color': '#e3e3de', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.4, 13.3, 1.4] },
+      })
+      map.addLayer({
+        id: 'strassen-haupt', type: 'line', source: 'strassen', maxzoom: 12,
+        filter: ['==', ['get', 'k'], 'haupt'],
+        paint: { 'line-color': '#d3d3cc', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.9, 13.3, 2.6] },
+      })
+      map.addLayer({ id: 'stadt-rand', type: 'line', source: 'stadt', maxzoom: 12, paint: { 'line-color': '#c9c9c4', 'line-width': 1 } })
       map.addLayer({
         id: 'netz',
         type: 'line',
@@ -797,6 +810,10 @@ export default function Velonavi() {
   startRef.current = start
   const feldRef = useRef(offenFeld)
   feldRef.current = offenFeld
+  const zielRef = useRef(ziel)
+  zielRef.current = ziel
+  /** Angetippter Ort samt Bildschirmposition, solange das kleine Menü offen ist. */
+  const [klickOrt, setKlickOrt] = useState<{ p: Punkt; x: number; y: number } | null>(null)
   useEffect(() => {
     const map = mapRef.current
     if (!kartenBereit || !map) return
@@ -809,6 +826,11 @@ export default function Velonavi() {
         return
       }
       const p = ortBeim(e.lngLat.lng, e.lngLat.lat, map.getZoom())
+      // Steht schon eine Strecke, fragt ein kleines Menü, was der Ort sein soll.
+      if (!feldRef.current && startRef.current && zielRef.current) {
+        setKlickOrt({ p, x: e.point.x, y: e.point.y })
+        return
+      }
       const feld = feldRef.current ?? (startRef.current ? 'ziel' : 'start')
       if (feld === 'start') setStart(p), setStartText(p.titel)
       else if (feld === 'ziel') setZiel(p), setZielText(p.titel)
@@ -821,9 +843,12 @@ export default function Velonavi() {
       setOffenFeld(null)
       setBlattOffen(true)
     }
+    const zu = () => setKlickOrt(null)
     map.on('click', klick)
+    map.on('movestart', zu)
     return () => {
       map.off('click', klick)
+      map.off('movestart', zu)
     }
   }, [kartenBereit, ortBeim, merken])
 
@@ -1099,6 +1124,51 @@ export default function Velonavi() {
   return (
     <div className="relative h-full w-full overflow-hidden" style={{ background: ui.bg }}>
       <div ref={containerRef} className="h-full w-full" />
+
+      {/* Klick in die Karte bei fertiger Strecke: erst fragen, was der Ort sein soll. */}
+      {klickOrt && (
+        <div
+          className="absolute z-30 flex -translate-x-1/2 flex-col overflow-hidden rounded-2xl border text-[13px] backdrop-blur-md"
+          style={{
+            left: klickOrt.x,
+            top: klickOrt.y + 12,
+            background: ui.panel,
+            borderColor: ui.border,
+            boxShadow: ui.schatten,
+            color: ui.fg,
+          }}
+        >
+          <div className="max-w-[14rem] truncate px-3 pt-2 text-[11.5px]" style={{ color: ui.muted }}>
+            {klickOrt.p.titel}
+          </div>
+          {(
+            [
+              ['Route von hier', 'start'],
+              ['Route hierhin', 'ziel'],
+              ['Als Zwischenziel', 'via'],
+            ] as const
+          ).map(([titel, was]) => (
+            <button
+              key={was}
+              className="zeile px-3 py-2 text-left"
+              style={{ '--weich': ui.weich } as React.CSSProperties}
+              onClick={() => {
+                const p = klickOrt.p
+                if (was === 'start') setStart(p), setStartText(p.titel)
+                else if (was === 'ziel') setZiel(p), setZielText(p.titel)
+                else {
+                  setZwischen((alt) => [...alt, p])
+                  setZwischenText((alt) => [...alt, p.titel])
+                }
+                merken(p)
+                setKlickOrt(null)
+              }}
+            >
+              {titel}
+            </button>
+          ))}
+        </div>
+      )}
 
       {mobil ? (
         <>

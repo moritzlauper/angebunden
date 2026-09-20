@@ -241,6 +241,7 @@ type NetzFeature = {
   geometry: { coordinates: number[][] }
   properties: {
     name: string | null
+    map_velo: number | string | null
     velo: number
     fuss: number
     veloweg: number
@@ -292,6 +293,10 @@ type Kante = {
   huerde: number
   /** Fussgängerzone: fahren erlaubt, aber im Schritttempo zwischen Leuten. */
   fussgaenger: boolean
+  /** Kategorie der städtischen Velokarte (`map_velo`), 0 heisst nicht darin. */
+  velokarte: number
+  /** OSM `cycleway=shared_lane`: Velopiktogramme auf der Fahrbahn, kein eigener Streifen. */
+  piktogramm: boolean
   /** Bahnhofshalle, Perron, Ladenpassage, Lift: mit dem Velo tabu. */
   innen: boolean
   /** Fahrspuren für den Autoverkehr, 0 wenn unbekannt. */
@@ -348,6 +353,8 @@ for (const f of netz) {
     unfallAnzahl: 0,
     huerde: 0,
     fussgaenger: false,
+    velokarte: Math.min(3, Number(p.map_velo) || 0),
+    piktogramm: false,
     innen: INNEN.test((p.name ?? '').trim()),
     spuren: 0,
     gegenverkehr: false,
@@ -445,6 +452,7 @@ for (const [i, k] of kanten.entries()) {
   const spur = [t.cycleway, t['cycleway:both'], t['cycleway:right'], t['cycleway:left']]
   if (spur.includes('track') || spur.includes('separate')) k.osmVelo = 'weg'
   else if (spur.includes('lane')) k.osmVelo = 'streifen'
+  if (spur.includes('shared_lane')) k.piktogramm = true
 }
 console.log(`  ${osmTreffer} von ${kanten.length} Kanten mit OSM-Partner`)
 
@@ -703,19 +711,28 @@ function infra(k: Kante, vorwaerts: boolean): number {
 function stress(k: Kante, vorwaerts: boolean): number {
   if (!k.velo) return 1
   const i = infra(k, vorwaerts)
+  // Velopiktogramme auf der Fahrbahn («shared_lane») sind in Zürich meist ein
+  // markierter Sicherheitsstreifen. Für die Einstufung nach Tempo zählen sie
+  // wie ein Streifen; Tramgleise und Fahrspuren bleiben davon unberührt.
+  const iMark = i === INFRA.keine && k.piktogramm ? INFRA.streifen : i
   const strasse = k.klasse >= KLASSE.wohnstrasse && k.klasse <= KLASSE.haupt
   let s: number
   if (i === INFRA.getrennt || !strasse) s = 1
   else if (k.tempo === TEMPO.fahrverbot || k.tempo === TEMPO.t20 || k.klasse === KLASSE.wohnstrasse) s = 1
   else if (k.tempo === TEMPO.t30 || k.tempo === TEMPO.keins) {
     s = k.klasse === KLASSE.haupt ? 2 : 1
-    if (i === INFRA.streifen) s = 1
+    if (iMark === INFRA.streifen) s = 1
   } else if (k.tempo === TEMPO.t50) {
     // Ein durchgehender Velostreifen macht auch eine Tempo-50-Achse fahrbar.
     // Nur auf der grossen Hauptachse bleibt er ein Strich neben viel Verkehr.
-    if (i === INFRA.streifen) s = k.klasse === KLASSE.haupt ? 2 : 1
+    if (iMark === INFRA.streifen) s = k.klasse === KLASSE.haupt ? 2 : 1
     else s = k.klasse === KLASSE.neben ? 3 : 4
-  } else s = i === INFRA.streifen ? 3 : 4
+  } else s = iMark === INFRA.streifen ? 3 : 4
+
+  // Eine Strasse, die in der Velokarte der Stadt steht, ist eine ausgeschilderte
+  // Route. Sie kann unangenehm sein, aber sie ist keine Achse, die man meidet.
+  // Dasselbe gilt für Velopiktogramme auf der Fahrbahn.
+  const gefuehrt = k.velokarte > 0 || k.piktogramm
 
   // Drei Spuren und mehr ohne eigenen Streifen: Hauptachsen mit Abbiegespuren,
   // oft mit Autobahnzufahrt. Abbiegespuren an einer Tempo-30-Kreuzung sind
@@ -732,6 +749,11 @@ function stress(k: Kante, vorwaerts: boolean): number {
   else if (k.belag === BELAG.platten || k.belag === BELAG.kies || k.belag === BELAG.naturweg) s = Math.min(4, s + 1)
   // Fussgängerzonen und Plätze: fahren erlaubt, aber im Schritttempo.
   if (k.fussgaenger && k.klasse !== KLASSE.veloweg) s = Math.max(s, 2)
+  // Eine Strasse in der Velokarte der Stadt ist eine ausgeschilderte Route:
+  // höchstens Stufe 2, wenn nichts Hartes dazukommt, sonst höchstens Stufe 3.
+  // Mit Tramgleisen oder drei Spuren bleibt sie, was sie ist.
+  if (gefuehrt && k.belag !== BELAG.kopfstein)
+    s = Math.min(s, k.tram || k.spuren >= 3 ? 3 : 2)
   return s
 }
 
@@ -992,6 +1014,7 @@ writeFileSync(
       stressKm: stressMeter.slice(1).map((m) => Math.round(m / 1000)),
       ampelKnoten: genutzt.size,
       gegenverkehr: kanten.filter((k) => k.gegenverkehr && k.einbahn).length,
+      velokarteKm: Math.round(kanten.filter((k) => k.velo && k.velokarte > 0).reduce((s, k) => s + k.laenge, 0) / 1000),
       mehrspurigKm: Math.round(kanten.filter((k) => k.velo && k.spuren >= 3).reduce((s, k) => s + k.laenge, 0) / 1000),
       innen: kanten.filter((k) => k.innen).length,
       huerden: huerdenZugeordnet,
