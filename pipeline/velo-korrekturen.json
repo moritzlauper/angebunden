@@ -38,6 +38,11 @@
       ],
       "stress": 4,
       "grund": "Sihlstrasse im Kreis 1: auf den Autoverkehr ausgerichtet, viel Verkehr, für Velos unangenehm. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Herterbrücke",
+      "gesperrt": true,
+      "grund": "Die Herterbrücke hat Treppen ohne fahrbare Velorampe und ist mit dem Velo nicht befahrbar."
     }
   ]
 }

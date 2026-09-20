@@ -880,7 +880,7 @@ export default function Velonavi() {
   const teilen = async () => {
     const url = window.location.href
     try {
-      if (navigator.share && mobil) await navigator.share({ title: 'Veloroute', url })
+      if (navigator.share) await navigator.share({ title: 'Veloroute', url })
       else {
         await navigator.clipboard.writeText(url)
         setKopiert(true)

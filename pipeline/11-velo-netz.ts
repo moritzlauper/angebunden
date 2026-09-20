@@ -299,6 +299,8 @@ type Kante = {
   piktogramm: boolean
   /** Fest vorgegebene Stufe aus den eigenen Korrekturen. */
   stressFest?: number
+  /** Explizit gesperrte Kante, auch vor dem automatischen Lückenschluss. */
+  gesperrt?: boolean
   /** Bahnhofshalle, Perron, Ladenpassage, Lift: mit dem Velo tabu. */
   innen: boolean
   /** Fahrspuren für den Autoverkehr, 0 wenn unbekannt. */
@@ -703,7 +705,7 @@ console.log('Eigene Korrekturen')
       if (r.beideRichtungen) (k.einbahn = null), (k.gegenverkehr = true)
       if (r.veloweg) k.veloweg = true
       if (r.velostreifen) k.streifen = 'BOTH'
-      if (r.gesperrt) k.velo = false
+      if (r.gesperrt) k.gesperrt = k.velo = false
       if (r.stress !== undefined) k.stressFest = r.stress
       betroffen++
     }
@@ -779,7 +781,7 @@ console.log('Lücken im Velonetz')
 
   let geschlossen = 0
   for (const [i, k] of kanten.entries()) {
-    if (k.velo || !k.fuss || k.innen || k.laenge > 30) continue
+    if (k.gesperrt || k.velo || !k.fuss || k.innen || k.laenge > 30) continue
     // Velowege an beiden Enden, die ungefähr in der Verlängerung liegen?
     const passend = (knoten: number, richtung: number) =>
       anKnoten[knoten].some((j) => {
