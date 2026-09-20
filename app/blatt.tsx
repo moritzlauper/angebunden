@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 type Ui = { fg: string; panel: string; border: string; schatten: string }
 
+
 /** Reagiert auf eine CSS-Medienabfrage. Vor dem ersten Anstrich gilt `false`. */
 export function useMedienabfrage(abfrage: string) {
   const [passt, setPasst] = useState(false)
