@@ -911,9 +911,12 @@ function stress(k: Kante, vorwaerts: boolean): number {
   // Auf Tempo 30 wiegt es weniger: Dort wählt man die Linie selbst und quert
   // die Rillen im günstigen Winkel, statt vom Verkehr hineingedrängt zu werden.
   if (k.tram && i === INFRA.keine) s = Math.min(4, s + (k.tempo >= TEMPO.t50 ? 2 : 1))
-  // Auf einer Hauptstrasse hilft auch der Streifen wenig: Das Tram fährt neben
-  // einem, und beim Ausweichen landet das Vorderrad in der Rille.
-  else if (k.tram && i === INFRA.streifen && k.klasse === KLASSE.haupt) s = Math.min(4, s + 1)
+  // Auf einer Haupt- oder Sammelstrasse hilft auch der Streifen wenig: Das Tram
+  // fährt neben einem, und beim Ausweichen landet das Vorderrad in der Rille.
+  // Ohne die Sammelstrassen war eine Achse mit Gleisen und markiertem Streifen
+  // ganz ohne Gleis-Aufschlag und landete auf Stufe 1 - die Brücke über die
+  // Seebahn beim Lochergut etwa, die real der unangenehmste Ort im Quartier ist.
+  else if (k.tram && i === INFRA.streifen && k.klasse >= KLASSE.sammel) s = Math.min(4, s + 1)
   // Kopfsteinpflaster rüttelt so stark, dass eine ruhige Gasse trotzdem
   // unangenehm ist. Feines Plaster und Kies zählen halb.
   if (k.belag === BELAG.kopfstein) s = Math.min(4, s + 2)

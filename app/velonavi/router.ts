@@ -229,6 +229,18 @@ const BELAG_KOSTEN = [0, 0.15, 1.3, 0.4, 0.8]
  * aber kein Grund für einen Umweg.
  */
 const STRESS_KOSTEN = [0, 0, 0.15, 1.5, 3.2]
+/**
+ * Aufschlag fürs Einbiegen auf eine harte Strecke, je Stufe, bei voller
+ * Gewichtung. Der Aufschlag oben zählt nur die Zeit auf der Strecke, deshalb
+ * war ein kurzes, hartes Stück fast gratis: Die Brücke über die Seebahn beim
+ * Lochergut dauert neun Sekunden, das wiegt keinen Umweg auf, so unangenehm
+ * sie auch ist. Das Unbehagen hängt aber kaum an der Länge - man muss sich
+ * einfädeln, die Gleise queren, sich neben den Verkehr stellen. Das ist ein
+ * fester Preis pro Stelle, wie ihn Ampeln und Hürden auch haben. Gezählt wird
+ * nur beim Wechsel auf eine härtere Stufe, damit eine lange harte Achse nicht
+ * für jede Teilkante erneut zahlt.
+ */
+const STRESS_EINSTIEG = [0, 0, 0, 25, 60]
 /** Rabatt für einen abgetrennten Veloweg: den nimmt man gerne, auch mit Umweg. */
 const GETRENNT_RABATT = 0.85
 /**
@@ -366,6 +378,11 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
   out.eintritt = NaN
   // Vom Velonetz der Stadt herunter: hält die Route auf dem Korridor.
   if (netzVon(g, a >> 1) > 0 && netzVon(g, b >> 1) === 0) out.kosten += NETZ_VERLASSEN
+
+  // Auf eine härtere Strecke einbiegen kostet einmalig, unabhängig davon, wie
+  // kurz sie ist. Nur der Sprung nach oben zählt.
+  const stressB = stressVon(g, b)
+  if (stressB > stressVon(g, a)) out.kosten += STRESS_EINSTIEG[stressB] * p.sicherheit
 
   // Jedes Abbiegen kostet: Abbremsen, Schulterblick, Handzeichen. Ohne
   // diesen Zuschlag nimmt der Router in Rasterquartieren eine Treppe durch die

@@ -114,6 +114,17 @@
       "grund": "Der Abschnitt beim Kalkbreiteplatz hat Velowege, ist also trotz der Tramgleise daneben gut zu fahren. Der Datensatz stufte ihn allein wegen der Gleise auf 3 bzw. 4 ein, was 'Komfort' unnötig auf Umwege schickte. Ortskenntnis des Betreibers."
     },
     {
+      "strasse": "Utoquai Überquerung",
+      "stress": 3,
+      "grund": "Gleicher Grund wie beim Utoquai selbst: Pflaster und viel Fussverkehr. Eine Korrektur an der Strasse trifft die separat benannten Querungsstücke nicht mit."
+    },
+    {
+      "strasse": "Sihlstrasse Überquerung",
+      "bbox": [8.53, 47.371, 8.541, 47.379],
+      "stress": 4,
+      "grund": "Gleicher Ausschnitt und Grund wie bei der Sihlstrasse im Kreis 1: viel Autoverkehr. Die Querung ist eher unangenehmer als die Strasse selbst, stand aber auf Stufe 1."
+    },
+    {
       "strasse": "Seebahnstrasse Überquerung",
       "stress": 4,
       "grund": "Die Querung der Seebahnstrasse ist mindestens so unangenehm wie die Strasse selbst - eine vierspurige, stark befahrene Achse queren ist der gefährlichste Teil, nicht der harmloseste. Die Korrektur für die Seebahnstrasse selbst trifft die separat benannten Querungsstücke nicht mit. Ortskenntnis des Betreibers."
