@@ -28,9 +28,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Ohne `version`: die Angabe kommt aus `packageManager` in der
+      # package.json. Steht sie an beiden Orten, bricht die Action mit
+      # ERR_PNPM_BAD_PM_VERSION ab.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:
