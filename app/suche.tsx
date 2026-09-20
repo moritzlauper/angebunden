@@ -224,9 +224,22 @@ export function Suchleiste({
   platzhalter?: string
 }) {
   const feldRef = useRef<HTMLInputElement>(null)
+  const huelleRef = useRef<HTMLDivElement>(null)
   const [aktiv, setAktiv] = useState(0)
 
   useEffect(() => setAktiv(0), [wert])
+
+  // Ein Klick irgendwo sonst schliesst die Vorschlagsliste. Die Liste selbst
+  // verhindert das Blur-Ereignis, damit die Auswahl noch ankommt, deshalb
+  // reicht der Fokus als Kriterium nicht.
+  useEffect(() => {
+    if (!offen) return
+    const zu = (e: PointerEvent) => {
+      if (!huelleRef.current?.contains(e.target as Node)) setOffen(false)
+    }
+    document.addEventListener('pointerdown', zu)
+    return () => document.removeEventListener('pointerdown', zu)
+  }, [offen, setOffen])
 
   const waehlen = (e: Eintrag) => {
     setWert(e.titel)
@@ -254,7 +267,7 @@ export function Suchleiste({
   const zeigeListe = offen && treffer.length > 0
 
   return (
-    <div className="pointer-events-auto relative z-40">
+    <div ref={huelleRef} className="pointer-events-auto relative z-40">
       <div className="flex items-center gap-2">
         <div
           className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-full border pl-4 pr-2 backdrop-blur-md"
