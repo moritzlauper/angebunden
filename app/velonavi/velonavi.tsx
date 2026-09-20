@@ -400,15 +400,33 @@ export default function Velonavi() {
             tileSize: 512,
             attribution: 'Basiskarte © Stadt Zürich',
           },
+          // Die schräg gezeichneten Gebäude wie im Züriplan. Die Stadt liefert
+          // sie erst ab etwa 1:10'000, darunter bleibt die Ebene leer.
+          gebaeude: {
+            type: 'raster',
+            tiles: [wms('Gebaeude_verkippt', 'Geb%C3%A4ude%20verkippt', true)],
+            tileSize: 512,
+            minzoom: 15,
+          },
         },
         layers: [
           { id: 'grund', type: 'background', paint: { 'background-color': ui.bg } },
           // Auf allen Zoomstufen: Die Stadtkarte zeigt Gebäude und Strassennamen,
           // die eigene Übersicht darunter bliebe zu grob. Dass die Stadt dabei
-          // ihre Detailstufe mehrmals wechselt, nehmen wir in Kauf: Der WMS
-          // erzwingt die Massstabsbereiche selbst und liefert für eine einzelne
-          // Stufe ausserhalb ihres Bereichs eine leere Kachel.
+          // ihre Detailstufe mehrmals wechselt, nehmen wir in Kauf.
           { id: 'basiskarte', type: 'raster', source: 'basiskarte', paint: { 'raster-fade-duration': 150 } },
+          // Die schrägen Gebäude liegen über der Basiskarte und verdecken deren
+          // Hausnummern. Ab Zoom 17 blenden sie deshalb aus.
+          {
+            id: 'gebaeude',
+            type: 'raster',
+            source: 'gebaeude',
+            minzoom: 15,
+            paint: {
+              'raster-fade-duration': 150,
+              'raster-opacity': ['interpolate', ['linear'], ['zoom'], 16.6, 1, 17.4, 0],
+            },
+          },
         ],
       },
       center: STADT.center,
