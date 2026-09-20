@@ -708,19 +708,21 @@ function stress(k: Kante, vorwaerts: boolean): number {
   if (i === INFRA.getrennt || !strasse) s = 1
   else if (k.tempo === TEMPO.fahrverbot || k.tempo === TEMPO.t20 || k.klasse === KLASSE.wohnstrasse) s = 1
   else if (k.tempo === TEMPO.t30 || k.tempo === TEMPO.keins) {
-    s = k.klasse === KLASSE.haupt ? 3 : k.klasse === KLASSE.sammel ? 2 : 1
-    if (i === INFRA.streifen) s = Math.max(1, s - 1)
+    s = k.klasse === KLASSE.haupt ? 2 : 1
+    if (i === INFRA.streifen) s = 1
   } else if (k.tempo === TEMPO.t50) {
-    if (i === INFRA.streifen) s = k.klasse === KLASSE.neben ? 2 : 3
+    // Ein durchgehender Velostreifen macht auch eine Tempo-50-Achse fahrbar.
+    if (i === INFRA.streifen) s = k.klasse === KLASSE.haupt ? 3 : k.klasse === KLASSE.sammel ? 2 : 1
     else s = k.klasse === KLASSE.neben ? 3 : 4
   } else s = i === INFRA.streifen ? 3 : 4
 
-  // Drei Spuren und mehr: mehrspurige Hauptachsen mit Abbiegespuren, oft mit
-  // Autobahnzufahrt. Dort fährt man im Verkehr, auch wenn ein Streifen da ist.
-  if (k.spuren >= 3 && i !== INFRA.getrennt) s = Math.max(s, i === INFRA.streifen ? 3 : 4)
-  // Tramgleise ohne eigene Spur: das Vorderrad im Rillengleis ist der
-  // häufigste Sturzgrund in der Stadt.
-  if (k.tram && i !== INFRA.getrennt) s = Math.min(4, s + (i === INFRA.keine ? 2 : 1))
+  // Drei Spuren und mehr ohne eigenen Streifen: Hauptachsen mit Abbiegespuren,
+  // oft mit Autobahnzufahrt. Abbiegespuren an einer Tempo-30-Kreuzung sind
+  // dagegen harmlos, deshalb erst ab Tempo 50.
+  if (k.spuren >= 3 && i === INFRA.keine && k.tempo >= TEMPO.t50) s = 4
+  // Tramgleise in der Fahrbahn: das Vorderrad im Rillengleis ist ein häufiger
+  // Sturzgrund. Mit eigenem Streifen fährt man neben den Rillen, nicht darin.
+  if (k.tram && i === INFRA.keine) s = Math.min(4, s + 2)
   // Kopfsteinpflaster rüttelt so stark, dass eine ruhige Gasse trotzdem
   // unangenehm ist. Feines Plaster und Kies zählen halb.
   if (k.belag === BELAG.kopfstein) s = Math.min(4, s + 2)
