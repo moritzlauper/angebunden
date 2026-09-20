@@ -101,6 +101,19 @@
       "grund": "Vierspurig entlang der Gleise, für Velos unangenehm, auch wo ein Streifen markiert ist."
     },
     {
+      "strasse": "Badenerstrasse",
+      "bbox": [8.5187, 47.3742, 8.5217, 47.3753],
+      "stress": 4,
+      "grund": "Die Badenerstrasse-Brücke über die Seebahn beim Lochergut und das Stück davor bis zur Kalkbreitestrasse: Tramgleise in der Fahrbahn, viel Verkehr, enge Spuren - mit dem Velo der unangenehmste Ort im Quartier. Der Datensatz stufte die Brücke je nach Richtung auf 1 bzw. 3 ein, weil in einer Richtung ein Streifen markiert ist; das entspricht nicht der Realität. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Kalkbreitestrasse",
+      "bbox": [8.52, 47.3737, 8.5218, 47.3746],
+      "stress": 1,
+      "veloweg": true,
+      "grund": "Der Abschnitt beim Kalkbreiteplatz hat Velowege, ist also trotz der Tramgleise daneben gut zu fahren. Der Datensatz stufte ihn allein wegen der Gleise auf 3 bzw. 4 ein, was 'Komfort' unnötig auf Umwege schickte. Ortskenntnis des Betreibers."
+    },
+    {
       "strasse": "Seebahnstrasse Überquerung",
       "stress": 4,
       "grund": "Die Querung der Seebahnstrasse ist mindestens so unangenehm wie die Strasse selbst - eine vierspurige, stark befahrene Achse queren ist der gefährlichste Teil, nicht der harmloseste. Die Korrektur für die Seebahnstrasse selbst trifft die separat benannten Querungsstücke nicht mit. Ortskenntnis des Betreibers."
