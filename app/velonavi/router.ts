@@ -183,10 +183,18 @@ export type Profil = {
   belag: number
   /** Ob kurze Stücke zu Fuss mit dem Velo an der Hand erlaubt sind. */
   schieben: boolean
+  /**
+   * Sucht nach der kürzesten Fahrzeit statt nach gefühlten Kosten: Hürden,
+   * Abbiegen und Ampeln zählen nur ihre tatsächlichen Sekunden, ohne
+   * Unbehagens-Aufschlag. Für «Schnell» gedacht, das sonst manchmal einen
+   * länge­ren, langsameren Weg wählte, weil ihm ein paar Querungen mehr
+   * unverhältnismässig stark angerechnet wurden.
+   */
+  zeitOptimal?: boolean
 }
 
 export const VOREINSTELLUNGEN = {
-  schnell: { sicherheit: 0.1, steigung: 0.1, ampeln: 0.4, belag: 0.3 },
+  schnell: { sicherheit: 0.1, steigung: 0.1, ampeln: 0.4, belag: 0.3, zeitOptimal: true },
   ausgewogen: { sicherheit: 0.5, steigung: 0.3, ampeln: 0.5, belag: 0.6 },
   // «Komfort»: deutlich ruhiger als «Schnell», aber ohne grosse Umwege. Bei
   // vollem Sicherheitsgewicht fuhr die Route im Mittel 14% Umweg und sammelte
@@ -300,11 +308,12 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
       // Sekunden, unabhängig von der Länge der Kante.
       const huerde = g.huerde[e]
       zeit[a] = t + huerde
-      kosten[a] =
-        t * faktor +
-        huerde * 1.6 +
-        auf * sProM * p.steigung * (1.2 + 12 * Math.max(0, steil - 0.05)) +
-        g.unfall[e] * 3 * p.sicherheit
+      kosten[a] = p.zeitOptimal
+        ? zeit[a]
+        : t * faktor +
+          huerde * 1.6 +
+          auf * sProM * p.steigung * (1.2 + 12 * Math.max(0, steil - 0.05)) +
+          g.unfall[e] * 3 * p.sicherheit
     } else if (p.schieben && schiebenErlaubt(g, a)) {
       const treppe = klasse === KLASSE.treppe
       const t = L / (treppe ? 0.5 : V_SCHIEBEN) + auf * (treppe ? 4 : 1.5)
@@ -373,6 +382,7 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
     if (g.knotenAmpel[g.kopf(b)] === J && g.laenge[b >> 1] < 40) {
       // Noch in der Kreuzung: das Manöver steht erst beim Verlassen fest.
       out.eintritt = rein
+      if (p.zeitOptimal) out.kosten = out.zeit
       return
     }
     const mv = manoever(drehung(rein, g.peilStart[b]))
@@ -387,6 +397,7 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
     out.kosten += warten * (0.3 + 1.6 * p.ampeln)
     out.ampel = J
     out.manoever = mv
+    if (p.zeitOptimal) out.kosten = out.zeit
     return
   }
 
@@ -411,6 +422,7 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
       out.kosten += 5 + 10 * p.sicherheit
     }
   }
+  if (p.zeitOptimal) out.kosten = out.zeit
 }
 
 // ------------------------------------------------------------ Einrasten
