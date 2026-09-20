@@ -1,6 +1,12 @@
 {
-  "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat). Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, stress (1-4).",
+  "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat). Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, stress (1-4), netz (keins/basis/haupt/vorzug).",
   "regeln": [
+    {
+      "strasse": "Sihlfeldstrasse",
+      "bbox": [8.5148, 47.3725, 8.5178, 47.3825],
+      "netz": "vorzug",
+      "grund": "Velostrasse durchs Quartier, durchgehend Tempo 30, für Velos angenehm und direkt zwischen Bullingerplatz und Hardplatz. Die Velonetzplanung der Stadt erfasst sie dort nur teilweise, weshalb die Route ohne diese Korrektur auf die Hardstrasse ausweicht, obwohl diese streckenweise Tempo 50 und Hauptstrassencharakter hat. Ortskenntnis des Betreibers."
+    },
     {
       "strasse": "Zweierstrasse",
       "beideRichtungen": true,
