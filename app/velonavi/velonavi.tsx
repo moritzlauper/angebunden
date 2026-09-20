@@ -344,6 +344,15 @@ export default function Velonavi() {
     // ist keine fehlende Verbindung, sondern eine Fahrt der Länge null.
     if (!routen.komfort?.koordinaten.length)
       return { fehler: 'Start und Ziel liegen am selben Ort. Es gibt keine Strecke zu rechnen.' }
+    // «Schnell» ist das Versprechen, die schnellste Strecke zu zeigen. Gesucht
+    // wird aber nach Kosten, nicht nach reiner Zeit: Ampeln, Abbiegen, Belag
+    // und Verkehr zählen auch bei «Schnell» ein wenig mit. Dadurch war die
+    // Komfortroute in etwa jeder sechsten Suche die schnellere von beiden.
+    // Wenn das passiert, ist sie auch die schnellste, die wir haben. Die beiden
+    // Karten legt `gleichWie` gleich darunter von selbst zusammen.
+    if (routen.schnell && routen.komfort && routen.komfort.zeit < routen.schnell.zeit) {
+      routen.schnell = routen.komfort
+    }
     // Varianten, die (fast) gleich verlaufen, zusammenlegen: die spätere zeigt
     // auf die frühere. Verglichen wird die befahrene Kantenmenge.
     const gleichWie = {} as Record<Variante, Variante | null>

@@ -1056,10 +1056,26 @@ for (const f of json('abbiegeverbote.geojson').features) {
 }
 console.log(`  ${verbote.length} Abbiegeverbote zugeordnet`)
 
-// Manche Abbiegeverbote der Stadt gelten nur fürs Auto, ohne dass die
-// Geodaten das festhalten ("ausser Velo" auf dem Schild). Ohne Ausnahme
-// blockiert das den Router an Kreuzungen, an denen Velofahren in Wahrheit
-// erlaubt ist.
+/**
+ * Ein Abbiegeverbot zwischen zwei ruhigen Quartierstrassen ist keine
+ * Verkehrsführung, sondern eine Durchfahrtssperre: Sie hält den Autoverkehr
+ * aus dem Quartier, und am Schild hängt in Zürich die Tafel «ausser Velo».
+ * Dieselbe Überlegung wie bei den Einbahnen weiter oben. Ohne die Ausnahme
+ * schickt der Router Velos um den halben Block: an der Kinkelstrasse und am
+ * Hottingerplatz etwa 400 bis 500 Meter weit.
+ */
+{
+  const vorher = verbote.length
+  const ruhig = (i: number) => kanten[i].tempo <= TEMPO.t30 && kanten[i].klasse <= KLASSE.neben
+  for (let i = verbote.length - 1; i >= 0; i--) {
+    const [a, b] = verbote[i]
+    if (ruhig(a) && ruhig(b)) verbote.splice(i, 1)
+  }
+  console.log(`  ${vorher - verbote.length} Abbiegeverbote zwischen Quartierstrassen fürs Velo aufgehoben`)
+}
+
+// Einzelne Abbiegeverbote gelten ebenfalls nur fürs Auto, liegen aber nicht
+// zwischen zwei Quartierstrassen und brauchen deshalb einen eigenen Eintrag.
 {
   const datei = new URL('./velo-korrekturen.json', import.meta.url).pathname
   const ausnahmen: { von: string; nach: string; bbox?: [number, number, number, number]; grund?: string }[] =
