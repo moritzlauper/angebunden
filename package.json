@@ -21,7 +21,7 @@
     "daten:dem": "node pipeline/01b-fetch-dem.ts",
     "daten:velo": "node pipeline/10-velo-daten.ts && node pipeline/11-velo-netz.ts",
     "verify": "node pipeline/verify.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p pipeline/tsconfig.json",
+    "typecheck": "next typegen && tsc --noEmit -p tsconfig.json && tsc --noEmit -p pipeline/tsconfig.json",
     "export": "STATISCH=1 next build"
   },
   "dependencies": {
