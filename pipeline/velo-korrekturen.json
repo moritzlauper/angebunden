@@ -14,6 +14,11 @@
       "grund": "Hardstrasse zwischen Albisriederplatz und Hardplatz ist eine breite, verkehrsorientierte Hauptstrasse, für Velos unangenehm. Parallel dazu liegt die ruhige Sihlfeldstrasse (Velostrasse, Tempo 30) bis zum Hardplatz, die immer vorzuziehen ist. Ortskenntnis des Betreibers."
     },
     {
+      "strasse": "Wipkingerbrücke",
+      "stress": 2,
+      "grund": "Tramgleise auf der Fahrbahn, aber ein breites, gut befahrbares Trottoir macht die Querung auch für «Komfort» angenehm genug. Ortskenntnis des Betreibers."
+    },
+    {
       "strasse": "Zweierstrasse",
       "beideRichtungen": true,
       "veloweg": true,
