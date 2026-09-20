@@ -43,7 +43,12 @@
     {
       "strasse": "Bahnhofquai",
       "stress": 3,
-      "grund": "Bahnhofquai und HB-Umfeld sind unangenehm zu fahren. Ausnahme ist der Velotunnel (im Netz «Stadttunnel»)."
+      "grund": "Bahnhofquai und HB-Umfeld sind unangenehm zu fahren."
+    },
+    {
+      "strasse": "Stadttunnel",
+      "gesperrt": true,
+      "grund": "Der Velotunnel ist noch nicht gebaut, nur geplant. Der Datensatz führt ihn bereits als befahrbare Vorzugsroute. Ortskenntnis des Betreibers."
     },
     {
       "strasse": "Sihlstrasse",
