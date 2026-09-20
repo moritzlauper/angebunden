@@ -689,6 +689,7 @@ console.log('Eigene Korrekturen')
     velostreifen?: boolean
     gesperrt?: boolean
     stress?: number
+    netz?: keyof typeof NETZ
     grund?: string
   }
   const datei = new URL('./velo-korrekturen.json', import.meta.url).pathname
@@ -707,6 +708,7 @@ console.log('Eigene Korrekturen')
       if (r.velostreifen) k.streifen = 'BOTH'
       if (r.gesperrt) k.gesperrt = k.velo = false
       if (r.stress !== undefined) k.stressFest = r.stress
+      if (r.netz !== undefined) k.netz = NETZ[r.netz]
       betroffen++
     }
     console.log(`  ${r.strasse}: ${betroffen} Kanten`)
