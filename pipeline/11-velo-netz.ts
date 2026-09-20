@@ -1053,6 +1053,32 @@ for (const f of json('abbiegeverbote.geojson').features) {
 }
 console.log(`  ${verbote.length} Abbiegeverbote zugeordnet`)
 
+// Manche Abbiegeverbote der Stadt gelten nur fürs Auto, ohne dass die
+// Geodaten das festhalten ("ausser Velo" auf dem Schild). Ohne Ausnahme
+// blockiert das den Router an Kreuzungen, an denen Velofahren in Wahrheit
+// erlaubt ist.
+{
+  const datei = new URL('./velo-korrekturen.json', import.meta.url).pathname
+  const ausnahmen: { von: string; nach: string; bbox?: [number, number, number, number]; grund?: string }[] =
+    JSON.parse(readFileSync(datei, 'utf8')).abbiegeverbotAusnahmen ?? []
+  let entfernt = 0
+  for (const x of ausnahmen) {
+    const vorher = verbote.length
+    for (let i = verbote.length - 1; i >= 0; i--) {
+      const [a, b, via] = verbote[i]
+      if (kanten[a].name !== x.von || kanten[b].name !== x.nach) continue
+      if (x.bbox) {
+        const [lon, lat] = [knotenLonLat[2 * via], knotenLonLat[2 * via + 1]]
+        const [minLon, minLat, maxLon, maxLat] = x.bbox
+        if (lon < minLon || lon > maxLon || lat < minLat || lat > maxLat) continue
+      }
+      verbote.splice(i, 1)
+    }
+    entfernt += vorher - verbote.length
+  }
+  if (entfernt) console.log(`  ${entfernt} Abbiegeverbote als Ausnahme fürs Velo entfernt`)
+}
+
 // ------------------------------------------------------------ Ausgabe
 
 console.log('Schreiben')

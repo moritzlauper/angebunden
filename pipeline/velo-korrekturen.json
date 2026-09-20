@@ -1,5 +1,5 @@
 {
-  "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat). Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, stress (1-4), netz (keins/basis/haupt/vorzug), fussgaenger (true/false).",
+  "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel in 'regeln' trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat). Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, stress (1-4), netz (keins/basis/haupt/vorzug), fussgaenger (true/false). 'abbiegeverbotAusnahmen' entfernt einzelne Abbiegeverbote fürs Velo (von-Strasse -> nach-Strasse, optional bbox um den Kreuzungsknoten), für Verbote, die laut Geodaten fürs Auto gelten, in Wahrheit aber nicht fürs Velo.",
   "regeln": [
     {
       "strasse": "Lehenstrasse",
@@ -146,6 +146,14 @@
       "strasse": "Herterbrücke",
       "gesperrt": true,
       "grund": "Die Herterbrücke hat Treppen ohne fahrbare Velorampe und ist mit dem Velo nicht befahrbar."
+    }
+  ],
+  "abbiegeverbotAusnahmen": [
+    {
+      "von": "Seilergraben",
+      "nach": "Hirschengraben",
+      "bbox": [8.5445, 47.3742, 8.5462, 47.3748],
+      "grund": "Kurze, direkte Verbindung vom Mühlegasse/Seilergraben-Ende via Hirschengraben hoch auf Auf der Mauer und weiter zur Uni - real mit dem Velo befahrbar. Das Abbiegeverbot der Stadt gilt hier nur fürs Auto, die Geodaten halten das nicht separat fest. Ohne diese Ausnahme umgeht der Router die Kreuzung komplett und macht stattdessen den grossen Umweg über Central. Ortskenntnis des Betreibers."
     }
   ]
 }
