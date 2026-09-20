@@ -341,10 +341,12 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
         </p>
         <p className="mt-4">
           Aus Tempo, Strassenklasse und Velostreifen ergibt sich je Fahrtrichtung eine Stufe von 1 bis
-          4, angelehnt an das Schema «Level of Traffic Stress». Dazu kommt, was in Zürich den
-          Unterschied macht und mit Autoverkehr nichts zu tun hat: Kopfsteinpflaster hebt eine Strecke
-          um zwei Stufen, Tramgleise in der Fahrbahn um eine bis zwei, Fussgängerzonen mindestens auf
-          Stufe 2. Die Gassen um das Grossmünster sind autofrei und trotzdem keine Strecke, auf der man
+          4, angelehnt an das Schema «Level of Traffic Stress». Ein durchgehender Velostreifen zählt dabei viel: Er
+          drückt eine Tempo-50-Sammelstrasse auf Stufe 2. Drei Fahrspuren und mehr ohne Streifen
+          ergeben ab Tempo 50 immer Stufe 4, Abbiegespuren an einer Tempo-30-Kreuzung dagegen nicht.
+          Dazu kommt, was mit Autoverkehr nichts zu tun hat: Kopfsteinpflaster hebt eine Strecke um
+          zwei Stufen, Tramgleise ohne eigenen Streifen ebenfalls um zwei, Fussgängerzonen mindestens
+          auf Stufe 2. Die Gassen um das Grossmünster sind autofrei und trotzdem keine Strecke, auf der man
           gerne fährt. Stufe 1 ist ein abgetrennter Veloweg oder eine glatte Tempo-30-Nebenstrasse,
           Stufe 4 Mischverkehr auf Tempo 50, Gleise ohne eigene Spur oder grobes Pflaster. Die Farben
           der Route auf der Karte zeigen diese Stufen.
