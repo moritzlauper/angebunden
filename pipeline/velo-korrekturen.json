@@ -133,6 +133,11 @@
       "grund": "Langstrassenunterführung: breite, velofreundliche Passage unter den Gleisen, im Datensatz aber wie eine gewöhnliche Fussgängerzone eingestuft. Das bremst das Zeitmodell künstlich (auf Fussgängertempo gedeckelt plus Unbehagens-Aufschlag), obwohl man hier zügig durchfährt, und lässt 'Schnell' auf einen langsameren Umweg über die Strasse ausweichen. Ortskenntnis des Betreibers."
     },
     {
+      "strasse": "Ankerstrasse",
+      "netz": "vorzug",
+      "grund": "Ruhige Tempo-30-Quartierstrasse, auf der Basiskarte der Stadt als Vorzugsroute ausgewiesen, im eigenen Datensatz aber nur als Basis- bzw. Hauptnetz erfasst. Der kleinere Netzrabatt lässt sie gegen Strecken ohne Netzstatus unnötig zurückfallen, obwohl sie mit Stress 1 schon die beste Stufe hat. Ortskenntnis des Betreibers."
+    },
+    {
       "strasse": "Herterbrücke",
       "gesperrt": true,
       "grund": "Die Herterbrücke hat Treppen ohne fahrbare Velorampe und ist mit dem Velo nicht befahrbar."
