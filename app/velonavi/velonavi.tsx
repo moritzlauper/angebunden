@@ -188,8 +188,11 @@ export default function Velonavi() {
   const [fehler, setFehler] = useState<string | null>(null)
   const [start, setStart] = useState<Punkt | null>(null)
   const [ziel, setZiel] = useState<Punkt | null>(null)
-  /** Zwischenziele: Punkte, über die die Route zwingend führt. */
-  const [zwischen, setZwischen] = useState<Punkt[]>([])
+  /**
+   * Zwischenziele: Punkte, über die die Route zwingend führt. `null` ist ein
+   * frisch angelegtes, noch leeres Feld; es zählt erst, wenn ein Ort drinsteht.
+   */
+  const [zwischen, setZwischen] = useState<(Punkt | null)[]>([])
   const [zwischenText, setZwischenText] = useState<string[]>([])
   const [wahl, setWahl] = useState<Variante>('komfort')
   const [gewichte, setGewichte] = useState<{ sicherheit: number; steigung: number; ampeln: number; belag: number }>({
@@ -240,7 +243,7 @@ export default function Velonavi() {
   }, [])
 
   useEffect(() => {
-    schreibeUrl(start, ziel, zwischen, wahl)
+    schreibeUrl(start, ziel, zwischen.filter((z): z is Punkt => !!z), wahl)
     if (start || ziel) schreib(SCHLUESSEL.letzte, { start, ziel })
   }, [start, ziel, zwischen, wahl])
 
@@ -303,7 +306,9 @@ export default function Velonavi() {
     const rechne = (mitSchieben: boolean) => {
       // Start, Zwischenziele und Ziel der Reihe nach; jedes Teilstück wird
       // einzeln gesucht und danach zu einer Route zusammengesetzt.
-      const halte = [start, ...zwischen, ziel].map((h) => einrasten(g, h.lon, h.lat, mitSchieben, strasseVon(h.titel)))
+      const halte = [start, ...zwischen.filter((z): z is Punkt => !!z), ziel].map((h) =>
+        einrasten(g, h.lon, h.lat, mitSchieben, strasseVon(h.titel))
+      )
       if (halte.some((h) => !h)) return null
       const out = {} as Record<Variante, Route | null>
       for (const v of VARIANTEN) {
@@ -404,7 +409,18 @@ export default function Velonavi() {
           // Erst ab Zoomstufe 13: In der Übersicht wechselt die Stadtkarte
           // sonst mehrfach die Detailstufe, was beim Zoomen unruhig wirkt.
           { id: 'basiskarte', type: 'raster', source: 'basiskarte', minzoom: 13, paint: { 'raster-fade-duration': 150 } },
-          { id: 'gebaeude', type: 'raster', source: 'gebaeude', minzoom: 15, paint: { 'raster-fade-duration': 150 } },
+          // Die schrägen Gebäude liegen über der Basiskarte und verdecken deren
+          // Hausnummern. Ab Zoom 17 blenden sie deshalb aus.
+          {
+            id: 'gebaeude',
+            type: 'raster',
+            source: 'gebaeude',
+            minzoom: 15,
+            paint: {
+              'raster-fade-duration': 150,
+              'raster-opacity': ['interpolate', ['linear'], ['zoom'], 16.6, 1, 17.4, 0],
+            },
+          },
         ],
       },
       center: STADT.center,
@@ -727,7 +743,8 @@ export default function Velonavi() {
     const map = mapRef.current
     if (!kartenBereit || !map) return
     viaMarken.current.forEach((m) => m.remove())
-    viaMarken.current = zwischen.map((z, i) => {
+    viaMarken.current = zwischen.flatMap((z, i) => {
+      if (!z) return []
       const el = document.createElement('div')
       el.style.cssText = `width:16px;height:16px;border-radius:999px;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:grab;background:${VORZUG}`
       el.setAttribute('aria-label', `Zwischenziel ${i + 1}`)
@@ -738,7 +755,7 @@ export default function Velonavi() {
         setZwischen((alt) => alt.map((x, j) => (j === i ? neu : x)))
         setZwischenText((alt) => alt.map((t, j) => (j === i ? neu.titel : t)))
       })
-      return mk
+      return [mk]
     })
   }, [kartenBereit, zwischen])
 
@@ -927,6 +944,7 @@ export default function Velonavi() {
             wert={zwischenText[i] ?? ''}
             setWert={(v) => setZwischenText((alt) => alt.map((t, j) => (j === i ? v : t)))}
             treffer={offenFeld === `via${i}` ? treffer(zwischenText[i] ?? '', z) : []}
+            platzhalter={`Zwischenziel ${i + 1}: Adresse oder Klick in die Karte`}
             offen={offenFeld === `via${i}`}
             setOffen={(o) => setOffenFeld(o ? (`via${i}` as Feld) : null)}
             onWaehlen={(e) => {
@@ -935,7 +953,6 @@ export default function Velonavi() {
               setZwischenText((alt) => alt.map((t, j) => (j === i ? p.titel : t)))
               merken(p)
             }}
-            platzhalter={`Zwischenziel ${i + 1}`}
             links={<Marke farbe={VORZUG} />}
             rechts={
               <button
@@ -971,14 +988,10 @@ export default function Velonavi() {
           rechts={
             <button
               onClick={() => {
-                // Ein neues Zwischenziel auf halbem Weg zwischen Start und Ziel,
-                // damit die Marke gleich in der Karte liegt und sich ziehen lässt.
-                const mitte =
-                  start && ziel
-                    ? ortBeimRef.current((start.lon + ziel.lon) / 2, (start.lat + ziel.lat) / 2, 16)
-                    : { lon: STADT.center[0], lat: STADT.center[1], titel: koordText(STADT.center[0], STADT.center[1]) }
-                setZwischen((alt) => [...alt, mitte])
-                setZwischenText((alt) => [...alt, mitte.titel])
+                // Leeres Feld anlegen und den Fokus hineinsetzen: Es zählt erst,
+                // wenn ein Ort drinsteht, entweder getippt oder in die Karte geklickt.
+                setZwischen((alt) => [...alt, null])
+                setZwischenText((alt) => [...alt, ''])
                 setOffenFeld(`via${zwischen.length}` as Feld)
               }}
               aria-label="Zwischenziel hinzufügen"
