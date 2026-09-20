@@ -18,7 +18,7 @@ import { Wortmarke } from '../marke'
 import { STAEDTE } from '../staedte'
 import { nf } from '../site'
 import {
-  ladeGraph, einrasten, route, kantenKosten, alsGpx, VOREINSTELLUNGEN,
+  ladeGraph, einrasten, route, kantenKosten, alsGpx, verbinde, VOREINSTELLUNGEN,
   veloErlaubt, stressVon, netzVon, NETZ,
   type Graph, type Profil, type Route, type VeloMeta,
 } from './router'
@@ -103,17 +103,24 @@ function leseUrl() {
     const [lon, lat] = s.split(',').map(Number)
     return Number.isFinite(lon) && Number.isFinite(lat) ? { lon, lat, titel: titel || koordText(lon, lat) } : null
   }
+  const vias = (p.get('via') ?? '').split(';').filter(Boolean)
+  const viaNamen = (p.get('vian') ?? '').split(';')
   return {
     start: punkt(p.get('von'), p.get('vn')),
     ziel: punkt(p.get('nach'), p.get('nn')),
+    zwischen: vias.map((v, i) => punkt(v, viaNamen[i] ?? null)).filter((x): x is Punkt => !!x),
     // «ideal» stammt aus der Zeit mit drei Varianten und zeigt jetzt auf Komfort.
     wahl: ((w) => (w === 'schnell' ? 'schnell' : w === 'komfort' || w === 'ideal' ? 'komfort' : null))(p.get('wahl')) as Variante | null,
   }
 }
 
-function schreibeUrl(start: Punkt | null, ziel: Punkt | null, wahl: Variante) {
+function schreibeUrl(start: Punkt | null, ziel: Punkt | null, zwischen: Punkt[], wahl: Variante) {
   const p = new URLSearchParams()
   if (start) p.set('von', `${start.lon.toFixed(5)},${start.lat.toFixed(5)}`), p.set('vn', start.titel)
+  if (zwischen.length) {
+    p.set('via', zwischen.map((z) => `${z.lon.toFixed(5)},${z.lat.toFixed(5)}`).join(';'))
+    p.set('vian', zwischen.map((z) => z.titel).join(';'))
+  }
   if (ziel) p.set('nach', `${ziel.lon.toFixed(5)},${ziel.lat.toFixed(5)}`), p.set('nn', ziel.titel)
   if (wahl !== 'komfort') p.set('wahl', wahl)
   const s = p.toString()
@@ -181,6 +188,9 @@ export default function Velonavi() {
   const [fehler, setFehler] = useState<string | null>(null)
   const [start, setStart] = useState<Punkt | null>(null)
   const [ziel, setZiel] = useState<Punkt | null>(null)
+  /** Zwischenziele: Punkte, über die die Route zwingend führt. */
+  const [zwischen, setZwischen] = useState<Punkt[]>([])
+  const [zwischenText, setZwischenText] = useState<string[]>([])
   const [wahl, setWahl] = useState<Variante>('komfort')
   const [gewichte, setGewichte] = useState<{ sicherheit: number; steigung: number; ampeln: number; belag: number }>({
     ...VOREINSTELLUNGEN.entspannt,
@@ -198,7 +208,8 @@ export default function Velonavi() {
   // Suche: zwei Felder mit eigenem Text, ein gemeinsamer Index.
   const [startText, setStartText] = useState('')
   const [zielText, setZielText] = useState('')
-  const [offenFeld, setOffenFeld] = useState<'start' | 'ziel' | null>(null)
+  type Feld = 'start' | 'ziel' | `via${number}`
+  const [offenFeld, setOffenFeld] = useState<Feld | null>(null)
   const [indexBereit, setIndexBereit] = useState(false)
   const [verlauf, setVerlauf] = useState<Punkt[]>([])
   const [zuhause, setZuhause] = useState<Punkt | null>(null)
@@ -224,13 +235,14 @@ export default function Velonavi() {
     const z = u.ziel ?? letzte?.ziel ?? null
     if (s) setStart(s), setStartText(s.titel)
     if (z) setZiel(z), setZielText(z.titel)
+    if (u.zwischen.length) setZwischen(u.zwischen), setZwischenText(u.zwischen.map((x) => x.titel))
     if (u.wahl) setWahl(u.wahl)
   }, [])
 
   useEffect(() => {
-    schreibeUrl(start, ziel, wahl)
+    schreibeUrl(start, ziel, zwischen, wahl)
     if (start || ziel) schreib(SCHLUESSEL.letzte, { start, ziel })
-  }, [start, ziel, wahl])
+  }, [start, ziel, zwischen, wahl])
 
   /**
    * Was gesucht oder angetippt wurde, kommt oben in den Verlauf. Punkte ohne
@@ -289,13 +301,24 @@ export default function Velonavi() {
     const t0 = performance.now()
     /** Alle drei Varianten mit einer Einstellung durchrechnen. */
     const rechne = (mitSchieben: boolean) => {
-      const s = einrasten(g, start.lon, start.lat, mitSchieben, strasseVon(start.titel))
-      const z = einrasten(g, ziel.lon, ziel.lat, mitSchieben, strasseVon(ziel.titel))
-      if (!s || !z) return null
+      // Start, Zwischenziele und Ziel der Reihe nach; jedes Teilstück wird
+      // einzeln gesucht und danach zu einer Route zusammengesetzt.
+      const halte = [start, ...zwischen, ziel].map((h) => einrasten(g, h.lon, h.lat, mitSchieben, strasseVon(h.titel)))
+      if (halte.some((h) => !h)) return null
       const out = {} as Record<Variante, Route | null>
       for (const v of VARIANTEN) {
         const pr = { ...profile[v.id], schieben: mitSchieben }
-        out[v.id] = route(g, pr, s, z, kantenKosten(g, pr))
+        const k = kantenKosten(g, pr)
+        const teile: Route[] = []
+        for (let i = 0; i + 1 < halte.length; i++) {
+          const r = route(g, pr, halte[i]!, halte[i + 1]!, k)
+          if (!r) {
+            teile.length = 0
+            break
+          }
+          teile.push(r)
+        }
+        out[v.id] = teile.length ? verbinde(teile) : null
       }
       return out.komfort ? out : null
     }
@@ -333,7 +356,7 @@ export default function Velonavi() {
       }
     })
     return { routen, gleichWie, ms, notSchieben }
-  }, [graphBereit, start, ziel, profile, schieben])
+  }, [graphBereit, start, ziel, zwischen, profile, schieben])
   const routen = ergebnis && 'routen' in ergebnis ? ergebnis : null
   // Die gewählte Variante, bei Zusammenlegung die, auf die sie zeigt.
   const aktiv: Variante | null = routen ? (routen.gleichWie[wahl] ?? (routen.routen[wahl] ? wahl : 'komfort')) : null
@@ -698,6 +721,27 @@ export default function Velonavi() {
     if (kartenBereit) setzeMarke('ziel', ziel)
   }, [kartenBereit, ziel, setzeMarke])
 
+  // Zwischenziele als kleinere Marken, ebenfalls verschiebbar.
+  const viaMarken = useRef<Marker[]>([])
+  useEffect(() => {
+    const map = mapRef.current
+    if (!kartenBereit || !map) return
+    viaMarken.current.forEach((m) => m.remove())
+    viaMarken.current = zwischen.map((z, i) => {
+      const el = document.createElement('div')
+      el.style.cssText = `width:16px;height:16px;border-radius:999px;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:grab;background:${VORZUG}`
+      el.setAttribute('aria-label', `Zwischenziel ${i + 1}`)
+      const mk = new Marker({ element: el, draggable: true }).setLngLat([z.lon, z.lat]).addTo(map)
+      mk.on('dragend', () => {
+        const { lng, lat } = mk.getLngLat()
+        const neu = ortBeimRef.current(lng, lat, map.getZoom())
+        setZwischen((alt) => alt.map((x, j) => (j === i ? neu : x)))
+        setZwischenText((alt) => alt.map((t, j) => (j === i ? neu.titel : t)))
+      })
+      return mk
+    })
+  }, [kartenBereit, zwischen])
+
   /**
    * Zum Klick den nächsten bekannten Ort suchen: Hausadresse, Kulturort oder
    * Haltestelle. So wird aus dem Tippen auf ein Haus die «Nussbaumstrasse 4»
@@ -750,7 +794,12 @@ export default function Velonavi() {
       const p = ortBeim(e.lngLat.lng, e.lngLat.lat, map.getZoom())
       const feld = feldRef.current ?? (startRef.current ? 'ziel' : 'start')
       if (feld === 'start') setStart(p), setStartText(p.titel)
-      else setZiel(p), setZielText(p.titel)
+      else if (feld === 'ziel') setZiel(p), setZielText(p.titel)
+      else {
+        const i = Number(feld.slice(3))
+        setZwischen((alt) => alt.map((z, j) => (j === i ? p : z)))
+        setZwischenText((alt) => alt.map((t, j) => (j === i ? p.titel : t)))
+      }
       merken(p)
       setOffenFeld(null)
       setBlattOffen(true)
@@ -871,7 +920,40 @@ export default function Velonavi() {
           }
         />
       </div>
-      <div className="relative z-40">
+      {zwischen.map((z, i) => (
+        <div key={i} className="relative" style={{ zIndex: 40 - i }}>
+          <Suchleiste
+            ui={ui}
+            wert={zwischenText[i] ?? ''}
+            setWert={(v) => setZwischenText((alt) => alt.map((t, j) => (j === i ? v : t)))}
+            treffer={offenFeld === `via${i}` ? treffer(zwischenText[i] ?? '', z) : []}
+            offen={offenFeld === `via${i}`}
+            setOffen={(o) => setOffenFeld(o ? (`via${i}` as Feld) : null)}
+            onWaehlen={(e) => {
+              const p = { lon: e.x, lat: e.y, titel: e.titel }
+              setZwischen((alt) => alt.map((x, j) => (j === i ? p : x)))
+              setZwischenText((alt) => alt.map((t, j) => (j === i ? p.titel : t)))
+              merken(p)
+            }}
+            platzhalter={`Zwischenziel ${i + 1}`}
+            links={<Marke farbe={VORZUG} />}
+            rechts={
+              <button
+                onClick={() => {
+                  setZwischen((alt) => alt.filter((_, j) => j !== i))
+                  setZwischenText((alt) => alt.filter((_, j) => j !== i))
+                }}
+                aria-label={`Zwischenziel ${i + 1} entfernen`}
+                className="grid h-12 w-12 shrink-0 place-items-center rounded-full border backdrop-blur-md text-[18px]"
+                style={{ background: ui.panel, borderColor: ui.border, color: ui.muted, boxShadow: ui.schatten }}
+              >
+                ×
+              </button>
+            }
+          />
+        </div>
+      ))}
+      <div className="relative z-30">
         <Suchleiste
           ui={ui}
           wert={zielText}
@@ -888,16 +970,38 @@ export default function Velonavi() {
           links={<Marke farbe={AKZENT} />}
           rechts={
             <button
-              onClick={tausche}
-              aria-label="Start und Ziel tauschen"
-              title="Start und Ziel tauschen"
-              className="grid h-12 w-12 shrink-0 place-items-center rounded-full border backdrop-blur-md"
+              onClick={() => {
+                // Ein neues Zwischenziel auf halbem Weg zwischen Start und Ziel,
+                // damit die Marke gleich in der Karte liegt und sich ziehen lässt.
+                const mitte =
+                  start && ziel
+                    ? ortBeimRef.current((start.lon + ziel.lon) / 2, (start.lat + ziel.lat) / 2, 16)
+                    : { lon: STADT.center[0], lat: STADT.center[1], titel: koordText(STADT.center[0], STADT.center[1]) }
+                setZwischen((alt) => [...alt, mitte])
+                setZwischenText((alt) => [...alt, mitte.titel])
+                setOffenFeld(`via${zwischen.length}` as Feld)
+              }}
+              aria-label="Zwischenziel hinzufügen"
+              title="Zwischenziel hinzufügen"
+              className="grid h-12 w-12 shrink-0 place-items-center rounded-full border backdrop-blur-md text-[20px]"
               style={{ background: ui.panel, borderColor: ui.border, color: ui.fg, boxShadow: ui.schatten }}
             >
-              <TauschSymbol />
+              +
             </button>
           }
         />
+      </div>
+      <div className="relative z-20 -mt-1 flex justify-end">
+        <button
+          onClick={tausche}
+          aria-label="Start und Ziel tauschen"
+          title="Start und Ziel tauschen"
+          className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] backdrop-blur-md"
+          style={{ background: ui.panel, borderColor: ui.border, color: ui.muted, boxShadow: ui.schatten }}
+        >
+          <TauschSymbol />
+          Tauschen
+        </button>
       </div>
       <Zuhausezeile
         zuhause={zuhause}

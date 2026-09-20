@@ -753,6 +753,56 @@ function auswerten(g: Graph, p: Profil, stuecke: Stueck[], kostenSumme: number):
   return r
 }
 
+/**
+ * Mehrere Teilrouten zu einer zusammenfassen, für Fahrten über Zwischenziele.
+ * Geometrie und Höhenprofil laufen durch, die Kennzahlen werden addiert.
+ */
+export function verbinde(teile: Route[]): Route {
+  const g = teile[0]
+  const out: Route = {
+    ...g,
+    stuecke: [], koordinaten: [], stufen: [], profil: [], strassen: [],
+    distanz: 0, zeit: 0, kosten: 0, hoch: 0, runter: 0,
+    meterNachStufe: [0, 0, 0, 0, 0], vorzugM: 0, tramM: 0, kopfsteinM: 0, kiesM: 0,
+    treppen: 0, unfaelle: 0, huerden: 0,
+    ampeln: { geradeaus: 0, abbiegen: 0, wartezeit: 0, orte: [] },
+  }
+  for (const t of teile) {
+    const versatz = out.distanz
+    out.stuecke.push(...t.stuecke)
+    t.koordinaten.forEach((c, i) => {
+      // Der erste Punkt einer Teilroute ist der letzte der vorherigen.
+      if (versatz > 0 && i === 0) return
+      out.koordinaten.push(c)
+      out.stufen.push(t.stufen[i])
+      out.profil.push([versatz + t.profil[i][0], t.profil[i][1]])
+    })
+    for (const st of t.strassen) {
+      const letzte = out.strassen[out.strassen.length - 1]
+      if (letzte && letzte.name === st.name) letzte.meter += st.meter
+      else out.strassen.push({ ...st })
+    }
+    out.distanz += t.distanz
+    out.zeit += t.zeit
+    out.kosten += t.kosten
+    out.hoch += t.hoch
+    out.runter += t.runter
+    out.vorzugM += t.vorzugM
+    out.tramM += t.tramM
+    out.kopfsteinM += t.kopfsteinM
+    out.kiesM += t.kiesM
+    out.treppen += t.treppen
+    out.unfaelle += t.unfaelle
+    out.huerden += t.huerden
+    t.meterNachStufe.forEach((m, i) => (out.meterNachStufe[i] += m))
+    out.ampeln.geradeaus += t.ampeln.geradeaus
+    out.ampeln.abbiegen += t.ampeln.abbiegen
+    out.ampeln.wartezeit += t.ampeln.wartezeit
+    out.ampeln.orte.push(...t.ampeln.orte)
+  }
+  return out
+}
+
 /** GPX-Track für Navigationsgeräte und Apps. */
 export function alsGpx(r: Route, name: string) {
   const pts = r.koordinaten

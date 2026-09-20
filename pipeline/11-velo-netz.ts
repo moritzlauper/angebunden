@@ -722,7 +722,9 @@ function stress(k: Kante, vorwaerts: boolean): number {
   if (k.spuren >= 3 && i === INFRA.keine && k.tempo >= TEMPO.t50) s = 4
   // Tramgleise in der Fahrbahn: das Vorderrad im Rillengleis ist ein häufiger
   // Sturzgrund. Mit eigenem Streifen fährt man neben den Rillen, nicht darin.
-  if (k.tram && i === INFRA.keine) s = Math.min(4, s + 2)
+  // Auf Tempo 30 wiegt es weniger: Dort wählt man die Linie selbst und quert
+  // die Rillen im günstigen Winkel, statt vom Verkehr hineingedrängt zu werden.
+  if (k.tram && i === INFRA.keine) s = Math.min(4, s + (k.tempo >= TEMPO.t50 ? 2 : 1))
   // Kopfsteinpflaster rüttelt so stark, dass eine ruhige Gasse trotzdem
   // unangenehm ist. Feines Plaster und Kies zählen halb.
   if (k.belag === BELAG.kopfstein) s = Math.min(4, s + 2)
