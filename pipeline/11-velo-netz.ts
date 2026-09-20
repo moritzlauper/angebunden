@@ -656,6 +656,77 @@ function lv95NachWgs(e: number, n: number): [number, number] {
   return [(lon * 100) / 36, (lat * 100) / 36]
 }
 
+// ------------------------------------------------------------ Lücken im Velonetz
+
+/**
+ * Die Stadt erfasst baulich abgetrennte Velowege als eigene Linien. An jeder
+ * Querstrasse endet so eine Linie, und weiter geht es über eine kurze
+ * «Überquerung», die im Datensatz nur für den Fussverkehr freigegeben ist.
+ * Wer diese Stücke wörtlich nimmt, kann einen Veloweg nicht durchfahren: Die
+ * Zweierstrasse war Richtung Stauffacher komplett unterbrochen.
+ *
+ * Darum: Ein kurzes Stück ohne Velofreigabe wird befahrbar, wenn es zwei
+ * Velowege derselben Richtung verbindet und dabei ungefähr geradeaus führt.
+ */
+console.log('Lücken im Velonetz')
+{
+  const anKnoten: number[][] = Array.from({ length: N }, () => [])
+  kanten.forEach((k, i) => {
+    anKnoten[k.von].push(i)
+    anKnoten[k.nach].push(i)
+  })
+  const peilungVon = (k: Kante, amAnfang: boolean) => {
+    const xy = k.xy
+    return amAnfang
+      ? peilung(xy[0], xy[1], xy[2], xy[3])
+      : peilung(xy[xy.length - 4], xy[xy.length - 3], xy[xy.length - 2], xy[xy.length - 1])
+  }
+  /**
+   * Ein Veloweg als Einbahn ohne Gegenstück daneben ist fast immer veraltet:
+   * Entweder fehlt die zweite Linie im Datensatz, oder die Strecke wurde
+   * inzwischen für beide Richtungen geöffnet. Die Zweierstrasse ist seit 2026
+   * durchgehend befahrbar, im Datensatz steht sie noch als Einbahn.
+   */
+  const velowegIndex = new LinienIndex(25)
+  kanten.forEach((k, i) => {
+    if (k.velo && (k.veloweg || k.klasse === KLASSE.veloweg)) velowegIndex.add(k.xy, i)
+  })
+  let geoeffnet = 0
+  for (const k of kanten) {
+    if (!k.velo || !k.einbahn || !(k.veloweg || k.klasse === KLASSE.veloweg)) continue
+    const proben = stichproben(k.xy, 10)
+    const gegen = proben.filter((pr) => {
+      const t = velowegIndex.naechstes(pr.x, pr.y, pr.r, 22, 35)
+      if (!t) return false
+      const n = kanten[t.linie.id]
+      return n !== k && n.einbahn !== k.einbahn
+    })
+    if (gegen.length / proben.length > 0.5) continue
+    k.einbahn = null
+    geoeffnet++
+  }
+  console.log(`  ${geoeffnet} Velowege ohne Gegenstück in beide Richtungen geöffnet`)
+
+  let geschlossen = 0
+  for (const [i, k] of kanten.entries()) {
+    if (k.velo || !k.fuss || k.innen || k.laenge > 30) continue
+    // Velowege an beiden Enden, die ungefähr in der Verlängerung liegen?
+    const passend = (knoten: number, richtung: number) =>
+      anKnoten[knoten].some((j) => {
+        const n = kanten[j]
+        if (j === i || !n.velo || (!n.veloweg && n.klasse !== KLASSE.veloweg)) return false
+        const r = n.von === knoten ? peilungVon(n, true) : peilungVon(n, false)
+        return winkelDiff(r, richtung) < 40
+      })
+    const r = peilungVon(k, true)
+    if (!passend(k.von, r) || !passend(k.nach, r)) continue
+    k.velo = true
+    k.veloweg = true
+    geschlossen++
+  }
+  console.log(`  ${geschlossen} kurze Verbindungen zwischen Velowegen befahrbar gemacht`)
+}
+
 // ------------------------------------------------------------ Hürden
 
 console.log('Hürden')
@@ -743,6 +814,9 @@ function stress(k: Kante, vorwaerts: boolean): number {
   // Auf Tempo 30 wiegt es weniger: Dort wählt man die Linie selbst und quert
   // die Rillen im günstigen Winkel, statt vom Verkehr hineingedrängt zu werden.
   if (k.tram && i === INFRA.keine) s = Math.min(4, s + (k.tempo >= TEMPO.t50 ? 2 : 1))
+  // Auf einer Hauptstrasse hilft auch der Streifen wenig: Das Tram fährt neben
+  // einem, und beim Ausweichen landet das Vorderrad in der Rille.
+  else if (k.tram && i === INFRA.streifen && k.klasse === KLASSE.haupt) s = Math.min(4, s + 1)
   // Kopfsteinpflaster rüttelt so stark, dass eine ruhige Gasse trotzdem
   // unangenehm ist. Feines Plaster und Kies zählen halb.
   if (k.belag === BELAG.kopfstein) s = Math.min(4, s + 2)
@@ -752,8 +826,13 @@ function stress(k: Kante, vorwaerts: boolean): number {
   // Eine Strasse in der Velokarte der Stadt ist eine ausgeschilderte Route:
   // höchstens Stufe 2, wenn nichts Hartes dazukommt, sonst höchstens Stufe 3.
   // Mit Tramgleisen oder drei Spuren bleibt sie, was sie ist.
-  if (gefuehrt && k.belag !== BELAG.kopfstein)
-    s = Math.min(s, k.tram || k.spuren >= 3 ? 3 : 2)
+  if (gefuehrt && k.belag !== BELAG.kopfstein) {
+    // Eine Sammel- oder Nebenstrasse, die in der Velokarte steht und keine
+    // Gleise hat, ist eine ausgeschilderte Veloachse: angenehm zu fahren,
+    // auch wenn OSM dort Abbiegespuren meldet. Auf den grossen Hauptachsen
+    // und bei Tramgleisen bleibt es bei höchstens Stufe 3.
+    s = Math.min(s, !k.tram && k.klasse <= KLASSE.sammel ? 1 : 3)
+  }
   return s
 }
 

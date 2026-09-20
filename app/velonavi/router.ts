@@ -228,7 +228,7 @@ const GETRENNT_RABATT = 0.85
  * Korridore, sie sind durchgehend, direkt und meist besser ausgebaut. Ohne ihn
  * zieht die Bewertung auf ruhige Quartierstrassen, auch wenn sie Umwege sind.
  */
-const NETZ_RABATT = [1, 0.9, 0.72, 0.62]
+const NETZ_RABATT = [1, 0.85, 0.68, 0.58]
 /**
  * Zuschlag fürs Verlassen einer Achse des städtischen Velonetzes. Er hält die
  * Route auf dem Korridor, statt sie zwischen Netzstücken und Nebenstrassen
@@ -236,7 +236,7 @@ const NETZ_RABATT = [1, 0.9, 0.72, 0.62]
  */
 const NETZ_VERLASSEN = 8
 /** Kleinster Kostenfaktor, den es gibt: begrenzt die A*-Schätzung nach unten. */
-const MIN_FAKTOR = 0.5
+const MIN_FAKTOR = 0.45
 
 /**
  * Erwartete Wartezeit an einem Lichtsignal in Sekunden, je Manöver.
@@ -282,6 +282,10 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
       let faktor =
         1 +
         STRESS_KOSTEN[stress] * p.sicherheit +
+        // Tramgleise entlang der Fahrbahn zählen auch dann, wenn ein Streifen
+        // oder Weg daneben liegt: Man quert sie beim Abbiegen, beim Ausweichen
+        // und an jeder Haltestelle.
+        (tramVon(g, e) ? 0.45 * p.sicherheit : 0) +
         (infraVon(g, a) === INFRA.getrennt ? 0 : spurig * 0.35 * p.sicherheit) +
         BELAG_KOSTEN[belag] * p.belag +
         // Auf Plätzen und in Fussgängerzonen kommt man weder zügig noch

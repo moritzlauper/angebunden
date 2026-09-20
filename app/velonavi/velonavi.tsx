@@ -455,14 +455,15 @@ export default function Velonavi() {
     attrib?.removeAttribute('open')
 
     map.on('load', async () => {
-      const [vorzug, stadtGeo, wasser, strassen] = await Promise.all(
-        ['velo-vorzug', 'city', 'water', 'streets'].map((n) => fetch(`${STADT.daten}/${n}.geojson`).then((r) => r.json()))
+      const [vorzug, stadtGeo] = await Promise.all(
+        ['velo-vorzug', 'city'].map((n) => fetch(`${STADT.daten}/${n}.geojson`).then((r) => r.json()))
       )
       const leer = { type: 'FeatureCollection' as const, features: [] }
-      // Unterhalb von Zoom 13 eine ruhige eigene Übersicht statt der Stadtkarte.
+      // Die Stadtkarte trägt inzwischen jede Zoomstufe. Von der früheren eigenen
+      // Übersicht bleibt nur der Stadtrand: Ihre weisse Stadtfläche lag über der
+      // Stadtkarte und liess Zürich beim Rauszoomen leer, während der Kartendienst
+      // rundum weiter zeichnete.
       map.addSource('stadt', { type: 'geojson', data: stadtGeo })
-      map.addSource('wasser', { type: 'geojson', data: wasser })
-      map.addSource('strassen', { type: 'geojson', data: strassen })
       map.addSource('vorzug', { type: 'geojson', data: vorzug })
       map.addSource('netz', { type: 'geojson', data: leer })
       map.addSource('ampeln', { type: 'geojson', data: leer })
@@ -471,29 +472,10 @@ export default function Velonavi() {
       map.addSource('route-ampeln', { type: 'geojson', data: leer })
       map.addSource('zeiger', { type: 'geojson', data: leer })
 
-      // Das Velonetz, nur eingeblendet, wenn es nach Stress eingefärbt wird.
-      map.addLayer({ id: 'stadt-flaeche', type: 'fill', source: 'stadt', maxzoom: 12, paint: { 'fill-color': '#ffffff' } })
-      map.addLayer({
-        id: 'wasser-flaeche', type: 'fill', source: 'wasser', maxzoom: 12,
-        filter: ['==', ['get', 'kind'], 'area'], paint: { 'fill-color': '#dcdcd6' },
-      })
-      map.addLayer({
-        id: 'wasser-linie', type: 'line', source: 'wasser', maxzoom: 12,
-        filter: ['==', ['get', 'kind'], 'line'],
-        paint: { 'line-color': '#dcdcd6', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 13, 8] },
-      })
-      // In der Übersicht die Strassen als Orientierung, bis die Stadtkarte übernimmt.
-      map.addLayer({
-        id: 'strassen-neben', type: 'line', source: 'strassen', maxzoom: 12,
-        filter: ['==', ['get', 'k'], 'neben'],
-        paint: { 'line-color': '#e3e3de', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.4, 13.3, 1.4] },
-      })
-      map.addLayer({
-        id: 'strassen-haupt', type: 'line', source: 'strassen', maxzoom: 12,
-        filter: ['==', ['get', 'k'], 'haupt'],
-        paint: { 'line-color': '#d3d3cc', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.9, 13.3, 2.6] },
-      })
+      // Der Stadtrand als Orientierung. Gefüllt wird nichts: Die Stadtkarte
+      // liegt darunter und soll auf jeder Zoomstufe zu sehen sein.
       map.addLayer({ id: 'stadt-rand', type: 'line', source: 'stadt', maxzoom: 12, paint: { 'line-color': '#c9c9c4', 'line-width': 1 } })
+      // Das Velonetz, nur eingeblendet, wenn es nach Stress eingefärbt wird.
       map.addLayer({
         id: 'netz',
         type: 'line',
