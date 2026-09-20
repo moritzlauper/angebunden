@@ -183,10 +183,19 @@ export type Profil = {
   belag: number
   /** Ob kurze Stücke zu Fuss mit dem Velo an der Hand erlaubt sind. */
   schieben: boolean
+  /**
+   * Poller, Kanten und Querungen zählen nur ihre tatsächlichen Sekunden statt
+   * eines Unbehagens-Aufschlags. Für «Schnell» gedacht, das sonst manchmal
+   * einen längeren, langsameren Weg wählte, weil ihm ein paar Querungen mehr
+   * unverhältnismässig stark angerechnet wurden. Der Abbiege-Aufschlag bleibt
+   * unverändert bestehen, sonst nimmt der Router im Rasterquartier eine
+   * Treppe durch die Blöcke, weil viele Wege dort fast gleich lang sind.
+   */
+  zeitOptimal?: boolean
 }
 
 export const VOREINSTELLUNGEN = {
-  schnell: { sicherheit: 0.1, steigung: 0.1, ampeln: 0.4, belag: 0.3 },
+  schnell: { sicherheit: 0.1, steigung: 0.1, ampeln: 0.4, belag: 0.3, zeitOptimal: true },
   ausgewogen: { sicherheit: 0.5, steigung: 0.3, ampeln: 0.5, belag: 0.6 },
   // «Komfort»: deutlich ruhiger als «Schnell», aber ohne grosse Umwege. Bei
   // vollem Sicherheitsgewicht fuhr die Route im Mittel 14% Umweg und sammelte
@@ -241,11 +250,13 @@ const MIN_FAKTOR = 0.45
 /**
  * Erwartete Wartezeit an einem Lichtsignal in Sekunden, je Manöver.
  * Geradeaus über die Kreuzung wartet man im Mittel eine halbe Rotphase.
- * Rechts abbiegen geht fast immer ohne Halt, links meist indirekt über den
- * Velosack oder den Fussgängerstreifen, was selten lange dauert.
+ * Rechts abbiegen geht praktisch nie mit Halt: Velos biegen dort in der
+ * Praxis unabhängig von der Ampelphase ab, ein kurzer Blick reicht.
+ * Links meist indirekt über den Velosack oder den Fussgängerstreifen, was
+ * selten lange dauert.
  */
 const WARTEN = {
-  knoten: { geradeaus: 24, links: 7, rechts: 2 },
+  knoten: { geradeaus: 24, links: 7, rechts: 1 },
   // Einzelne Fussgängerampeln: entlang der Strasse meist grün, beim Queren rot.
   einzeln: { entlang: 5, queren: 18, abbiegen: 2 },
 }
@@ -300,9 +311,15 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
       // Sekunden, unabhängig von der Länge der Kante.
       const huerde = g.huerde[e]
       zeit[a] = t + huerde
+      // Poller, Kanten und Querungen fallen für "Schnell" nicht stärker ins
+      // Gewicht, als sie an Zeit kosten: Sonst wich die Route auf einen
+      // Umweg aus, der auf dem Papier ein paar Querungen weniger hatte,
+      // real aber länger dauerte. Für die übrigen Profile bleibt der
+      // Aufschlag (1.6x), weil Hindernisse dort bewusst stärker gewichtet
+      // gemieden werden als ihre reine Zeit.
       kosten[a] =
         t * faktor +
-        huerde * 1.6 +
+        huerde * (p.zeitOptimal ? 1 : 1.6) +
         auf * sProM * p.steigung * (1.2 + 12 * Math.max(0, steil - 0.05)) +
         g.unfall[e] * 3 * p.sicherheit
     } else if (p.schieben && schiebenErlaubt(g, a)) {

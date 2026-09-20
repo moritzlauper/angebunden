@@ -1,6 +1,61 @@
 {
-  "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat). Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, stress (1-4), netz (keins/basis/haupt/vorzug).",
+  "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat). Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, stress (1-4), netz (keins/basis/haupt/vorzug), fussgaenger (true/false).",
   "regeln": [
+    {
+      "strasse": "Lehenstrasse",
+      "bbox": [8.5195, 47.3965, 8.5275, 47.3975],
+      "netz": "vorzug",
+      "grund": "Der Abschnitt beim Kirchplatz Wipkingen ist im Basisdatensatz nur als Fussweg ohne Velofreigabe erfasst, gehört aber zur Vorzugsroute 30 (Höngg - Wipkingen) und ist mit dem Velo durchfahrbar. netz=vorzug reicht als Korrektur, weil eine Vorzugsroute laut eigener Regel immer für Velos freigegeben wird (siehe weiter unten in 11-velo-netz.ts). Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Wunderlistrasse",
+      "bbox": [8.5195, 47.3965, 8.5275, 47.3975],
+      "netz": "vorzug",
+      "grund": "Gleicher Kirchplatz-Abschnitt wie die Lehenstrasse, Teil derselben Vorzugsroute 30. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Lehenstrasse Überquerung",
+      "netz": "vorzug",
+      "grund": "Kurze Querungsstücke zwischen den Lehenstrasse-Abschnitten beim Kirchplatz, ohne die das Quartier trotz freigegebener Lehenstrasse eine Velo-Insel ohne Anschluss ans übrige Netz bliebe. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Wunderlistrasse Überquerung",
+      "netz": "vorzug",
+      "grund": "Gleicher Grund wie Lehenstrasse Überquerung, nur für die Wunderlistrasse-Seite des Kirchplatzes."
+    },
+    {
+      "strasse": "Corrodisteig",
+      "netz": "vorzug",
+      "grund": "Verbindungsstück zwischen Wunderlistrasse und Lehenstrasse beim Kirchplatz Wipkingen, sonst bliebe das freigegebene Stück eine Velo-Insel."
+    },
+    {
+      "strasse": "Waidstrasse",
+      "bbox": [8.5226, 47.3966, 8.523, 47.397],
+      "netz": "vorzug",
+      "grund": "Kurzes Verbindungsstück zum Kirchplatz Wipkingen (nicht die übrige Waidstrasse, die bereits befahrbar ist)."
+    },
+    {
+      "strasse": "Auf der Mauer",
+      "beideRichtungen": true,
+      "grund": "Ruhige Tempo-30-Quartierstrasse zwischen Hirschengraben und Leonhardstrasse, umgeht das unangenehme Central komplett. In Zürich ist Velofahren gegen die Einbahn immer erlaubt, auch wo der Datensatz das nicht so führt. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Hirschengraben",
+      "bbox": [8.5405, 47.372, 8.548, 47.377],
+      "beideRichtungen": true,
+      "grund": "Verbindet Central/Seilergraben mit Auf der Mauer, in diesem Abschnitt bislang nur in eine Richtung als velo-befahrbar erfasst. Velofahren gegen die Einbahn ist in Zürich immer erlaubt, auch hier. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Fussweg",
+      "bbox": [8.5448, 47.3767, 8.5455, 47.3769],
+      "netz": "vorzug",
+      "grund": "Kurze Rampe zwischen der Leonhardshalde und der Querung bei Auf der Mauer, im Datensatz als Treppe ohne Velofreigabe erfasst. Real ist es eine mit dem Velo befahrbare Rampe, ohne die Auf der Mauer trotz Freigabe in beide Richtungen eine Velo-Insel bliebe, weil die beiden Abschnitte sonst nur über den Umweg via Hirschengraben verbunden sind. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Auf der Mauer Überquerung",
+      "netz": "vorzug",
+      "grund": "Kurze Querungsstücke der Strasse Auf der Mauer, ohne die die Rampe (siehe oben) nicht ans übrige Netz anschliesst. Ortskenntnis des Betreibers."
+    },
     {
       "strasse": "Sihlfeldstrasse",
       "bbox": [8.5148, 47.3725, 8.5178, 47.3825],
@@ -8,10 +63,25 @@
       "grund": "Velostrasse durchs Quartier, durchgehend Tempo 30, für Velos angenehm und direkt zwischen Bullingerplatz und Hardplatz. Die Velonetzplanung der Stadt erfasst sie dort nur teilweise, weshalb die Route ohne diese Korrektur auf die Hardstrasse ausweicht, obwohl diese streckenweise Tempo 50 und Hauptstrassencharakter hat. Ortskenntnis des Betreibers."
     },
     {
+      "strasse": "Aemtlerstrasse",
+      "stress": 2,
+      "grund": "Sammelstrasse mit nur einer Spur je Richtung und ohne Tram, real nicht so unangenehm zu fahren wie andere Tempo-50-Sammelstrassen. Die Einstufung nach Klasse/Tempo deckelt sie sonst pauschal auf Stufe 4, was 'Komfort' auf einen Umweg über Nebenstrassen ausweichen lässt, obwohl die Aemtlerstrasse direkt zur Kalkbreitestrasse/Feldstrasse führt, der von der Velomarkierung vorgesehenen Route. Ortskenntnis des Betreibers."
+    },
+    {
       "strasse": "Hardstrasse",
       "bbox": [8.5095, 47.3775, 8.5155, 47.383],
       "stress": 4,
       "grund": "Hardstrasse zwischen Albisriederplatz und Hardplatz ist eine breite, verkehrsorientierte Hauptstrasse, für Velos unangenehm. Parallel dazu liegt die ruhige Sihlfeldstrasse (Velostrasse, Tempo 30) bis zum Hardplatz, die immer vorzuziehen ist. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Utoquai",
+      "stress": 3,
+      "grund": "Die Seepromenade am Utoquai ist grösstenteils Pflasterstein und oft voller Fussgänger, real unangenehm zu fahren. Der Datensatz stuft sie als ausgeschilderte Route ein und deckelt die Stressstufe deshalb auf 1 - das passt nicht zum tatsächlichen Belag und Fussgängeraufkommen. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Wipkingerbrücke",
+      "stress": 2,
+      "grund": "Tramgleise auf der Fahrbahn, aber ein breites, gut befahrbares Trottoir macht die Querung auch für «Komfort» angenehm genug. Ortskenntnis des Betreibers."
     },
     {
       "strasse": "Zweierstrasse",
@@ -38,7 +108,12 @@
     {
       "strasse": "Bahnhofquai",
       "stress": 3,
-      "grund": "Bahnhofquai und HB-Umfeld sind unangenehm zu fahren. Ausnahme ist der Velotunnel (im Netz «Stadttunnel»)."
+      "grund": "Bahnhofquai und HB-Umfeld sind unangenehm zu fahren."
+    },
+    {
+      "strasse": "Stadttunnel",
+      "gesperrt": true,
+      "grund": "Der Velotunnel ist noch nicht gebaut, nur geplant. Der Datensatz führt ihn bereits als befahrbare Vorzugsroute. Ortskenntnis des Betreibers."
     },
     {
       "strasse": "Sihlstrasse",
@@ -50,6 +125,17 @@
       ],
       "stress": 4,
       "grund": "Sihlstrasse im Kreis 1: auf den Autoverkehr ausgerichtet, viel Verkehr, für Velos unangenehm. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Langstrasse",
+      "bbox": [8.5278, 47.3802, 8.5296, 47.382],
+      "fussgaenger": false,
+      "grund": "Langstrassenunterführung: breite, velofreundliche Passage unter den Gleisen, im Datensatz aber wie eine gewöhnliche Fussgängerzone eingestuft. Das bremst das Zeitmodell künstlich (auf Fussgängertempo gedeckelt plus Unbehagens-Aufschlag), obwohl man hier zügig durchfährt, und lässt 'Schnell' auf einen langsameren Umweg über die Strasse ausweichen. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Ankerstrasse",
+      "netz": "vorzug",
+      "grund": "Ruhige Tempo-30-Quartierstrasse, auf der Basiskarte der Stadt als Vorzugsroute ausgewiesen, im eigenen Datensatz aber nur als Basis- bzw. Hauptnetz erfasst. Der kleinere Netzrabatt lässt sie gegen Strecken ohne Netzstatus unnötig zurückfallen, obwohl sie mit Stress 1 schon die beste Stufe hat. Ortskenntnis des Betreibers."
     },
     {
       "strasse": "Herterbrücke",
