@@ -51,10 +51,23 @@ async function ladeVeloMeta(): Promise<VeloMeta> {
   )
 }
 
+/**
+ * Setzt das Thema, bevor das erste Bild steht. Ohne dieses Skript käme die
+ * Seite hell aus dem Server, und der Wechsel auf dunkel würde nach dem
+ * Hydrieren sichtbar aufblitzen. Die Regel muss zu `themaAuto` in
+ * `velonavi.tsx` passen: ab 20 Uhr dunkel, tagsüber wie das Betriebssystem.
+ */
+const THEMA_SKRIPT = `try{
+var w=localStorage.getItem('velonavi.thema'),v=w?JSON.parse(w):'auto',h=new Date().getHours();
+document.documentElement.dataset.vnThema=
+  v==='dunkel'||(v==='auto'&&(h>=20||h<7||matchMedia('(prefers-color-scheme: dark)').matches))?'dunkel':'hell';
+}catch(e){}`
+
 export default async function Page() {
   const meta = await ladeVeloMeta()
   return (
     <>
+      <script dangerouslySetInnerHTML={{ __html: THEMA_SKRIPT }} />
       <SeoInhalt statistik={meta.statistik} />
       <Velonavi />
     </>

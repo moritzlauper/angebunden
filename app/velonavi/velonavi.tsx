@@ -62,16 +62,48 @@ export const STUFEN = [
 const VORZUG = '#7c5cd6'
 const AKZENT = '#2563eb'
 
+/**
+ * Die Oberfläche liest ihre Farben als CSS-Variablen (definiert in
+ * `globals.css`), nicht als feste Werte. So wechselt das Thema, indem am
+ * <html> ein Attribut umgesetzt wird - ohne die Farben durch jede Komponente
+ * durchzureichen und ohne dass ein einziges `style` hier davon weiss.
+ */
 const ui = {
-  bg: '#f7f7f5',
-  fg: '#18181b',
-  panel: 'rgba(255,255,255,0.88)',
-  border: 'rgba(24,24,27,0.07)',
-  muted: '#71717a',
-  weich: 'rgba(24,24,27,0.045)',
-  aktiv: '#ffffff',
-  ring: 'rgba(37,99,235,0.35)',
-  schatten: '0 1px 1px rgba(24,24,27,0.03), 0 10px 30px -12px rgba(24,24,27,0.22)',
+  bg: 'var(--vn-bg)',
+  fg: 'var(--vn-fg)',
+  panel: 'var(--vn-panel)',
+  border: 'var(--vn-border)',
+  muted: 'var(--vn-muted)',
+  weich: 'var(--vn-weich)',
+  aktiv: 'var(--vn-aktiv)',
+  ring: 'var(--vn-ring)',
+  akzent: 'var(--vn-akzent)',
+  /** Schiene von Reglern und Schaltern. */
+  spur: 'var(--vn-spur)',
+  schatten: 'var(--vn-schatten)',
+}
+
+type Thema = 'hell' | 'dunkel'
+type Themenwahl = Thema | 'auto'
+
+/**
+ * MapLibre kennt keine CSS-Variablen, die Karte braucht echte Werte.
+ * Die Rasterkacheln der Stadt sind für helle Karten gezeichnet; statt sie zu
+ * invertieren (dann kippen auch die Farben der Route) werden sie abgedunkelt
+ * und entsättigt. Die eigenen Ebenen darüber behalten ihre Farben.
+ */
+const KARTE = {
+  hell: { grund: '#f7f7f5', helligkeit: 1, saettigung: 0, kontrast: 0 },
+  dunkel: { grund: '#101013', helligkeit: 0.3, saettigung: -0.45, kontrast: -0.1 },
+} as const
+
+/** Nachts von selbst dunkel: von 20 Uhr bis 7 Uhr. */
+const istNacht = (d = new Date()) => d.getHours() >= 20 || d.getHours() < 7
+
+/** Was `auto` gerade bedeutet: nachts dunkel, sonst wie das Betriebssystem. */
+function themaAuto(): Thema {
+  if (istNacht()) return 'dunkel'
+  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dunkel' : 'hell'
 }
 
 type Punkt = { lon: number; lat: number; titel: string }
@@ -142,7 +174,12 @@ function strasseVon(titel: string) {
  * localStorage des Browsers. Sie verlassen das Gerät nie, und wer keinen
  * Speicher erlaubt (privates Fenster), merkt davon nur, dass nichts bleibt.
  */
-const SCHLUESSEL = { verlauf: 'velonavi.verlauf', zuhause: 'velonavi.zuhause', letzte: 'velonavi.letzte' }
+const SCHLUESSEL = {
+  verlauf: 'velonavi.verlauf',
+  zuhause: 'velonavi.zuhause',
+  letzte: 'velonavi.letzte',
+  thema: 'velonavi.thema',
+}
 const VERLAUF_MAX = 10
 
 function lies<T>(schluessel: string, vorgabe: T): T {
@@ -202,6 +239,15 @@ export default function Velonavi() {
   // Schiebestück gar nicht geht, sagt das der Hinweis bei «keine Verbindung».
   const [schieben, setSchieben] = useState(false)
   const [netzFarbig, setNetzFarbig] = useState(false)
+  // Serverseitig steht noch nicht fest, wie spät es beim Betrachter ist. Bis
+  // der erste Effekt läuft, gilt hell; das Skript in `page.tsx` hat das
+  // Attribut am <html> da längst gesetzt, es blitzt also nichts auf.
+  const [themenwahl, setThemenwahl] = useState<Themenwahl>('auto')
+  const [thema, setThema] = useState<Thema>('hell')
+  // Die eigene Adresse gibt es erst im Browser. Sie direkt beim Rendern zu
+  // lesen, ergäbe serverseitig etwas anderes als im Browser - genau die
+  // Abweichung, die React beim Hydrieren bemängelt.
+  const [seitenUrl, setSeitenUrl] = useState('')
   const [feinOffen, setFeinOffen] = useState(false)
   const [hover, setHover] = useState<number | null>(null)
   const [kopiert, setKopiert] = useState(false)
@@ -227,6 +273,30 @@ export default function Velonavi() {
     [schieben, gewichte]
   )
 
+  // --- Thema: gemerkte Wahl, sonst nach Tageszeit
+  useEffect(() => {
+    setThemenwahl(lies<Themenwahl>(SCHLUESSEL.thema, 'auto'))
+  }, [])
+
+  useEffect(() => {
+    const setzen = () => setThema(themenwahl === 'auto' ? themaAuto() : themenwahl)
+    setzen()
+    if (themenwahl !== 'auto') return
+    // Bei `auto` von selbst nachziehen, wenn es Abend wird oder das
+    // Betriebssystem umschaltet - ohne dass man die Seite neu laden muss.
+    const uhr = window.setInterval(setzen, 60_000)
+    const mq = window.matchMedia?.('(prefers-color-scheme: dark)')
+    mq?.addEventListener('change', setzen)
+    return () => {
+      window.clearInterval(uhr)
+      mq?.removeEventListener('change', setzen)
+    }
+  }, [themenwahl])
+
+  useEffect(() => {
+    document.documentElement.dataset.vnThema = thema
+  }, [thema])
+
   // --- Zustand aus dem Link übernehmen
   useEffect(() => {
     setVerlauf(lies<Punkt[]>(SCHLUESSEL.verlauf, []))
@@ -244,6 +314,7 @@ export default function Velonavi() {
 
   useEffect(() => {
     schreibeUrl(start, ziel, zwischen.filter((z): z is Punkt => !!z), wahl)
+    setSeitenUrl(window.location.href)
     if (start || ziel) schreib(SCHLUESSEL.letzte, { start, ziel })
   }, [start, ziel, zwischen, wahl])
 
@@ -419,7 +490,7 @@ export default function Velonavi() {
           },
         },
         layers: [
-          { id: 'grund', type: 'background', paint: { 'background-color': ui.bg } },
+          { id: 'grund', type: 'background', paint: { 'background-color': KARTE.hell.grund } },
           // Auf allen Zoomstufen: Die Stadtkarte zeigt Gebäude und Strassennamen,
           // die eigene Übersicht darunter bliebe zu grob. Dass die Stadt dabei
           // ihre Detailstufe mehrmals wechselt, nehmen wir in Kauf.
@@ -622,6 +693,21 @@ export default function Velonavi() {
 
   // Die 38'000 Kanten des Velonetzes kommen erst in die Karte, wenn man sie
   // einfärbt. Als stille Quelle würden sie bei jedem Zoom neu zerlegt.
+  // Die Rasterkacheln der Stadt gibt es nur hell. Für das dunkle Thema werden
+  // sie abgedunkelt und entsättigt, statt sie zu invertieren - sonst kippen
+  // auch die Farben der Route und des Velonetzes darüber.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!kartenBereit || !map) return
+    const k = KARTE[thema]
+    map.setPaintProperty('grund', 'background-color', k.grund)
+    for (const id of ['basiskarte', 'gebaeude']) {
+      map.setPaintProperty(id, 'raster-brightness-max', k.helligkeit)
+      map.setPaintProperty(id, 'raster-saturation', k.saettigung)
+      map.setPaintProperty(id, 'raster-contrast', k.kontrast)
+    }
+  }, [kartenBereit, thema])
+
   const netzGezeichnet = useRef(false)
   useEffect(() => {
     const map = mapRef.current
@@ -947,7 +1033,7 @@ export default function Velonavi() {
             merken(p)
           }}
           platzhalter="Start: Adresse oder Haus in der Karte"
-          links={<Marke farbe="#18181b" />}
+          links={<Marke farbe={ui.fg} />}
           rechts={
             <button
               onClick={standort}
@@ -1072,6 +1158,11 @@ export default function Velonavi() {
       setSchieben={setSchieben}
       netzFarbig={netzFarbig}
       setNetzFarbig={setNetzFarbig}
+      themenwahl={themenwahl}
+      setThemenwahl={(v) => {
+        setThemenwahl(v)
+        schreib(SCHLUESSEL.thema, v)
+      }}
       feinOffen={feinOffen}
       setFeinOffen={setFeinOffen}
     />
@@ -1115,7 +1206,7 @@ export default function Velonavi() {
         {' · '}
         <a
           href={`mailto:moritz.lauper@hispeed.ch?subject=${encodeURIComponent('Velonavi: Verbesserung')}&body=${encodeURIComponent(
-            `Was mir an dieser Route aufgefallen ist:\n\n\nStrecke: ${typeof window === 'undefined' ? '' : window.location.href}\n`
+            `Was mir an dieser Route aufgefallen ist:\n\n\nStrecke: ${seitenUrl}\n`
           )}`}
           className="underline underline-offset-2"
         >
@@ -1366,12 +1457,12 @@ function Variantenwahl({
             aria-pressed={an}
             className="rounded-2xl border px-2.5 py-2 text-left transition-colors"
             style={{
-              borderColor: an ? AKZENT : 'rgba(24,24,27,0.1)',
+              borderColor: an ? ui.akzent : ui.border,
               background: an ? 'rgba(37,99,235,0.06)' : 'transparent',
-              boxShadow: an ? `0 0 0 1px ${AKZENT}` : undefined,
+              boxShadow: an ? `0 0 0 1px ${ui.akzent}` : undefined,
             }}
           >
-            <div className="truncate text-[11.5px] font-medium" style={{ color: an ? AKZENT : ui.muted }}>
+            <div className="truncate text-[11.5px] font-medium" style={{ color: an ? ui.akzent : ui.muted }}>
               {k.titel}
             </div>
             <div className="mt-0.5 text-[17px] font-semibold leading-tight tabular-nums">{minuten(k.r.zeit)}</div>
@@ -1462,7 +1553,7 @@ function Hoehenprofil({ r, hover, setHover }: { r: Route; hover: number | null; 
       >
         {[min, max].map((v) => (
           <g key={v}>
-            <line x1={P.l} x2={B - P.r} y1={y(v)} y2={y(v)} stroke="rgba(24,24,27,0.08)" />
+            <line x1={P.l} x2={B - P.r} y1={y(v)} y2={y(v)} stroke={ui.spur} />
             <text x={P.l - 4} y={y(v) + 3.5} textAnchor="end" fontSize="9.5" fill={ui.muted}>
               {v}
             </text>
@@ -1499,7 +1590,7 @@ function Wegbeschreibung({ r }: { r: Route }) {
   }
   return (
     <div>
-      <button onClick={() => setOffen(!offen)} className="text-[12.5px] font-medium" style={{ color: AKZENT }}>
+      <button onClick={() => setOffen(!offen)} className="text-[12.5px] font-medium" style={{ color: ui.akzent }}>
         {offen ? 'Strassenfolge ausblenden' : `Strassenfolge (${zeilen.length})`}
       </button>
       {offen && (
@@ -1520,7 +1611,7 @@ function Wegbeschreibung({ r }: { r: Route }) {
 
 function Einstellungen({
   gewichte, setzeGewicht, schieben, setSchieben,
-  netzFarbig, setNetzFarbig, feinOffen, setFeinOffen,
+  netzFarbig, setNetzFarbig, themenwahl, setThemenwahl, feinOffen, setFeinOffen,
 }: {
   gewichte: Record<(typeof REGLER)[number]['id'], number>
   setzeGewicht: (id: (typeof REGLER)[number]['id'], v: number) => void
@@ -1528,12 +1619,14 @@ function Einstellungen({
   setSchieben: (v: boolean) => void
   netzFarbig: boolean
   setNetzFarbig: (v: boolean) => void
+  themenwahl: Themenwahl
+  setThemenwahl: (v: Themenwahl) => void
   feinOffen: boolean
   setFeinOffen: (v: boolean) => void
 }) {
   return (
     <section className="flex flex-col gap-2.5">
-      <button onClick={() => setFeinOffen(!feinOffen)} className="self-start text-[12.5px] font-medium" style={{ color: AKZENT }}>
+      <button onClick={() => setFeinOffen(!feinOffen)} className="self-start text-[12.5px] font-medium" style={{ color: ui.akzent }}>
         {feinOffen ? 'Feineinstellung ausblenden' : 'Komfort-Route selbst gewichten'}
       </button>
       {feinOffen && (
@@ -1559,7 +1652,7 @@ function Einstellungen({
                 className="regler mt-1"
                 style={
                   {
-                    '--fuellung': `linear-gradient(to right, ${AKZENT} ${gewichte[rg.id] * 100}%, rgba(24,24,27,0.12) ${gewichte[rg.id] * 100}%)`,
+                    '--fuellung': `linear-gradient(to right, ${ui.akzent} ${gewichte[rg.id] * 100}%, ${ui.spur} ${gewichte[rg.id] * 100}%)`,
                     '--knopf': '#ffffff',
                     '--ring': ui.ring,
                   } as React.CSSProperties
@@ -1571,6 +1664,7 @@ function Einstellungen({
         </div>
       )}
       <Schalter an={netzFarbig} setAn={setNetzFarbig} titel="Ganzes Velonetz einfärben" />
+      <Themenschalter wahl={themenwahl} setWahl={setThemenwahl} />
     </section>
   )
 }
@@ -1632,6 +1726,50 @@ function Segmente({ werte, aktiv, onWahl }: { werte: { id: string; titel: string
   )
 }
 
+/**
+ * Hell, dunkel oder von selbst. «Automatisch» heisst: ab 20 Uhr dunkel, und
+ * tagsüber so, wie das Betriebssystem eingestellt ist.
+ */
+function Themenschalter({ wahl, setWahl }: { wahl: Themenwahl; setWahl: (v: Themenwahl) => void }) {
+  const knoepfe: { id: Themenwahl; titel: string }[] = [
+    { id: 'auto', titel: 'Automatisch' },
+    { id: 'hell', titel: 'Hell' },
+    { id: 'dunkel', titel: 'Dunkel' },
+  ]
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-[12.5px]" style={{ color: ui.fg }}>
+        Darstellung
+      </span>
+      <div
+        role="group"
+        aria-label="Darstellung"
+        className="flex shrink-0 rounded-full p-0.5"
+        style={{ background: ui.weich }}
+      >
+        {knoepfe.map((k) => {
+          const an = wahl === k.id
+          return (
+            <button
+              key={k.id}
+              onClick={() => setWahl(k.id)}
+              aria-pressed={an}
+              className="rounded-full px-2.5 py-1 text-[11.5px] font-medium transition-colors"
+              style={{
+                background: an ? ui.aktiv : 'transparent',
+                color: an ? ui.akzent : ui.muted,
+                boxShadow: an ? ui.schatten : undefined,
+              }}
+            >
+              {k.titel}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function Schalter({ an, setAn, titel, hilfe }: { an: boolean; setAn: (v: boolean) => void; titel: string; hilfe?: string }) {
   return (
     <button onClick={() => setAn(!an)} className="flex items-center justify-between gap-3 text-left text-[12.5px]" role="switch" aria-checked={an}>
@@ -1643,7 +1781,7 @@ function Schalter({ an, setAn, titel, hilfe }: { an: boolean; setAn: (v: boolean
           </span>
         )}
       </span>
-      <span className="relative h-5 w-9 shrink-0 rounded-full transition-colors" style={{ background: an ? AKZENT : 'rgba(24,24,27,0.15)' }}>
+      <span className="relative h-5 w-9 shrink-0 rounded-full transition-colors" style={{ background: an ? ui.akzent : ui.spur }}>
         <span className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all" style={{ left: an ? 18 : 2 }} />
       </span>
     </button>
@@ -1716,7 +1854,7 @@ function KleinKnopf({ onClick, titel, children }: { onClick: () => void; titel: 
       onClick={onClick}
       title={titel}
       className="rounded-full border px-3 py-1.5 text-[12px] font-medium"
-      style={{ borderColor: 'rgba(24,24,27,0.12)', color: ui.fg }}
+      style={{ borderColor: ui.border, color: ui.fg }}
     >
       {children}
     </button>
@@ -1724,7 +1862,7 @@ function KleinKnopf({ onClick, titel, children }: { onClick: () => void; titel: 
 }
 
 function Marke({ farbe }: { farbe: string }) {
-  return <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ background: farbe, boxShadow: '0 0 0 2px #fff, 0 0 0 3px rgba(0,0,0,0.12)' }} />
+  return <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ background: farbe, boxShadow: `0 0 0 2px ${ui.panel}, 0 0 0 3px ${ui.border}` }} />
 }
 
 function OrtungSymbol() {

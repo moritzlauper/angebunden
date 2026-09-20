@@ -83,7 +83,14 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="de-CH" className="h-full">
+    <html
+      lang="de-CH"
+      className="h-full"
+      /* Das Velonavi setzt `data-vn-thema` schon vor dem Hydrieren, damit das
+         dunkle Thema nicht sichtbar aufblitzt. Serverseitig steht das Attribut
+         deshalb noch nicht da - React soll das nicht als Fehler melden. */
+      suppressHydrationWarning
+    >
       <body className="h-full">
         {children}
         <BesucherZaehler />

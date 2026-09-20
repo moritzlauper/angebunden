@@ -178,3 +178,52 @@ body {
   background: rgb(24 24 26 / 0.92);
   color: #f4f4f5;
 }
+
+/*
+ * Farben des Velonavi, hell und dunkel. Die Oberfläche greift ausschliesslich
+ * über diese Variablen darauf zu, damit ein Themenwechsel ohne Durchreichen
+ * durch jede Komponente auskommt. Gesetzt wird `data-vn-thema` am <html> –
+ * vor dem ersten Bild durch das Skript in `velonavi/page.tsx`, danach von der
+ * Oberfläche selbst.
+ */
+:root {
+  --vn-bg: #f7f7f5;
+  --vn-fg: #18181b;
+  --vn-panel: rgba(255, 255, 255, 0.88);
+  --vn-border: rgba(24, 24, 27, 0.07);
+  --vn-muted: #71717a;
+  --vn-weich: rgba(24, 24, 27, 0.045);
+  --vn-aktiv: #ffffff;
+  --vn-ring: rgba(37, 99, 235, 0.35);
+  --vn-akzent: #2563eb;
+  --vn-spur: rgba(24, 24, 27, 0.14);
+  --vn-schatten: 0 1px 1px rgba(24, 24, 27, 0.03), 0 10px 30px -12px rgba(24, 24, 27, 0.22);
+}
+
+html[data-vn-thema='dunkel'] {
+  --vn-bg: #101013;
+  --vn-fg: #ececef;
+  --vn-panel: rgba(26, 26, 30, 0.9);
+  --vn-border: rgba(255, 255, 255, 0.1);
+  --vn-muted: #9b9ba4;
+  --vn-weich: rgba(255, 255, 255, 0.06);
+  --vn-aktiv: #26262c;
+  --vn-ring: rgba(122, 162, 255, 0.45);
+  /* Das Blau von hell hat auf dunklem Grund zu wenig Kontrast für Text. */
+  --vn-akzent: #7aa2ff;
+  --vn-spur: rgba(255, 255, 255, 0.16);
+  --vn-schatten: 0 1px 1px rgba(0, 0, 0, 0.35), 0 10px 30px -12px rgba(0, 0, 0, 0.75);
+}
+
+/* Die Bedienelemente von MapLibre sind für helle Karten gezeichnet. */
+html[data-vn-thema='dunkel'] .maplibregl-ctrl-group {
+  background: var(--vn-panel);
+  filter: invert(1) hue-rotate(180deg);
+}
+html[data-vn-thema='dunkel'] .maplibregl-ctrl-attrib {
+  background: var(--vn-panel);
+  color: var(--vn-muted);
+}
+html[data-vn-thema='dunkel'] .maplibregl-ctrl-attrib a {
+  color: var(--vn-muted);
+}
