@@ -35,6 +35,17 @@
       "grund": "Kurzes Verbindungsstück zum Kirchplatz Wipkingen (nicht die übrige Waidstrasse, die bereits befahrbar ist)."
     },
     {
+      "strasse": "Auf der Mauer",
+      "beideRichtungen": true,
+      "grund": "Ruhige Tempo-30-Quartierstrasse zwischen Hirschengraben und Leonhardstrasse, umgeht das unangenehme Central komplett. In Zürich ist Velofahren gegen die Einbahn immer erlaubt, auch wo der Datensatz das nicht so führt. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Hirschengraben",
+      "bbox": [8.5405, 47.372, 8.548, 47.377],
+      "beideRichtungen": true,
+      "grund": "Verbindet Central/Seilergraben mit Auf der Mauer, in diesem Abschnitt bislang nur in eine Richtung als velo-befahrbar erfasst. Velofahren gegen die Einbahn ist in Zürich immer erlaubt, auch hier. Ortskenntnis des Betreibers."
+    },
+    {
       "strasse": "Sihlfeldstrasse",
       "bbox": [8.5148, 47.3725, 8.5178, 47.3825],
       "netz": "vorzug",
