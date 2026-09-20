@@ -101,6 +101,11 @@
       "grund": "Vierspurig entlang der Gleise, für Velos unangenehm, auch wo ein Streifen markiert ist."
     },
     {
+      "strasse": "Seebahnstrasse Überquerung",
+      "stress": 4,
+      "grund": "Die Querung der Seebahnstrasse ist mindestens so unangenehm wie die Strasse selbst - eine vierspurige, stark befahrene Achse queren ist der gefährlichste Teil, nicht der harmloseste. Die Korrektur für die Seebahnstrasse selbst trifft die separat benannten Querungsstücke nicht mit. Ortskenntnis des Betreibers."
+    },
+    {
       "strasse": "Central",
       "grund": "Das Central ist mit dem Velo zu meiden: Tramgleise aus allen Richtungen, enge Spuren, viel Fussverkehr. Ganz sperren geht nicht, sonst weicht die Route zwei Kilometer weit aus; Stufe 4 macht sie nur zum letzten Mittel.",
       "stress": 4
