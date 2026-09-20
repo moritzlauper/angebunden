@@ -1,0 +1,82 @@
+name: Velodaten
+
+# Holt die Grundlagen des Velonavi neu und baut den Routinggraphen: das Fuss-
+# und Velowegnetz der Stadt Zürich, Lichtsignale, Tempo, Velonetzplanung,
+# Unfälle, dazu Wege, Tramgleise und Hindernisse aus OpenStreetMap. Committet
+# wird nur, wenn sich am Ergebnis etwas ändert.
+#
+# Läuft am 3. jedes Monats und von Hand. Die Stadt aktualisiert ihre Geodaten
+# in grossen Abständen, OSM laufend; monatlich trifft beides gut genug.
+# Was in keiner der Quellen stimmt, gehört in pipeline/velo-korrekturen.json.
+
+on:
+  schedule:
+    - cron: '40 3 3 * *' # 03:40 UTC am 3. des Monats
+  workflow_dispatch:
+
+concurrency:
+  group: velodaten
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Abhängigkeiten
+        run: pnpm install --frozen-lockfile
+
+      # Die Höhenkacheln ändern sich nie. Ohne Cache lädt jeder Lauf rund
+      # 200 PNG von AWS, mit Cache keine einzige.
+      - name: Höhenkacheln aus dem Cache
+        uses: actions/cache@v4
+        with:
+          path: data/raw/dem
+          key: dem-kacheln-zoom13
+
+      - name: Höhenraster
+        run: node pipeline/01b-fetch-dem.ts
+
+      # Kein Cache für data/raw/velo: Der Sinn des Laufs ist, frische Daten zu holen.
+      - name: Daten holen und Graph bauen
+        run: pnpm daten:velo
+
+      - name: Prüfen
+        run: pnpm typecheck
+
+      - name: Änderungen committen
+        run: |
+          set -euo pipefail
+          git config user.name  "velodaten-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add public/data/zuerich/velo.bin public/data/zuerich/velo.json \
+                  public/data/zuerich/velo-vorzug.geojson public/data/zuerich/velo-adressen.json
+
+          if git diff --cached --quiet; then
+            echo "Keine Änderungen an den Velodaten."
+            exit 0
+          fi
+
+          # Die Kennzahlen aus velo.json in die Commit-Meldung, damit man im
+          # Verlauf sieht, was sich verschoben hat, ohne die Binärdatei zu öffnen.
+          ZAHLEN=$(node -e '
+            const s = require("./public/data/zuerich/velo.json").statistik
+            console.log(`${s.veloKm} km Velonetz, Stufen ${s.stressKm.join("/")}, ${s.ampelKnoten} Ampelkreuzungen, ${s.huerden} Hindernisse`)
+          ')
+          git commit -m "Velodaten aufgefrischt: ${ZAHLEN} [skip ci]"
+          git push
