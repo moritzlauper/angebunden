@@ -188,7 +188,10 @@ export type Profil = {
 export const VOREINSTELLUNGEN = {
   schnell: { sicherheit: 0.1, steigung: 0.1, ampeln: 0.4, belag: 0.3 },
   ausgewogen: { sicherheit: 0.5, steigung: 0.3, ampeln: 0.5, belag: 0.6 },
-  entspannt: { sicherheit: 0.95, steigung: 0.8, ampeln: 0.6, belag: 1 },
+  // «Komfort»: deutlich ruhiger als «Schnell», aber ohne grosse Umwege. Bei
+  // vollem Sicherheitsgewicht fuhr die Route im Mittel 14% Umweg und sammelte
+  // Nebenstrassen ein, was als Zickzack auffällt.
+  entspannt: { sicherheit: 0.7, steigung: 0.8, ampeln: 0.6, belag: 1 },
 } as const
 
 /** Tempo in der Ebene, 23 km/h. */
@@ -225,9 +228,9 @@ const GETRENNT_RABATT = 0.85
  * Korridore, sie sind durchgehend, direkt und meist besser ausgebaut. Ohne ihn
  * zieht die Bewertung auf ruhige Quartierstrassen, auch wenn sie Umwege sind.
  */
-const NETZ_RABATT = [1, 1, 0.75, 0.65]
+const NETZ_RABATT = [1, 0.94, 0.86, 0.8]
 /** Kleinster Kostenfaktor, den es gibt: begrenzt die A*-Schätzung nach unten. */
-const MIN_FAKTOR = 0.55
+const MIN_FAKTOR = 0.6
 
 /**
  * Erwartete Wartezeit an einem Lichtsignal in Sekunden, je Manöver.

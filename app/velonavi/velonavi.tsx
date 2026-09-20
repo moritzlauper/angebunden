@@ -110,7 +110,7 @@ function leseUrl() {
     ziel: punkt(p.get('nach'), p.get('nn')),
     zwischen: vias.map((v, i) => punkt(v, viaNamen[i] ?? null)).filter((x): x is Punkt => !!x),
     // «ideal» stammt aus der Zeit mit drei Varianten und zeigt jetzt auf Komfort.
-    wahl: ((w) => (w === 'schnell' ? 'schnell' : w === 'komfort' || w === 'ideal' ? 'komfort' : null))(p.get('wahl')) as Variante | null,
+    wahl: ((w) => (w === 'schnell' ? 'schnell' : w ? 'komfort' : null))(p.get('wahl')) as Variante | null,
   }
 }
 
@@ -1113,6 +1113,15 @@ export default function Velonavi() {
         <Link href="/methode#velonavi" className="underline underline-offset-2">
           Wie das gerechnet ist
         </Link>
+        {' · '}
+        <a
+          href={`mailto:moritz.lauper@hispeed.ch?subject=${encodeURIComponent('Velonavi: Verbesserung')}&body=${encodeURIComponent(
+            `Was mir an dieser Route aufgefallen ist:\n\n\nStrecke: ${typeof window === 'undefined' ? '' : window.location.href}\n`
+          )}`}
+          className="underline underline-offset-2"
+        >
+          Bessere Route melden
+        </a>
         {' · '}
         <Link href="/" className="underline underline-offset-2">
           Zur Vergleichskarte
