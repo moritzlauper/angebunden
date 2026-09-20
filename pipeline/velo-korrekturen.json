@@ -46,6 +46,17 @@
       "grund": "Verbindet Central/Seilergraben mit Auf der Mauer, in diesem Abschnitt bislang nur in eine Richtung als velo-befahrbar erfasst. Velofahren gegen die Einbahn ist in Zürich immer erlaubt, auch hier. Ortskenntnis des Betreibers."
     },
     {
+      "strasse": "Fussweg",
+      "bbox": [8.5448, 47.3767, 8.5455, 47.3769],
+      "netz": "vorzug",
+      "grund": "Kurze Rampe zwischen der Leonhardshalde und der Querung bei Auf der Mauer, im Datensatz als Treppe ohne Velofreigabe erfasst. Real ist es eine mit dem Velo befahrbare Rampe, ohne die Auf der Mauer trotz Freigabe in beide Richtungen eine Velo-Insel bliebe, weil die beiden Abschnitte sonst nur über den Umweg via Hirschengraben verbunden sind. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Auf der Mauer Überquerung",
+      "netz": "vorzug",
+      "grund": "Kurze Querungsstücke der Strasse Auf der Mauer, ohne die die Rampe (siehe oben) nicht ans übrige Netz anschliesst. Ortskenntnis des Betreibers."
+    },
+    {
       "strasse": "Sihlfeldstrasse",
       "bbox": [8.5148, 47.3725, 8.5178, 47.3825],
       "netz": "vorzug",
