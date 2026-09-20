@@ -47,6 +47,11 @@
       "grund": "Hardstrasse zwischen Albisriederplatz und Hardplatz ist eine breite, verkehrsorientierte Hauptstrasse, für Velos unangenehm. Parallel dazu liegt die ruhige Sihlfeldstrasse (Velostrasse, Tempo 30) bis zum Hardplatz, die immer vorzuziehen ist. Ortskenntnis des Betreibers."
     },
     {
+      "strasse": "Utoquai",
+      "stress": 3,
+      "grund": "Die Seepromenade am Utoquai ist grösstenteils Pflasterstein und oft voller Fussgänger, real unangenehm zu fahren. Der Datensatz stuft sie als ausgeschilderte Route ein und deckelt die Stressstufe deshalb auf 1 - das passt nicht zum tatsächlichen Belag und Fussgängeraufkommen. Ortskenntnis des Betreibers."
+    },
+    {
       "strasse": "Wipkingerbrücke",
       "stress": 2,
       "grund": "Tramgleise auf der Fahrbahn, aber ein breites, gut befahrbares Trottoir macht die Querung auch für «Komfort» angenehm genug. Ortskenntnis des Betreibers."
