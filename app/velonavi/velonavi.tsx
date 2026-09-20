@@ -1345,8 +1345,10 @@ function Variantenwahl({
     <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${karten.length}, minmax(0, 1fr))` }}>
       {karten.map((k) => {
         const an = k.id === aktiv
-        // «Angenehm» heisst Stufe 1 und 2: ruhig und höchstens leicht ruppig.
-        const ruhig = k.r.meterNachStufe[1] + k.r.meterNachStufe[2]
+        // Nur Stufe 1 zählt als «angenehm» - dieselbe Definition wie in der
+        // Detailansicht (STUFEN). Stufe 2 («Mässig») separat mitzuzählen gab
+        // hier eine Prozentzahl, die nicht zur Aufteilung unten passte.
+        const angenehm = k.r.meterNachStufe[1]
         return (
           <button
             key={k.id}
@@ -1367,7 +1369,7 @@ function Variantenwahl({
             <div className="mt-0.5 text-[11px] leading-snug tabular-nums" style={{ color: ui.muted }}>
               {km(k.r.distanz)} · ↑{Math.round(k.r.hoch)} m
               <br />
-              {prozent(ruhig, k.r.distanz)} angenehm · {k.r.ampeln.geradeaus} Ampeln
+              {prozent(angenehm, k.r.distanz)} angenehm · {k.r.ampeln.geradeaus} Ampeln
             </div>
           </button>
         )
