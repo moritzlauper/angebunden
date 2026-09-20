@@ -1,0 +1,22 @@
+{
+  "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat). Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, stress (1-4).",
+  "regeln": [
+    {
+      "strasse": "Zweierstrasse",
+      "beideRichtungen": true,
+      "veloweg": true,
+      "grund": "Seit 2026 durchgehend in beiden Richtungen befahrbar, Velovorzugsroute. Stadtdaten und OSM führen sie noch als Einbahn."
+    },
+    {
+      "strasse": "Zentralstrasse",
+      "beideRichtungen": true,
+      "veloweg": true,
+      "grund": "Velowege in beide Richtungen, im Datensatz nur teilweise erfasst."
+    },
+    {
+      "strasse": "Seebahnstrasse",
+      "stress": 4,
+      "grund": "Vierspurig entlang der Gleise, für Velos unangenehm, auch wo ein Streifen markiert ist."
+    }
+  ]
+}

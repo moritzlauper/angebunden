@@ -297,10 +297,14 @@ type Kante = {
   velokarte: number
   /** OSM `cycleway=shared_lane`: Velopiktogramme auf der Fahrbahn, kein eigener Streifen. */
   piktogramm: boolean
+  /** Fest vorgegebene Stufe aus den eigenen Korrekturen. */
+  stressFest?: number
   /** Bahnhofshalle, Perron, Ladenpassage, Lift: mit dem Velo tabu. */
   innen: boolean
   /** Fahrspuren für den Autoverkehr, 0 wenn unbekannt. */
   spuren: number
+  /** OSM sagt ausdrücklich, dass die Einbahn auch fürs Velo gilt. */
+  einbahnStreng: boolean
   /** Einbahn, die für Velos in Gegenrichtung offen ist. */
   gegenverkehr: boolean
   /** Ob die Gegenrichtung einen eigenen Streifen hat. */
@@ -357,6 +361,7 @@ for (const f of netz) {
     piktogramm: false,
     innen: INNEN.test((p.name ?? '').trim()),
     spuren: 0,
+    einbahnStreng: false,
     gegenverkehr: false,
     gegenStreifen: false,
     hoehen: [],
@@ -441,6 +446,7 @@ for (const [i, k] of kanten.entries()) {
   // In Zürich sind viele Einbahnen für Velos in Gegenrichtung offen. Das Netz
   // der Stadt führt sie trotzdem als Einbahn, OSM hält es fest.
   const gegen = [t.cycleway, t['cycleway:left'], t['cycleway:right'], t['cycleway:both']].join(' ')
+  if (t['oneway:bicycle'] === 'yes') k.einbahnStreng = true
   if (t['oneway:bicycle'] === 'no' || /opposite/.test(gegen)) {
     k.gegenverkehr = true
     k.gegenStreifen = /opposite_lane|opposite_track/.test(gegen)
@@ -656,6 +662,48 @@ function lv95NachWgs(e: number, n: number): [number, number] {
   return [(lon * 100) / 36, (lat * 100) / 36]
 }
 
+// ------------------------------------------------------------ Eigene Korrekturen
+
+/**
+ * Was wir besser wissen als die Datensätze. Die Stadt aktualisiert ihr Netz
+ * in grossen Abständen, OSM hängt an Freiwilligen, und ein Umbau ist oft
+ * monatelang in keiner der beiden Quellen. `pipeline/velo-korrekturen.json`
+ * hält solche Fälle fest, mit Begründung.
+ */
+console.log('Eigene Korrekturen')
+{
+  type Regel = {
+    strasse: string
+    bbox?: [number, number, number, number]
+    beideRichtungen?: boolean
+    veloweg?: boolean
+    velostreifen?: boolean
+    gesperrt?: boolean
+    stress?: number
+    grund?: string
+  }
+  const datei = new URL('./velo-korrekturen.json', import.meta.url).pathname
+  const regeln: Regel[] = JSON.parse(readFileSync(datei, 'utf8')).regeln
+  for (const r of regeln) {
+    let betroffen = 0
+    for (const k of kanten) {
+      if (k.name !== r.strasse) continue
+      if (r.bbox) {
+        const [minLon, minLat, maxLon, maxLat] = r.bbox
+        const drin = k.coords.some(([lon, lat]) => lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat)
+        if (!drin) continue
+      }
+      if (r.beideRichtungen) (k.einbahn = null), (k.gegenverkehr = true)
+      if (r.veloweg) k.veloweg = true
+      if (r.velostreifen) k.streifen = 'BOTH'
+      if (r.gesperrt) k.velo = false
+      if (r.stress !== undefined) k.stressFest = r.stress
+      betroffen++
+    }
+    console.log(`  ${r.strasse}: ${betroffen} Kanten`)
+  }
+}
+
 // ------------------------------------------------------------ Lücken im Velonetz
 
 /**
@@ -681,6 +729,21 @@ console.log('Lücken im Velonetz')
       ? peilung(xy[0], xy[1], xy[2], xy[3])
       : peilung(xy[xy.length - 4], xy[xy.length - 3], xy[xy.length - 2], xy[xy.length - 1])
   }
+  /**
+   * In Tempo-30-Zonen und Quartierstrassen fährt man mit dem Velo in beide
+   * Richtungen, auch wo die Einbahn im Datensatz noch für alle gilt. Nur wo
+   * OSM ausdrücklich `oneway:bicycle=yes` sagt, bleibt die Sperre.
+   */
+  let quartier = 0
+  for (const k of kanten) {
+    if (!k.velo || !k.einbahn || k.einbahnStreng) continue
+    const ruhig = k.tempo <= TEMPO.t30 && k.klasse <= KLASSE.neben
+    if (!ruhig) continue
+    k.einbahn = null
+    quartier++
+  }
+  console.log(`  ${quartier} Einbahnen in Tempo-30-Quartierstrassen für Velos geöffnet`)
+
   /**
    * Ein Veloweg als Einbahn ohne Gegenstück daneben ist fast immer veraltet:
    * Entweder fehlt die zweite Linie im Datensatz, oder die Strecke wurde
@@ -781,6 +844,7 @@ function infra(k: Kante, vorwaerts: boolean): number {
  */
 function stress(k: Kante, vorwaerts: boolean): number {
   if (!k.velo) return 1
+  if (k.stressFest !== undefined) return k.stressFest
   const i = infra(k, vorwaerts)
   // Velopiktogramme auf der Fahrbahn («shared_lane») sind in Zürich meist ein
   // markierter Sicherheitsstreifen. Für die Einstufung nach Tempo zählen sie
@@ -1092,7 +1156,7 @@ writeFileSync(
       veloKm: Math.round(kanten.filter((k) => k.velo).reduce((s, k) => s + k.laenge, 0) / 1000),
       stressKm: stressMeter.slice(1).map((m) => Math.round(m / 1000)),
       ampelKnoten: genutzt.size,
-      gegenverkehr: kanten.filter((k) => k.gegenverkehr && k.einbahn).length,
+      gegenverkehr: kanten.filter((k) => k.gegenverkehr).length,
       velokarteKm: Math.round(kanten.filter((k) => k.velo && k.velokarte > 0).reduce((s, k) => s + k.laenge, 0) / 1000),
       mehrspurigKm: Math.round(kanten.filter((k) => k.velo && k.spuren >= 3).reduce((s, k) => s + k.laenge, 0) / 1000),
       innen: kanten.filter((k) => k.innen).length,
