@@ -17,6 +17,16 @@
       "strasse": "Seebahnstrasse",
       "stress": 4,
       "grund": "Vierspurig entlang der Gleise, für Velos unangenehm, auch wo ein Streifen markiert ist."
+    },
+    {
+      "strasse": "Central",
+      "stress": 4,
+      "grund": "Das Central ist mit dem Velo zu meiden: Tramgleise aus allen Richtungen, enge Spuren, viel Fussverkehr. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Bahnhofquai",
+      "stress": 3,
+      "grund": "Bahnhofquai und HB-Umfeld sind unangenehm zu fahren. Ausnahme ist der Velotunnel (im Netz «Stadttunnel»)."
     }
   ]
 }
