@@ -339,6 +339,11 @@ export default function Velonavi() {
     const ms = performance.now() - t0
     if (!routen)
       return { fehler: 'Keine Verbindung gefunden. Start oder Ziel liegt ausserhalb des Velonetzes der Stadt Zürich.' }
+    // Rasten Start und Ziel auf dieselbe Stelle derselben Kante ein, ist jedes
+    // Teilstück null Meter lang und die Route hat keinen einzigen Punkt. Das
+    // ist keine fehlende Verbindung, sondern eine Fahrt der Länge null.
+    if (!routen.komfort?.koordinaten.length)
+      return { fehler: 'Start und Ziel liegen am selben Ort. Es gibt keine Strecke zu rechnen.' }
     // Varianten, die (fast) gleich verlaufen, zusammenlegen: die spätere zeigt
     // auf die frühere. Verglichen wird die befahrene Kantenmenge.
     const gleichWie = {} as Record<Variante, Variante | null>
@@ -687,11 +692,14 @@ export default function Velonavi() {
     if (!map || !r || !start || !ziel) return
     const k = `${start.lon},${start.lat},${ziel.lon},${ziel.lat}`
     if (eingepasst.current === k) return
-    eingepasst.current = k
     let w = Infinity, s = Infinity, o = -Infinity, n = -Infinity
     for (const [lon, lat] of r.koordinaten) {
       w = Math.min(w, lon); o = Math.max(o, lon); s = Math.min(s, lat); n = Math.max(n, lat)
     }
+    // Ohne Koordinaten blieben die Grenzen unendlich, und fitBounds wirft.
+    // Erst danach merken, sonst bliebe eine spätere echte Route ungepasst.
+    if (!Number.isFinite(w) || !Number.isFinite(s)) return
+    eingepasst.current = k
     map.fitBounds(
       [[w, s], [o, n]],
       {
@@ -1312,7 +1320,8 @@ function Ergebnis({
 
       <StressBalken r={r} />
 
-      <Hoehenprofil r={r} hover={hover} setHover={setHover} />
+      {/* Ohne Profilpunkte wären min und max unendlich und jede Koordinate NaN. */}
+      {r.profil.length > 0 && <Hoehenprofil r={r} hover={hover} setHover={setHover} />}
 
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[12.5px]">
         {fakten.map((f) => (
