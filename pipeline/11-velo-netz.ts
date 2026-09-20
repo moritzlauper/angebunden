@@ -712,7 +712,8 @@ function stress(k: Kante, vorwaerts: boolean): number {
     if (i === INFRA.streifen) s = 1
   } else if (k.tempo === TEMPO.t50) {
     // Ein durchgehender Velostreifen macht auch eine Tempo-50-Achse fahrbar.
-    if (i === INFRA.streifen) s = k.klasse === KLASSE.haupt ? 3 : k.klasse === KLASSE.sammel ? 2 : 1
+    // Nur auf der grossen Hauptachse bleibt er ein Strich neben viel Verkehr.
+    if (i === INFRA.streifen) s = k.klasse === KLASSE.haupt ? 2 : 1
     else s = k.klasse === KLASSE.neben ? 3 : 4
   } else s = i === INFRA.streifen ? 3 : 4
 

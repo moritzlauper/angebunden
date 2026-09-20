@@ -341,8 +341,8 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
         </p>
         <p className="mt-4">
           Aus Tempo, Strassenklasse und Velostreifen ergibt sich je Fahrtrichtung eine Stufe von 1 bis
-          4, angelehnt an das Schema «Level of Traffic Stress». Ein durchgehender Velostreifen zählt dabei viel: Er
-          drückt eine Tempo-50-Sammelstrasse auf Stufe 2. Drei Fahrspuren und mehr ohne Streifen
+          4, angelehnt an das Schema «Level of Traffic Stress». Ein durchgehender Velostreifen zählt dabei viel: Mit
+          Streifen ist eine Tempo-50-Strasse Stufe 1, auf der grossen Hauptachse Stufe 2. Drei Fahrspuren und mehr ohne Streifen
           ergeben ab Tempo 50 immer Stufe 4, Abbiegespuren an einer Tempo-30-Kreuzung dagegen nicht.
           Dazu kommt, was mit Autoverkehr nichts zu tun hat: Kopfsteinpflaster hebt eine Strecke um
           zwei Stufen, Tramgleise ohne eigenen Streifen ebenfalls um zwei, Fussgängerzonen mindestens
