@@ -20,13 +20,24 @@
     },
     {
       "strasse": "Central",
-      "stress": 4,
-      "grund": "Das Central ist mit dem Velo zu meiden: Tramgleise aus allen Richtungen, enge Spuren, viel Fussverkehr. Ortskenntnis des Betreibers."
+      "grund": "Das Central ist mit dem Velo zu meiden: Tramgleise aus allen Richtungen, enge Spuren, viel Fussverkehr. Ganz sperren geht nicht, sonst weicht die Route zwei Kilometer weit aus; Stufe 4 macht sie nur zum letzten Mittel.",
+      "stress": 4
     },
     {
       "strasse": "Bahnhofquai",
       "stress": 3,
       "grund": "Bahnhofquai und HB-Umfeld sind unangenehm zu fahren. Ausnahme ist der Velotunnel (im Netz «Stadttunnel»)."
+    },
+    {
+      "strasse": "Sihlstrasse",
+      "bbox": [
+        8.53,
+        47.371,
+        8.541,
+        47.379
+      ],
+      "stress": 4,
+      "grund": "Sihlstrasse im Kreis 1: auf den Autoverkehr ausgerichtet, viel Verkehr, für Velos unangenehm. Ortskenntnis des Betreibers."
     }
   ]
 }
