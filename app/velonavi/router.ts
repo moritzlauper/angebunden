@@ -334,13 +334,18 @@ const EINSTIEG_ZEIT = 0.3
  * Geradeaus über die Kreuzung wartet man im Mittel eine halbe Rotphase.
  * Rechts abbiegen geht praktisch nie mit Halt: Velos biegen dort in der
  * Praxis unabhängig von der Ampelphase ab, ein kurzer Blick reicht.
- * Links meist indirekt über den Velosack oder den Fussgängerstreifen, was
- * selten lange dauert.
+ *
+ * Links dauert länger als geradeaus, nicht kürzer: Direkt einspuren geht mit
+ * dem Velo selten, also fährt man indirekt - erst mit der einen Grünphase
+ * über die Kreuzung, dann an der Ecke warten und mit der nächsten über die
+ * zweite Achse. Das sind zwei Wartezeiten statt einer, und die zweite Phase
+ * liegt fast nie günstig.
  */
 const WARTEN = {
-  knoten: { geradeaus: 24, links: 7, rechts: 1 },
-  // Einzelne Fussgängerampeln: entlang der Strasse meist grün, beim Queren rot.
-  einzeln: { entlang: 5, queren: 18, abbiegen: 2 },
+  knoten: { geradeaus: 24, links: 34, rechts: 1 },
+  // Einzelne Fussgängerampeln: entlang der Strasse meist grün, beim Queren
+  // rot. Wer abbiegt, quert dabei die Fahrbahn und wartet entsprechend.
+  einzeln: { entlang: 5, queren: 18, abbiegen: 12 },
 }
 
 type Kosten = { zeit: Float32Array; kosten: Float32Array }

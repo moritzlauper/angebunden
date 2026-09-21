@@ -818,6 +818,11 @@ console.log('Verbindungen von Hand')
       [knotenLonLat[2 * nach], knotenLonLat[2 * nach + 1]],
     ]
     const xy = projiziere(coords)
+    // Die Höhen sind zu diesem Zeitpunkt längst verteilt, diese Kante gibt es
+    // noch nicht. Sie bekommt die beiden Knotenhöhen; ohne das stünden ihre
+    // Punkte auf null Meter, und das Höhenprofil der Route stürzte dort ab.
+    const h0 = knotenHoehe[von]
+    const h1 = knotenHoehe[nach]
     kanten.push({
       von, nach, coords, xy, laenge: laengeVon(xy),
       name: v.name ?? '', velo: true, fuss: false,
@@ -826,7 +831,8 @@ console.log('Verbindungen von Hand')
       tram: false, bruecke: false, tunnel: false, osmVelo: null, netz: NETZ.keins,
       unfall: 0, unfallAnzahl: 0, huerde: 0, fussgaenger: false, velokarte: 0,
       piktogramm: false, velostrasse: false, innen: false, spuren: 0, einbahnStreng: false,
-      gegenverkehr: true, gegenStreifen: false, hoehen: [], hoch: 0, runter: 0,
+      gegenverkehr: true, gegenStreifen: false,
+      hoehen: [h0, h1], hoch: Math.max(0, h1 - h0), runter: Math.max(0, h0 - h1),
       stressFest: v.stress ?? 1,
     })
     console.log(`  ${v.name ?? 'Verbindung'}: Knoten ${von} -> ${nach}, ${laengeVon(xy).toFixed(0)} m`)
