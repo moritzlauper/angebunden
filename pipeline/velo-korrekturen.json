@@ -303,6 +303,12 @@
       "nurFahrbahn": true,
       "offen": true,
       "grund": "Der Weg durch die Anlage bei der Andreaskirche, vom Letzigraben hinunter zur Brahmsstrasse, ist im Basisdatensatz ohne Velofreigabe, obwohl es eine kleine Fahrstrasse ist und die Anlage ringsum ein durchgehendes Velowegnetz hat. Ohne ihn endete dieses Netz gegen Sueden blind: Vom Letzigraben zur Brahmsstrasse waren es 734 Meter aussen herum statt gut 350 hindurch. nurFahrbahn laesst die Spazierwege daneben unberuehrt. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Seebahnstrasse",
+      "nurFahrbahn": true,
+      "stressMin": 4,
+      "grund": "Die Seebahnstrasse ist auf ganzer Laenge dieselbe Strasse: Tempo 50, drei bis vier Fahrstreifen, kein Velostreifen, das Gleisfeld an der Seite. Ein Abschnitt von 154 Metern noerdlich der Stationsstrasse steht in der staedtischen Velokarte und kam deshalb auf Stufe 3, mitten zwischen lauter Stufe 4. Mit nurFahrbahn bleiben die Trottoirs daneben unberuehrt. Ortskenntnis des Betreibers."
     }
   ],
   "verbindungen": [

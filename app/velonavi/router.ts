@@ -221,7 +221,7 @@ const V0 = 6.4
  */
 const S_PRO_M = 3.2
 /** Deckel für Abfahrten in der Stadt, 34 km/h. */
-const VMAX = 9.4
+export const VMAX = 9.4
 /** Tempo zu Fuss mit dem Velo an der Hand. */
 const V_SCHIEBEN = 1.25
 /** Tempofaktor je Belag. */
@@ -285,14 +285,31 @@ const NETZ_VERLASSEN = 8
 const MIN_FAKTOR = 0.45
 
 /**
- * Das Profil hinter «Schnell», sobald wirklich nur die Fahrzeit zählt.
- * Alle Regler auf null, ausser dem Warten an der Ampel: das ist echte Zeit
- * und zählt voll. Zusammen mit `reineZeit` sind Kosten und Zeit damit
- * überall dasselbe, und die Suche liefert die wirklich schnellste Strecke.
+ * Das Profil hinter «Schnell». `reineZeit` schaltet alles ab, was die Kosten
+ * von der Fahrzeit wegzieht: Netzrabatt, Abbiege- und Hürdenaufschlag, das
+ * Gewicht aufs Warten. Übrig bleibt die Zeit - und, je nach `sicherheit`,
+ * ein Aufschlag für unangenehme Abschnitte.
+ *
+ * Mit `sicherheit = 0` sind Kosten und Zeit überall dasselbe, das ist die
+ * wirklich schnellste Strecke. Mit einem kleinen Gewicht macht dieselbe
+ * Rechnung einen kurzen Bogen um ein hartes Stück, ohne den Korridor zu
+ * wechseln - die Seebahnbrücke beim Lochergut etwa lässt sich für ein paar
+ * Meter umfahren, während der gewichtete Suchlauf gleich die ganze Route
+ * nach Norden verlegt.
  */
 export function reinZeitlich(p: Profil): Profil {
   return { ...p, sicherheit: 0, steigung: 0, belag: 0, ampeln: 1, zeitOptimal: true, reineZeit: true }
 }
+
+/**
+ * Was ein hartes Stück bei «Schnell» kostet - nicht je Meter, sondern einmal
+ * beim Einbiegen. Ein Aufschlag je Meter würde die ganze Route verschieben,
+ * sobald die Innenstadt ein paar Hauptachsen verlangt. Der feste Preis dagegen
+ * wirkt genau dort, wo er soll: Ein kurzer Bogen um die Seebahnstrasse lohnt
+ * sich, ein Umweg über das halbe Quartier nicht. Bei 0.3 sind das rund
+ * 18 Sekunden für eine Stufe-4-Strecke, also etwa hundert Meter Umweg.
+ */
+const EINSTIEG_ZEIT = 0.3
 
 /**
  * Erwartete Wartezeit an einem Lichtsignal in Sekunden, je Manöver.
@@ -339,7 +356,7 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
       const spurig = Math.max(0, g.spuren[e] - 2)
       let faktor =
         1 +
-        STRESS_KOSTEN[stress] * Math.max(p.sicherheit, STRESS_MINDEST[stress]) +
+        STRESS_KOSTEN[stress] * (p.reineZeit ? p.sicherheit : Math.max(p.sicherheit, STRESS_MINDEST[stress])) +
         // Tramgleise entlang der Fahrbahn zählen auch dann, wenn ein Streifen
         // oder Weg daneben liegt: Man quert sie beim Abbiegen, beim Ausweichen
         // und an jeder Haltestelle.
@@ -347,8 +364,10 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
         (infraVon(g, a) === INFRA.getrennt ? 0 : spurig * 0.35 * p.sicherheit) +
         BELAG_KOSTEN[belag] * p.belag +
         // Auf Plätzen und in Fussgängerzonen kommt man weder zügig noch
-        // entspannt durch, unabhängig davon, wie man die Regler stellt.
-        (fuss ? 0.4 : 0)
+        // entspannt durch, unabhängig davon, wie man die Regler stellt. Nur
+        // bei der reinen Zeitrechnung nicht: Das Schritttempo steckt dort
+        // schon in der Fahrzeit, ein zweites Mal soll es nicht zählen.
+        (fuss && !p.reineZeit ? 0.4 : 0)
       // Der Rabatt fürs städtische Velonetz gilt nur, wo die Achse auch
       // angenehm ist. Die Badenerstrasse beim Lochergut steht im Hauptnetz und
       // bleibt trotzdem eine Strecke, die man meidet.
@@ -358,11 +377,13 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
       // Eine Vorzugsroute fährt sich flüssiger, aber keine 42% schneller.
       // Ungedämpft nahm «Schnell» dafür 580 Meter Umweg und eine Minute in
       // Kauf, ohne dass die Kosten den Unterschied überhaupt bemerkten.
-      if (stress <= 2) {
-        const rabatt = NETZ_RABATT[netzVon(g, e)]
-        faktor *= p.zeitOptimal ? 1 - (1 - rabatt) * ZEIT_RABATT_ANTEIL : rabatt
+      if (!p.reineZeit) {
+        if (stress <= 2) {
+          const rabatt = NETZ_RABATT[netzVon(g, e)]
+          faktor *= p.zeitOptimal ? 1 - (1 - rabatt) * ZEIT_RABATT_ANTEIL : rabatt
+        }
+        if (infraVon(g, a) === INFRA.getrennt) faktor *= GETRENNT_RABATT
       }
-      if (infraVon(g, a) === INFRA.getrennt) faktor *= GETRENNT_RABATT
       // Poller, Tore, Bahnübergänge und ungesicherte Querungen: feste
       // Sekunden, unabhängig von der Länge der Kante.
       const huerde = g.huerde[e]
@@ -373,12 +394,11 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
       // real aber länger dauerte. Für die übrigen Profile bleibt der
       // Aufschlag (1.6x), weil Hindernisse dort bewusst stärker gewichtet
       // gemieden werden als ihre reine Zeit.
-      kosten[a] = p.reineZeit
-        ? zeit[a]
-        : t * faktor +
-          huerde * (p.zeitOptimal ? 1 : 1.6) +
-          auf * sProM * p.steigung * (1.2 + 12 * Math.max(0, steil - 0.05)) +
-          g.unfall[e] * 3 * p.sicherheit
+      kosten[a] =
+        t * faktor +
+        huerde * (p.zeitOptimal ? 1 : 1.6) +
+        auf * sProM * p.steigung * (1.2 + 12 * Math.max(0, steil - 0.05)) +
+        g.unfall[e] * 3 * p.sicherheit
     } else if (p.schieben && schiebenErlaubt(g, a)) {
       const treppe = klasse === KLASSE.treppe
       const t = L / (treppe ? 0.5 : V_SCHIEBEN) + auf * (treppe ? 4 : 1.5)
@@ -421,16 +441,15 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
   out.ampel = -1
   out.manoever = null
   out.eintritt = NaN
-  if (!p.reineZeit) {
-    // Vom Velonetz der Stadt herunter: hält die Route auf dem Korridor.
-    if (netzVon(g, a >> 1) > 0 && netzVon(g, b >> 1) === 0) out.kosten += NETZ_VERLASSEN
+  // Vom Velonetz der Stadt herunter: hält die Route auf dem Korridor.
+  if (!p.reineZeit && netzVon(g, a >> 1) > 0 && netzVon(g, b >> 1) === 0) out.kosten += NETZ_VERLASSEN
 
-    // Auf eine härtere Strecke einbiegen kostet einmalig, unabhängig davon, wie
-    // kurz sie ist. Nur der Sprung nach oben zählt.
-    const stressB = stressVon(g, b)
-    if (stressB > stressVon(g, a))
-      out.kosten += STRESS_EINSTIEG[stressB] * Math.max(p.sicherheit, STRESS_MINDEST[stressB])
-  }
+  // Auf eine härtere Strecke einbiegen kostet einmalig, unabhängig davon, wie
+  // kurz sie ist. Nur der Sprung nach oben zählt.
+  const stressB = stressVon(g, b)
+  if (stressB > stressVon(g, a))
+    out.kosten +=
+      STRESS_EINSTIEG[stressB] * (p.reineZeit ? EINSTIEG_ZEIT : Math.max(p.sicherheit, STRESS_MINDEST[stressB]))
 
   // Jedes Abbiegen kostet: Abbremsen, Schulterblick, Handzeichen. Ohne
   // diesen Zuschlag nimmt der Router in Rasterquartieren eine Treppe durch die

@@ -19,7 +19,7 @@ import { STAEDTE } from '../staedte'
 import { nf } from '../site'
 import {
   ladeGraph, einrasten, route, kantenKosten, alsGpx, verbinde, VOREINSTELLUNGEN, reinZeitlich,
-  veloErlaubt, stressVon, netzVon, NETZ,
+  veloErlaubt, stressVon, netzVon, NETZ, VMAX,
   type Graph, type Profil, type Route, type VeloMeta,
 } from './router'
 
@@ -162,11 +162,19 @@ function anteilAngenehm(r: Route) {
  * alle drei für `a` sprechen; dann gibt es keinen Grund, `b` noch zu zeigen.
  */
 /**
- * Wie viel länger und weiter «Schnell» fahren darf, wenn es sich dafür eine
- * deutlich angenehmere Strecke aussucht, und wie viel angenehmer sie dafür
- * sein muss. Beides zählt: Ohne die Schranke auf die Länge nahm «Schnell»
- * bei gleicher Fahrzeit 240 Meter Umweg um eine Anlage herum in Kauf, statt
+ * Der Aufwand einer Strecke: die Fahrzeit plus die Zeit, die ihre blosse
+ * Länge bei Höchsttempo kosten würde. So zählen beide Fragen mit, die
+ * «Schnell» beantworten soll - wie schnell und wie kurz -, und zwar in einer
+ * einzigen Zahl. Nur die Zeit zu messen reichte nicht: Bei gleicher Fahrzeit
+ * nahm «Schnell» sonst 240 Meter Umweg um eine Anlage herum in Kauf, statt
  * den Weg hindurch zu nehmen.
+ */
+const aufwand = (r: Route) => r.zeit + r.distanz / VMAX
+
+/**
+ * Wie viel mehr Aufwand «Schnell» treiben darf, wenn es sich dafür eine
+ * deutlich angenehmere Strecke aussucht, und wie viel angenehmer sie dafür
+ * sein muss.
  */
 const SPIELRAUM = 0.05
 const MINDESTGEWINN = 0.25
@@ -456,14 +464,21 @@ export default function Velonavi() {
       // Variante darf nur bleiben, wenn sie höchstens fünf Prozent länger
       // dauert und dafür spürbar weniger Ruppiges enthält. Sonst gewinnt die
       // Zeit, auch wenn die Strecke über eine laute Achse führt.
+      // «Schnell» heisst schnell und kurz. Gesucht wird zusätzlich die
+      // schnellste Strecke ohne jede Komfortgewichtung; sie gibt den Aufwand
+      // vor, an dem sich die übrigen messen müssen. Von den Vorschlägen
+      // gewinnt der angenehmste, der höchstens fünf Prozent mehr Aufwand
+      // treibt - und auch nur, wenn er spürbar angenehmer ist.
       if (out.schnell) {
         const schnellst = suche(reinZeitlich({ ...profile.schnell, schieben: mitSchieben }))
         if (schnellst) {
-          const imBudget =
-            out.schnell.zeit <= schnellst.zeit * (1 + SPIELRAUM) &&
-            out.schnell.distanz <= schnellst.distanz * (1 + SPIELRAUM)
-          const lohnt = laestig(out.schnell) <= laestig(schnellst) * (1 - MINDESTGEWINN)
-          if (!imBudget || !lohnt) out.schnell = schnellst
+          const grenze = aufwand(schnellst) * (1 + SPIELRAUM)
+          let beste = schnellst
+          for (const k of [out.schnell, out.komfort]) {
+            if (!k || aufwand(k) > grenze) continue
+            if (laestig(k) <= laestig(beste) * (1 - MINDESTGEWINN)) beste = k
+          }
+          out.schnell = beste
         }
       }
       return out.komfort ? out : null
