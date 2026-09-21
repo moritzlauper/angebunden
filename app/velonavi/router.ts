@@ -201,6 +201,8 @@ export type Profil = {
    * vergleicht sie danach mit der leicht komfortgewichteten Variante.
    */
   reineZeit?: boolean
+  /** Nur mit `reineZeit`: Gewicht für den festen Preis fürs Einbiegen. */
+  einstieg?: number
 }
 
 export const VOREINSTELLUNGEN = {
@@ -297,17 +299,33 @@ const MIN_FAKTOR = 0.45
  * Meter umfahren, während der gewichtete Suchlauf gleich die ganze Route
  * nach Norden verlegt.
  */
-export function reinZeitlich(p: Profil): Profil {
-  return { ...p, sicherheit: 0, steigung: 0, belag: 0, ampeln: 1, zeitOptimal: true, reineZeit: true }
+export function reinZeitlich(p: Profil, mitBogen = false): Profil {
+  return {
+    ...p,
+    sicherheit: mitBogen ? SICHER_ZEIT : 0,
+    einstieg: mitBogen ? EINSTIEG_ZEIT : 0,
+    steigung: 0,
+    belag: 0,
+    ampeln: 1,
+    zeitOptimal: true,
+    reineZeit: true,
+  }
 }
 
 /**
- * Was ein hartes Stück bei «Schnell» kostet - nicht je Meter, sondern einmal
- * beim Einbiegen. Ein Aufschlag je Meter würde die ganze Route verschieben,
- * sobald die Innenstadt ein paar Hauptachsen verlangt. Der feste Preis dagegen
- * wirkt genau dort, wo er soll: Ein kurzer Bogen um die Seebahnstrasse lohnt
- * sich, ein Umweg über das halbe Quartier nicht. Bei 0.3 sind das rund
- * 18 Sekunden für eine Stufe-4-Strecke, also etwa hundert Meter Umweg.
+ * Die beiden Gewichte für den Bogen: ein kleiner Aufschlag je Meter, damit
+ * eine lange harte Strecke mehr wiegt als eine kurze, und der feste Preis
+ * fürs Einbiegen. Zusammen kosten die 190 Meter Seebahnstrasse zwischen
+ * Stationsstrasse und Zweierstrasse rund 36 Sekunden - genug, um die 24
+ * Sekunden Umweg über die Zurlindenstrasse zu rechtfertigen, zu wenig, um
+ * die Route aus dem Korridor zu werfen.
+ */
+const SICHER_ZEIT = 0.06
+
+/**
+ * Der feste Preis fürs Einbiegen auf eine harte Strecke, rund 18 Sekunden
+ * für Stufe 4. Er wirkt unabhängig von der Länge und damit genau dort, wo
+ * ein kurzer Bogen hilft.
  */
 const EINSTIEG_ZEIT = 0.3
 
@@ -449,7 +467,8 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
   const stressB = stressVon(g, b)
   if (stressB > stressVon(g, a))
     out.kosten +=
-      STRESS_EINSTIEG[stressB] * (p.reineZeit ? EINSTIEG_ZEIT : Math.max(p.sicherheit, STRESS_MINDEST[stressB]))
+      STRESS_EINSTIEG[stressB] *
+      (p.reineZeit ? (p.einstieg ?? 0) : Math.max(p.sicherheit, STRESS_MINDEST[stressB]))
 
   // Jedes Abbiegen kostet: Abbremsen, Schulterblick, Handzeichen. Ohne
   // diesen Zuschlag nimmt der Router in Rasterquartieren eine Treppe durch die

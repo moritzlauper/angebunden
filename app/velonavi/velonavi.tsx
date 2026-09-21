@@ -470,11 +470,16 @@ export default function Velonavi() {
       // gewinnt der angenehmste, der höchstens fünf Prozent mehr Aufwand
       // treibt - und auch nur, wenn er spürbar angenehmer ist.
       if (out.schnell) {
-        const schnellst = suche(reinZeitlich({ ...profile.schnell, schieben: mitSchieben }))
+        const pr = { ...profile.schnell, schieben: mitSchieben }
+        const schnellst = suche(reinZeitlich(pr))
         if (schnellst) {
           const grenze = aufwand(schnellst) * (1 + SPIELRAUM)
           let beste = schnellst
-          for (const k of [out.schnell, out.komfort]) {
+          // Der Reihe nach: dieselbe Rechnung mit einem kleinen Gewicht auf
+          // harte Stücke, die Voreinstellung von «Schnell», und «Komfort»
+          // selbst. Wer in den Spielraum passt und spürbar angenehmer ist,
+          // gewinnt.
+          for (const k of [suche(reinZeitlich(pr, true)), out.schnell, out.komfort]) {
             if (!k || aufwand(k) > grenze) continue
             if (laestig(k) <= laestig(beste) * (1 - MINDESTGEWINN)) beste = k
           }
