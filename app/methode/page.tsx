@@ -352,7 +352,7 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           der Route auf der Karte zeigen diese Stufen.
         </p>
         <p className="mt-4">
-          Was ein Velo aufhält, zählt in Sekunden: Poller 3, Tore 8, Drängelgitter 15, Umlaufgitter
+          Was ein Velo aufhält, zählt in Sekunden: Pfosten 3, Schranken 8, Drängelgitter 15, Umlaufgitter
           und Drehkreuze 45 bis 60, Bahnübergänge 6, eine Fahrbahn ohne Ampel queren 3. Die Standorte
           kommen aus OpenStreetMap, 9&apos;877 davon liegen auf einer Kante des Netzes. Wege durch
           Gebäude fallen ganz aus dem Netz: Das Netz der Stadt enthält Bahnhofshallen, Perrons,

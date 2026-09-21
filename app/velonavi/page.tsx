@@ -8,7 +8,7 @@ import type { VeloMeta } from './router'
 
 const BESCHREIBUNG =
   'Veloroutenplaner für Zürich in zwei Varianten, schnell oder komfortabel. Rechnet Verkehr, ' +
-  'Velostreifen, Tramgleise, Kopfsteinpflaster, Steigung und die Wartezeit an Lichtsignalen mit, ' +
+  'Velostreifen, Tramgleise, Kopfsteinpflaster, Steigung und die Wartezeit an Ampeln mit, ' +
   'je nach Abbiegerichtung. Mit Zwischenzielen, GPX-Export und teilbarem Link.'
 
 const SOZIAL = `Velonavi Zürich · ${SITE_NAME}`

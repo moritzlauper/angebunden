@@ -88,13 +88,24 @@ type Themenwahl = Thema | 'auto'
 
 /**
  * MapLibre kennt keine CSS-Variablen, die Karte braucht echte Werte.
- * Die Rasterkacheln der Stadt sind für helle Karten gezeichnet; statt sie zu
- * invertieren (dann kippen auch die Farben der Route) werden sie abgedunkelt
- * und entsättigt. Die eigenen Ebenen darüber behalten ihre Farben.
+ *
+ * Die Rasterkacheln der Stadt gibt es nur hell. Blosses Abdunkeln half nicht:
+ * `raster-brightness-max` staucht den ganzen Tonwertumfang nach unten, das
+ * weisse Papier wird dunkelgrau und alles andere fast schwarz - die Karte
+ * verliert ihren Kontrast und wird zu einem einzigen dunklen Brei.
+ *
+ * Richtig ist Invertieren. Der Rastershader rechnet
+ * `mix(vec3(brightness_min), vec3(brightness_max), rgb)`, mit min 1 und max 0
+ * ergibt das genau `1 - rgb`: Papier wird schwarz, die Beschriftung weiss, und
+ * der Kontrast bleibt erhalten. Beim Invertieren kippen allerdings die
+ * Farbtöne, Grün würde Magenta. Die Drehung um 180 Grad läuft im Shader vor
+ * der Invertierung und gleicht das im Voraus aus, sodass die Parks grün
+ * bleiben. Route und Velonetz liegen als eigene Ebenen darüber und sind von
+ * alldem nicht betroffen.
  */
 const KARTE = {
-  hell: { grund: '#f7f7f5', helligkeit: 1, saettigung: 0, kontrast: 0 },
-  dunkel: { grund: '#101013', helligkeit: 0.3, saettigung: -0.45, kontrast: -0.1 },
+  hell: { grund: '#f7f7f5', hellMin: 0, hellMax: 1, drehung: 0, saettigung: 0, kontrast: 0 },
+  dunkel: { grund: '#0a0a0c', hellMin: 1, hellMax: 0, drehung: 180, saettigung: -0.2, kontrast: -0.05 },
 } as const
 
 /** Nachts von selbst dunkel: von 20 Uhr bis 7 Uhr. */
@@ -525,7 +536,7 @@ export default function Velonavi() {
       new AttributionControl({
         compact: true,
         customAttribution:
-          'Velonetz, Lichtsignale, Tempo, Velonetzplanung, Unfälle © Stadt Zürich (OGD) · Wege, Belag, Tramgleise © OpenStreetMap-Mitwirkende · Höhen: AWS Terrain Tiles',
+          'Velonetz, Ampeln, Tempo, Velonetzplanung, Unfälle © Stadt Zürich (OGD) · Wege, Belag, Tramgleise © OpenStreetMap-Mitwirkende · Höhen: AWS Terrain Tiles',
       }),
       'bottom-left'
     )
@@ -702,7 +713,9 @@ export default function Velonavi() {
     const k = KARTE[thema]
     map.setPaintProperty('grund', 'background-color', k.grund)
     for (const id of ['basiskarte', 'gebaeude']) {
-      map.setPaintProperty(id, 'raster-brightness-max', k.helligkeit)
+      map.setPaintProperty(id, 'raster-brightness-min', k.hellMin)
+      map.setPaintProperty(id, 'raster-brightness-max', k.hellMax)
+      map.setPaintProperty(id, 'raster-hue-rotate', k.drehung)
       map.setPaintProperty(id, 'raster-saturation', k.saettigung)
       map.setPaintProperty(id, 'raster-contrast', k.kontrast)
     }
@@ -1198,7 +1211,7 @@ export default function Velonavi() {
       {einstellungen}
       <Legende />
       <p className="text-[11.5px] leading-snug" style={{ color: ui.muted }}>
-        Grundlage ist das Fuss- und Velowegnetz der Stadt Zürich, ergänzt um Lichtsignale, Tempo,
+        Grundlage ist das Fuss- und Velowegnetz der Stadt Zürich, ergänzt um Ampeln, Tempo,
         Velonetzplanung und Unfalldaten der Stadt sowie Belag und Tramgleise aus OpenStreetMap.{' '}
         <Link href="/methode#velonavi" className="underline underline-offset-2">
           Wie das gerechnet ist
@@ -1359,7 +1372,7 @@ function Ergebnis({
   const fakten: { titel: string; wert: string; hilfe?: string }[] = []
   const warten = Math.round(r.ampeln.wartezeit / 60)
   fakten.push({
-    titel: 'Lichtsignale',
+    titel: 'Ampeln',
     wert:
       r.ampeln.geradeaus + r.ampeln.abbiegen === 0
         ? 'keine'
@@ -1373,9 +1386,9 @@ function Ergebnis({
   if (r.meterNachStufe[0] > 10) fakten.push({ titel: 'Schieben', wert: km(r.meterNachStufe[0]), hilfe: r.treppen ? `inkl. ${r.treppen} Treppe${r.treppen > 1 ? 'n' : ''}` : 'Fussweg, Velofahren nicht erlaubt' })
   if (r.huerden > 4)
     fakten.push({
-      titel: 'Poller, Tore, Querungen',
+      titel: 'Hindernisse und Querungen',
       wert: `rund ${Math.round(r.huerden)} s`,
-      hilfe: 'Abbremsen an Hindernissen und ungesicherten Übergängen',
+      hilfe: 'Pfosten, Schranken, Gitter, Übergänge ohne Ampel',
     })
   fakten.push({ titel: 'Velounfälle entlang der Route', wert: nf(r.unfaelle), hilfe: 'seit 2016, polizeilich registriert' })
 
@@ -1828,7 +1841,7 @@ function Leerzustand({ geladen, statistik }: { geladen: boolean; statistik?: Vel
     <section className="text-[13px] leading-snug">
       <p>
         Start und Ziel eingeben oder in die Karte tippen. Die Route berücksichtigt Verkehr, Velostreifen,
-        Tramgleise, Kopfsteinpflaster, Steigung, Poller und Tore, und bei Lichtsignalen, ob man geradeaus
+        Tramgleise, Kopfsteinpflaster, Steigung, Pfosten und Schranken, und bei Ampeln, ob man geradeaus
         über die Kreuzung muss oder nur abbiegt.
       </p>
       <p className="mt-2 text-[12px]" style={{ color: ui.muted }}>

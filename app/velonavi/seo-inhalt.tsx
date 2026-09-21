@@ -35,7 +35,7 @@ export function SeoInhalt({ statistik }: { statistik: VeloMeta['statistik'] }) {
     ],
     description:
       `Veloroutenplaner für Zürich auf ${nf(statistik.veloKm)} km Velonetz. Rechnet Verkehr, ` +
-      `Velostreifen, Tramgleise, Belag, Steigung und die Wartezeit an Lichtsignalen mit.`,
+      `Velostreifen, Tramgleise, Belag, Steigung und die Wartezeit an Ampeln mit.`,
   }
 
   return (
@@ -48,7 +48,7 @@ export function SeoInhalt({ statistik }: { statistik: VeloMeta['statistik'] }) {
           der Stadt. Jedes Wegstück trägt das signalisierte Tempo, die Strassenklasse, den Belag,
           Tramgleise in der Fahrbahn, die Höhenmeter und die Zugehörigkeit zum Vorzugs- oder
           Hauptnetz der städtischen Velonetzplanung. Dazu kommen {nf(statistik.ampelKnoten)}{' '}
-          Kreuzungen mit Lichtsignal und {nf(statistik.verbote)} Abbiegeverbote.
+          Kreuzungen mit Ampel und {nf(statistik.verbote)} Abbiegeverbote.
         </p>
         <p>
           Gerechnet werden immer zwei Varianten. «Schnell» achtet fast nur auf die Fahrzeit.
@@ -58,9 +58,9 @@ export function SeoInhalt({ statistik }: { statistik: VeloMeta['statistik'] }) {
           die fertige Route als GPX herunterladen oder als Link teilen.
         </p>
         <p>
-          Gesucht wird im Browser, Start und Ziel verlassen das Gerät nicht. An Lichtsignalen zählt
-          die Wartezeit danach, ob man geradeaus über die Kreuzung muss oder nur abbiegt; Poller,
-          Tore und Drängelgitter kosten Sekunden.
+          Gesucht wird im Browser, Start und Ziel verlassen das Gerät nicht. An Ampeln zählt
+          die Wartezeit danach, ob man geradeaus über die Kreuzung muss oder nur abbiegt. Pfosten,
+          Schranken und Drängelgitter kosten Sekunden.
         </p>
         <p>
           <Link href="/methode#velonavi">Wie das gerechnet ist</Link>: die Formeln, Parameter und
@@ -88,7 +88,7 @@ export function SeoInhalt({ statistik }: { statistik: VeloMeta['statistik'] }) {
             </p>
             <p style={{ marginTop: '0.75rem' }}>
               Der Velonavi sucht die Veloroute zwischen zwei Adressen in Zürich und rechnet Verkehr,
-              Tramgleise, Belag, Steigung und die Wartezeit an Lichtsignalen mit. Die Route entsteht
+              Tramgleise, Belag, Steigung und die Wartezeit an Ampeln mit. Die Route entsteht
               im Browser, dafür braucht er JavaScript.
             </p>
             <p style={{ marginTop: '0.75rem' }}>
