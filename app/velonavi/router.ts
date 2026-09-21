@@ -251,6 +251,12 @@ const GETRENNT_RABATT = 0.85
  */
 const NETZ_RABATT = [1, 0.85, 0.68, 0.58]
 /**
+ * Wie viel vom Netzrabatt bei «Schnell» übrig bleibt. Dort zählt die Zeit,
+ * und ein besser ausgebauter Korridor bringt real eher zehn bis fünfzehn
+ * Prozent als über vierzig.
+ */
+const ZEIT_RABATT_ANTEIL = 0.35
+/**
  * Zuschlag fürs Verlassen einer Achse des städtischen Velonetzes. Er hält die
  * Route auf dem Korridor, statt sie zwischen Netzstücken und Nebenstrassen
  * hin- und herspringen zu lassen.
@@ -317,7 +323,16 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
       // Der Rabatt fürs städtische Velonetz gilt nur, wo die Achse auch
       // angenehm ist. Die Badenerstrasse beim Lochergut steht im Hauptnetz und
       // bleibt trotzdem eine Strecke, die man meidet.
-      if (stress <= 2) faktor *= NETZ_RABATT[netzVon(g, e)]
+      // Für «Schnell» wirkt der Rabatt nur gedämpft. Voll gewichtet heisst
+      // NETZ_RABATT[vorzug] = 0.58, dass ein Kilometer Vorzugsroute so viel
+      // kostet wie 580 Meter daneben - als Mass für Fahrzeit ist das zu viel.
+      // Eine Vorzugsroute fährt sich flüssiger, aber keine 42% schneller.
+      // Ungedämpft nahm «Schnell» dafür 580 Meter Umweg und eine Minute in
+      // Kauf, ohne dass die Kosten den Unterschied überhaupt bemerkten.
+      if (stress <= 2) {
+        const rabatt = NETZ_RABATT[netzVon(g, e)]
+        faktor *= p.zeitOptimal ? 1 - (1 - rabatt) * ZEIT_RABATT_ANTEIL : rabatt
+      }
       if (infraVon(g, a) === INFRA.getrennt) faktor *= GETRENNT_RABATT
       // Poller, Tore, Bahnübergänge und ungesicherte Querungen: feste
       // Sekunden, unabhängig von der Länge der Kante.
