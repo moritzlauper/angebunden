@@ -1,5 +1,5 @@
 {
-  "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel in 'regeln' trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat) und mit 'nurFahrbahn' auf die Strassenstuecke, die man sich mit dem Auto teilt. Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, stress (1-4, setzt die Stufe fest), stressMin / stressMax (lassen die Bewertung stehen und begrenzen sie nur nach unten bzw. oben), netz (keins/basis/haupt/vorzug), fussgaenger (true/false), nurFahrbahn. 'abbiegeverbotAusnahmen' entfernt einzelne Abbiegeverbote fuers Velo (von-Strasse -> nach-Strasse, optional bbox um den Kreuzungsknoten), fuer Verbote, die laut Geodaten fuers Auto gelten, in Wahrheit aber nicht fuers Velo.",
+  "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel in 'regeln' trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat) und mit 'nurFahrbahn' auf die Strassenstuecke, die man sich mit dem Auto teilt. Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, offen, stress (1-4, setzt die Stufe fest), stressMin / stressMax (lassen die Bewertung stehen und begrenzen sie nur nach unten bzw. oben), netz (keins/basis/haupt/vorzug), fussgaenger (true/false), nurFahrbahn. 'abbiegeverbotAusnahmen' entfernt einzelne Abbiegeverbote fuers Velo (von-Strasse -> nach-Strasse, optional bbox um den Kreuzungsknoten), fuer Verbote, die laut Geodaten fuers Auto gelten, in Wahrheit aber nicht fuers Velo.",
   "regeln": [
     {
       "strasse": "Lehenstrasse",
@@ -280,6 +280,29 @@
       "strasse": "Bucheggplatz",
       "stressMin": 3,
       "grund": "Der Kreisel am Bucheggplatz hat mehrere Fahrstreifen, einen Autobahnzubringer und eine Tramunterfuehrung; der Velostreifen fuehrt mittendurch. In den Datensaetzen hat nur ein Teil der Ringstuecke eine Spurzahl, deshalb greift die allgemeine Regel fuer mehrspurige Achsen dort nur stueckweise. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Lehenstrasse Überquerung",
+      "bbox": [
+        8.5204,
+        47.3963,
+        8.5207,
+        47.3965
+      ],
+      "gesperrt": true,
+      "grund": "Diese Querung liegt nicht am Kirchplatz, sondern weiter suedwestlich zwischen zwei Trottoirs der Lehenstrasse. Die Regel fuer die Kirchplatz-Querungen hat sie versehentlich mitfreigegeben; sie haengt seither als einziges befahrbares Stueck zwischen lauter Fusswegen. Die Lehenstrasse 72 rastete darauf ein und war vom uebrigen Netz abgeschnitten."
+    },
+    {
+      "strasse": "Park",
+      "bbox": [
+        8.5031,
+        47.3785,
+        8.5036,
+        47.3794
+      ],
+      "nurFahrbahn": true,
+      "offen": true,
+      "grund": "Der Weg durch die Anlage bei der Andreaskirche, vom Letzigraben hinunter zur Brahmsstrasse, ist im Basisdatensatz ohne Velofreigabe, obwohl es eine kleine Fahrstrasse ist und die Anlage ringsum ein durchgehendes Velowegnetz hat. Ohne ihn endete dieses Netz gegen Sueden blind: Vom Letzigraben zur Brahmsstrasse waren es 734 Meter aussen herum statt gut 350 hindurch. nurFahrbahn laesst die Spazierwege daneben unberuehrt. Ortskenntnis des Betreibers."
     }
   ],
   "verbindungen": [
@@ -294,6 +317,54 @@
       ],
       "name": "Hirschengraben",
       "grund": "Beim Lichtsignal Mühlegasse/Seilergraben fährt man mit dem Velo einfach geradeaus weiter auf den Hirschengraben und von dort hoch auf Auf der Mauer. Im Datensatz sind Fahrbahn- und Fusswegnetz an dieser Kreuzung nicht zusammengeheftet: Die beiden Knoten liegen 44 m auseinander, ohne Kante dazwischen. Der Router musste deshalb 212 m nach Süden ausholen und wieder zurück. Ortskenntnis des Betreibers."
+    },
+    {
+      "von": [
+        8.52389,
+        47.39675
+      ],
+      "nach": [
+        8.52384,
+        47.39681
+      ],
+      "name": "Lehenstrasse",
+      "grund": "Am Kirchplatz Wipkingen laufen Fahrbahn und Platzweg als zwei Linien nebeneinander, die sich im Datensatz nirgends beruehren. Wer auf der Fahrbahn ankommt und auf dem Platzweg weiter will, fuhr deshalb 198 Meter ueber die Wunderlistrasse im Haken zurueck. Die beiden Knoten liegen sieben Meter auseinander."
+    },
+    {
+      "von": [
+        8.52464,
+        47.3966
+      ],
+      "nach": [
+        8.52466,
+        47.39664
+      ],
+      "name": "Lehenstrasse",
+      "grund": "Dieselbe Naht am oestlichen Ende des Kirchplatzes, fuenf Meter zwischen Fahrbahn und Platzweg."
+    },
+    {
+      "von": [
+        8.50343,
+        47.37935
+      ],
+      "nach": [
+        8.50321,
+        47.3793
+      ],
+      "name": "Park",
+      "grund": "Naht in der Anlage bei der Andreaskirche: Das Velowegnetz der Anlage und der Weg hinunter zur Brahmsstrasse enden siebzehn Meter voneinander entfernt, ohne Kante dazwischen."
+    },
+    {
+      "von": [
+        8.50349,
+        47.37858
+      ],
+      "nach": [
+        8.50354,
+        47.37853
+      ],
+      "name": "Park",
+      "grund": "Dieselbe Naht am unteren Ende, sieben Meter zwischen dem Weg aus der Anlage und der Brahmsstrasse."
     }
   ],
   "abbiegeverbotAusnahmen": [

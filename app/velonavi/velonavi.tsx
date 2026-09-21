@@ -162,12 +162,13 @@ function anteilAngenehm(r: Route) {
  * alle drei für `a` sprechen; dann gibt es keinen Grund, `b` noch zu zeigen.
  */
 /**
- * Wie viel länger «Schnell» dauern darf, wenn es sich dafür eine deutlich
- * angenehmere Strecke aussucht, und wie viel angenehmer sie dafür sein muss.
- * Ohne diese Schranke nahm «Schnell» für ein bisschen Ruhe auch einmal eine
- * Minute und vierhundert Meter Umweg in Kauf.
+ * Wie viel länger und weiter «Schnell» fahren darf, wenn es sich dafür eine
+ * deutlich angenehmere Strecke aussucht, und wie viel angenehmer sie dafür
+ * sein muss. Beides zählt: Ohne die Schranke auf die Länge nahm «Schnell»
+ * bei gleicher Fahrzeit 240 Meter Umweg um eine Anlage herum in Kauf, statt
+ * den Weg hindurch zu nehmen.
  */
-const ZEIT_SPIELRAUM = 0.05
+const SPIELRAUM = 0.05
 const MINDESTGEWINN = 0.25
 
 function bessergleich(a: Route, b: Route) {
@@ -458,7 +459,9 @@ export default function Velonavi() {
       if (out.schnell) {
         const schnellst = suche(reinZeitlich({ ...profile.schnell, schieben: mitSchieben }))
         if (schnellst) {
-          const imBudget = out.schnell.zeit <= schnellst.zeit * (1 + ZEIT_SPIELRAUM)
+          const imBudget =
+            out.schnell.zeit <= schnellst.zeit * (1 + SPIELRAUM) &&
+            out.schnell.distanz <= schnellst.distanz * (1 + SPIELRAUM)
           const lohnt = laestig(out.schnell) <= laestig(schnellst) * (1 - MINDESTGEWINN)
           if (!imBudget || !lohnt) out.schnell = schnellst
         }

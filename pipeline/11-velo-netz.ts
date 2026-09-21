@@ -708,6 +708,13 @@ function lv95NachWgs(e: number, n: number): [number, number] {
  * hält solche Fälle fest, mit Begründung.
  */
 console.log('Eigene Korrekturen')
+/**
+ * Trägt die `gesperrt`-Regeln nach, nachdem die Lückenschliesser gelaufen
+ * sind. Sie prüfen `k.gesperrt` zwar alle, aber eine Sperre ist eine
+ * Ortskenntnis-Aussage («der Velotunnel ist noch gar nicht gebaut»), und die
+ * soll am Schluss gelten, egal welcher Automatismus vorher etwas geöffnet hat.
+ */
+let gesperrtNachtragen: () => number = () => 0
 {
   type Regel = {
     strasse: string
@@ -716,6 +723,7 @@ console.log('Eigene Korrekturen')
     veloweg?: boolean
     velostreifen?: boolean
     gesperrt?: boolean
+    offen?: boolean
     stress?: number
     stressMin?: number
     stressMax?: number
@@ -739,6 +747,9 @@ console.log('Eigene Korrekturen')
       if (r.veloweg) k.veloweg = true
       if (r.velostreifen) k.streifen = 'BOTH'
       if (r.gesperrt) k.gesperrt = k.velo = false
+      // Das Gegenstück zu `gesperrt`: ein Stück, das der Basisdatensatz nur
+      // als Fussweg führt, obwohl man dort fährt.
+      if (r.offen) (k.gesperrt = false), (k.velo = true)
       // Nur die Fahrbahn: Strassenstücke, die man sich mit dem Auto teilt.
       // Die Trottoirs, Fusswege und abgetrennten Velowege, die unter demselben
       // Strassennamen laufen, bleiben aussen vor.
@@ -750,7 +761,25 @@ console.log('Eigene Korrekturen')
       if (r.fussgaenger !== undefined) k.fussgaenger = r.fussgaenger
       betroffen++
     }
-    console.log(`  ${r.strasse}: ${betroffen} Kanten`)
+    // Eine Regel, die nichts trifft, ist stumm wirkungslos - meist, weil die
+    // Stadt eine Strasse umbenannt hat. Das soll im Lauf auffallen.
+    console.log(`  ${r.strasse}: ${betroffen} Kanten${betroffen ? '' : '  <-- ACHTUNG, keine Kante getroffen'}`)
+  }
+  gesperrtNachtragen = () => {
+    let n = 0
+    for (const r of regeln) {
+      if (!r.gesperrt) continue
+      for (const k of kanten) {
+        if (k.name !== r.strasse || !k.velo) continue
+        if (r.bbox) {
+          const [minLon, minLat, maxLon, maxLat] = r.bbox
+          if (!k.coords.some(([lon, lat]) => lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat)) continue
+        }
+        k.gesperrt = k.velo = false
+        n++
+      }
+    }
+    return n
   }
 }
 
@@ -908,6 +937,8 @@ console.log('Lücken im Velonetz')
     geschlossen++
   }
   console.log(`  ${geschlossen} kurze Verbindungen zwischen Velowegen befahrbar gemacht`)
+  const nachtrag = gesperrtNachtragen()
+  if (nachtrag) console.log(`  ${nachtrag} Kanten nachträglich wieder gesperrt (eigene Korrekturen)`)
 }
 
 // ------------------------------------------------------------ Hürden
