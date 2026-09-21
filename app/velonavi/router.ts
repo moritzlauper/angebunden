@@ -594,7 +594,7 @@ export type Route = {
   kiesM: number
   treppen: number
   unfaelle: number
-  /** Sekunden für Poller, Tore, Bahnübergänge und Querungen. */
+  /** Sekunden für Pfosten, Schranken, Bahnübergänge und Querungen. */
   huerden: number
   ampeln: { geradeaus: number; abbiegen: number; wartezeit: number; orte: [number, number, Manoever][] }
   /** Höhenprofil: [Distanz ab Start in m, Höhe in m]. */

@@ -129,6 +129,30 @@ const VARIANTEN: { id: Variante; titel: string; hilfe: string }[] = [
   { id: 'komfort', titel: 'Komfort', hilfe: 'Meidet Verkehr, Tramgleise, Pflaster und Steigungen' },
 ]
 
+/**
+ * Wie viel an einer Strecke stört, in gewichteten Metern: «mässig» zählt
+ * einfach, «unangenehm» doppelt, «hart» vierfach. Geschobene Meter zählen
+ * am schwersten, sie kosten am meisten Nerven.
+ */
+function laestig(r: Route) {
+  const m = r.meterNachStufe
+  return m[2] + 2 * m[3] + 4 * m[4] + 6 * m[0]
+}
+
+/** Anteil angenehmer Meter an der ganzen Strecke, dieselbe Zahl wie auf der Karte. */
+function anteilAngenehm(r: Route) {
+  return r.distanz > 0 ? r.meterNachStufe[1] / r.distanz : 0
+}
+
+/**
+ * Ist `a` in allem, was der Velonavi anzeigt, mindestens so gut wie `b`?
+ * Zeit, Anteil angenehmer Meter und die gewichteten störenden Meter müssen
+ * alle drei für `a` sprechen; dann gibt es keinen Grund, `b` noch zu zeigen.
+ */
+function bessergleich(a: Route, b: Route) {
+  return a.zeit <= b.zeit && anteilAngenehm(a) >= anteilAngenehm(b) && laestig(a) <= laestig(b)
+}
+
 const REGLER: { id: 'sicherheit' | 'steigung' | 'ampeln' | 'belag'; titel: string }[] = [
   { id: 'sicherheit', titel: 'Verkehr und Tramgleise meiden' },
   { id: 'steigung', titel: 'Steigungen meiden' },
@@ -434,6 +458,14 @@ export default function Velonavi() {
     // Karten legt `gleichWie` gleich darunter von selbst zusammen.
     if (routen.schnell && routen.komfort && routen.komfort.zeit < routen.schnell.zeit) {
       routen.schnell = routen.komfort
+    }
+    // Und dasselbe Versprechen andersherum: «Komfort» darf nie die
+    // unangenehmere Strecke sein. Weil auch «Komfort» nach Kosten sucht und
+    // nicht nach reiner Ruhe, kam es vor, dass sie länger, langsamer und
+    // ruppiger war als «Schnell». Ist die schnelle Strecke in jeder
+    // angezeigten Zahl mindestens so gut, übernimmt «Komfort» sie.
+    if (routen.schnell && routen.komfort && bessergleich(routen.schnell, routen.komfort)) {
+      routen.komfort = routen.schnell
     }
     // Varianten, die (fast) gleich verlaufen, zusammenlegen: die spätere zeigt
     // auf die frühere. Verglichen wird die befahrene Kantenmenge.
