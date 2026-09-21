@@ -18,7 +18,7 @@ import { Wortmarke } from '../marke'
 import { STAEDTE } from '../staedte'
 import { nf } from '../site'
 import {
-  ladeGraph, einrasten, route, kantenKosten, alsGpx, verbinde, VOREINSTELLUNGEN,
+  ladeGraph, einrasten, route, kantenKosten, alsGpx, verbinde, VOREINSTELLUNGEN, reinZeitlich,
   veloErlaubt, stressVon, netzVon, NETZ,
   type Graph, type Profil, type Route, type VeloMeta,
 } from './router'
@@ -161,6 +161,15 @@ function anteilAngenehm(r: Route) {
  * Zeit, Anteil angenehmer Meter und die gewichteten störenden Meter müssen
  * alle drei für `a` sprechen; dann gibt es keinen Grund, `b` noch zu zeigen.
  */
+/**
+ * Wie viel länger «Schnell» dauern darf, wenn es sich dafür eine deutlich
+ * angenehmere Strecke aussucht, und wie viel angenehmer sie dafür sein muss.
+ * Ohne diese Schranke nahm «Schnell» für ein bisschen Ruhe auch einmal eine
+ * Minute und vierhundert Meter Umweg in Kauf.
+ */
+const ZEIT_SPIELRAUM = 0.05
+const MINDESTGEWINN = 0.25
+
 function bessergleich(a: Route, b: Route) {
   return a.zeit <= b.zeit && anteilAngenehm(a) >= anteilAngenehm(b) && laestig(a) <= laestig(b)
 }
@@ -428,20 +437,31 @@ export default function Velonavi() {
         einrasten(g, h.lon, h.lat, mitSchieben, strasseVon(h.titel))
       )
       if (halte.some((h) => !h)) return null
-      const out = {} as Record<Variante, Route | null>
-      for (const v of VARIANTEN) {
-        const pr = { ...profile[v.id], schieben: mitSchieben }
+      /** Eine Strecke über alle Halte mit einem Profil. */
+      const suche = (pr: Profil) => {
         const k = kantenKosten(g, pr)
         const teile: Route[] = []
         for (let i = 0; i + 1 < halte.length; i++) {
           const r = route(g, pr, halte[i]!, halte[i + 1]!, k)
-          if (!r) {
-            teile.length = 0
-            break
-          }
+          if (!r) return null
           teile.push(r)
         }
-        out[v.id] = teile.length ? verbinde(teile) : null
+        return teile.length ? verbinde(teile) : null
+      }
+      const out = {} as Record<Variante, Route | null>
+      for (const v of VARIANTEN) out[v.id] = suche({ ...profile[v.id], schieben: mitSchieben })
+      // «Schnell» heisst schnell. Gesucht wird zusätzlich die wirklich
+      // schnellste Strecke, ganz ohne Komfortgewichte. Die leicht gewichtete
+      // Variante darf nur bleiben, wenn sie höchstens fünf Prozent länger
+      // dauert und dafür spürbar weniger Ruppiges enthält. Sonst gewinnt die
+      // Zeit, auch wenn die Strecke über eine laute Achse führt.
+      if (out.schnell) {
+        const schnellst = suche(reinZeitlich({ ...profile.schnell, schieben: mitSchieben }))
+        if (schnellst) {
+          const imBudget = out.schnell.zeit <= schnellst.zeit * (1 + ZEIT_SPIELRAUM)
+          const lohnt = laestig(out.schnell) <= laestig(schnellst) * (1 - MINDESTGEWINN)
+          if (!imBudget || !lohnt) out.schnell = schnellst
+        }
       }
       return out.komfort ? out : null
     }

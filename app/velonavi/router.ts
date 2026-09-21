@@ -192,6 +192,15 @@ export type Profil = {
    * Treppe durch die Blöcke, weil viele Wege dort fast gleich lang sind.
    */
   zeitOptimal?: boolean
+  /**
+   * Sucht ausschliesslich nach Fahrzeit: Kosten und Zeit sind dasselbe, kein
+   * einziger Aufschlag für Verkehr, Gleise, Belag, Steigung oder Netzrabatt.
+   * Was die Geschwindigkeit wirklich drückt - grober Belag, Fussgängerzone,
+   * Steigung, Warten an der Ampel, Poller -, steckt ohnehin schon in der
+   * Zeit. «Schnell» rechnet damit die wirklich schnellste Strecke aus und
+   * vergleicht sie danach mit der leicht komfortgewichteten Variante.
+   */
+  reineZeit?: boolean
 }
 
 export const VOREINSTELLUNGEN = {
@@ -276,6 +285,16 @@ const NETZ_VERLASSEN = 8
 const MIN_FAKTOR = 0.45
 
 /**
+ * Das Profil hinter «Schnell», sobald wirklich nur die Fahrzeit zählt.
+ * Alle Regler auf null, ausser dem Warten an der Ampel: das ist echte Zeit
+ * und zählt voll. Zusammen mit `reineZeit` sind Kosten und Zeit damit
+ * überall dasselbe, und die Suche liefert die wirklich schnellste Strecke.
+ */
+export function reinZeitlich(p: Profil): Profil {
+  return { ...p, sicherheit: 0, steigung: 0, belag: 0, ampeln: 1, zeitOptimal: true, reineZeit: true }
+}
+
+/**
  * Erwartete Wartezeit an einem Lichtsignal in Sekunden, je Manöver.
  * Geradeaus über die Kreuzung wartet man im Mittel eine halbe Rotphase.
  * Rechts abbiegen geht praktisch nie mit Halt: Velos biegen dort in der
@@ -354,16 +373,17 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
       // real aber länger dauerte. Für die übrigen Profile bleibt der
       // Aufschlag (1.6x), weil Hindernisse dort bewusst stärker gewichtet
       // gemieden werden als ihre reine Zeit.
-      kosten[a] =
-        t * faktor +
-        huerde * (p.zeitOptimal ? 1 : 1.6) +
-        auf * sProM * p.steigung * (1.2 + 12 * Math.max(0, steil - 0.05)) +
-        g.unfall[e] * 3 * p.sicherheit
+      kosten[a] = p.reineZeit
+        ? zeit[a]
+        : t * faktor +
+          huerde * (p.zeitOptimal ? 1 : 1.6) +
+          auf * sProM * p.steigung * (1.2 + 12 * Math.max(0, steil - 0.05)) +
+          g.unfall[e] * 3 * p.sicherheit
     } else if (p.schieben && schiebenErlaubt(g, a)) {
       const treppe = klasse === KLASSE.treppe
       const t = L / (treppe ? 0.5 : V_SCHIEBEN) + auf * (treppe ? 4 : 1.5)
       zeit[a] = t
-      kosten[a] = t * (treppe ? 3.5 : 2.5)
+      kosten[a] = p.reineZeit ? t : t * (treppe ? 3.5 : 2.5)
     }
   }
   return { zeit, kosten }
@@ -401,14 +421,16 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
   out.ampel = -1
   out.manoever = null
   out.eintritt = NaN
-  // Vom Velonetz der Stadt herunter: hält die Route auf dem Korridor.
-  if (netzVon(g, a >> 1) > 0 && netzVon(g, b >> 1) === 0) out.kosten += NETZ_VERLASSEN
+  if (!p.reineZeit) {
+    // Vom Velonetz der Stadt herunter: hält die Route auf dem Korridor.
+    if (netzVon(g, a >> 1) > 0 && netzVon(g, b >> 1) === 0) out.kosten += NETZ_VERLASSEN
 
-  // Auf eine härtere Strecke einbiegen kostet einmalig, unabhängig davon, wie
-  // kurz sie ist. Nur der Sprung nach oben zählt.
-  const stressB = stressVon(g, b)
-  if (stressB > stressVon(g, a))
-    out.kosten += STRESS_EINSTIEG[stressB] * Math.max(p.sicherheit, STRESS_MINDEST[stressB])
+    // Auf eine härtere Strecke einbiegen kostet einmalig, unabhängig davon, wie
+    // kurz sie ist. Nur der Sprung nach oben zählt.
+    const stressB = stressVon(g, b)
+    if (stressB > stressVon(g, a))
+      out.kosten += STRESS_EINSTIEG[stressB] * Math.max(p.sicherheit, STRESS_MINDEST[stressB])
+  }
 
   // Jedes Abbiegen kostet: Abbremsen, Schulterblick, Handzeichen. Ohne
   // diesen Zuschlag nimmt der Router in Rasterquartieren eine Treppe durch die
@@ -416,14 +438,15 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
   const d = drehung(g.peilEnde[a], g.peilStart[b])
   const b_ = Math.abs(d)
   if (b_ > 35) {
-    out.kosten += b_ > 120 ? 14 : 8
-    out.zeit += b_ > 120 ? 5 : 3
+    const wende = b_ > 120
+    out.zeit += wende ? 5 : 3
+    out.kosten += p.reineZeit ? (wende ? 5 : 3) : wende ? 14 : 8
   }
 
   // Absteigen und wieder aufsteigen.
   if (veloErlaubt(g, a) !== veloErlaubt(g, b)) {
     out.zeit += 8
-    out.kosten += 25
+    out.kosten += p.reineZeit ? 8 : 25
   }
 
   const J = g.knotenAmpel[v]
@@ -444,7 +467,7 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
       warten = mv === 'geradeaus' ? (quer ? WARTEN.einzeln.queren : WARTEN.einzeln.entlang) : WARTEN.einzeln.abbiegen
     }
     out.zeit += warten
-    out.kosten += warten * (0.3 + 1.6 * p.ampeln)
+    out.kosten += warten * (p.reineZeit ? 1 : 0.3 + 1.6 * p.ampeln)
     out.ampel = J
     out.manoever = mv
     return
