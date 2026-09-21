@@ -177,7 +177,7 @@ const aufwand = (r: Route) => r.zeit + r.distanz / VMAX
  * sein muss.
  */
 const SPIELRAUM = 0.05
-const MINDESTGEWINN = 0.25
+const MINDESTGEWINN = 0.1
 
 function bessergleich(a: Route, b: Route) {
   return a.zeit <= b.zeit && anteilAngenehm(a) >= anteilAngenehm(b) && laestig(a) <= laestig(b)
