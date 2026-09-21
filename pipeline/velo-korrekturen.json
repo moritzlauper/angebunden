@@ -1,15 +1,25 @@
 {
-  "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel in 'regeln' trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat). Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, stress (1-4), netz (keins/basis/haupt/vorzug), fussgaenger (true/false). 'abbiegeverbotAusnahmen' entfernt einzelne Abbiegeverbote fürs Velo (von-Strasse -> nach-Strasse, optional bbox um den Kreuzungsknoten), für Verbote, die laut Geodaten fürs Auto gelten, in Wahrheit aber nicht fürs Velo.",
+  "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel in 'regeln' trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat) und mit 'nurFahrbahn' auf die Strassenstuecke, die man sich mit dem Auto teilt. Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, stress (1-4, setzt die Stufe fest), stressMin / stressMax (lassen die Bewertung stehen und begrenzen sie nur nach unten bzw. oben), netz (keins/basis/haupt/vorzug), fussgaenger (true/false), nurFahrbahn. 'abbiegeverbotAusnahmen' entfernt einzelne Abbiegeverbote fuers Velo (von-Strasse -> nach-Strasse, optional bbox um den Kreuzungsknoten), fuer Verbote, die laut Geodaten fuers Auto gelten, in Wahrheit aber nicht fuers Velo.",
   "regeln": [
     {
       "strasse": "Lehenstrasse",
-      "bbox": [8.5195, 47.3965, 8.5275, 47.3975],
+      "bbox": [
+        8.5195,
+        47.3965,
+        8.5275,
+        47.3975
+      ],
       "netz": "vorzug",
       "grund": "Der Abschnitt beim Kirchplatz Wipkingen ist im Basisdatensatz nur als Fussweg ohne Velofreigabe erfasst, gehört aber zur Vorzugsroute 30 (Höngg - Wipkingen) und ist mit dem Velo durchfahrbar. netz=vorzug reicht als Korrektur, weil eine Vorzugsroute laut eigener Regel immer für Velos freigegeben wird (siehe weiter unten in 11-velo-netz.ts). Ortskenntnis des Betreibers."
     },
     {
       "strasse": "Wunderlistrasse",
-      "bbox": [8.5195, 47.3965, 8.5275, 47.3975],
+      "bbox": [
+        8.5195,
+        47.3965,
+        8.5275,
+        47.3975
+      ],
       "netz": "vorzug",
       "grund": "Gleicher Kirchplatz-Abschnitt wie die Lehenstrasse, Teil derselben Vorzugsroute 30. Ortskenntnis des Betreibers."
     },
@@ -30,7 +40,12 @@
     },
     {
       "strasse": "Waidstrasse",
-      "bbox": [8.5226, 47.3966, 8.523, 47.397],
+      "bbox": [
+        8.5226,
+        47.3966,
+        8.523,
+        47.397
+      ],
       "netz": "vorzug",
       "grund": "Kurzes Verbindungsstück zum Kirchplatz Wipkingen (nicht die übrige Waidstrasse, die bereits befahrbar ist)."
     },
@@ -41,13 +56,23 @@
     },
     {
       "strasse": "Hirschengraben",
-      "bbox": [8.5405, 47.372, 8.548, 47.377],
+      "bbox": [
+        8.5405,
+        47.372,
+        8.548,
+        47.377
+      ],
       "beideRichtungen": true,
       "grund": "Verbindet Central/Seilergraben mit Auf der Mauer, in diesem Abschnitt bislang nur in eine Richtung als velo-befahrbar erfasst. Velofahren gegen die Einbahn ist in Zürich immer erlaubt, auch hier. Ortskenntnis des Betreibers."
     },
     {
       "strasse": "Fussweg",
-      "bbox": [8.5448, 47.3767, 8.5455, 47.3769],
+      "bbox": [
+        8.5448,
+        47.3767,
+        8.5455,
+        47.3769
+      ],
       "netz": "vorzug",
       "grund": "Kurze Rampe zwischen der Leonhardshalde und der Querung bei Auf der Mauer, im Datensatz als Treppe ohne Velofreigabe erfasst. Real ist es eine mit dem Velo befahrbare Rampe, ohne die Auf der Mauer trotz Freigabe in beide Richtungen eine Velo-Insel bliebe, weil die beiden Abschnitte sonst nur über den Umweg via Hirschengraben verbunden sind. Ortskenntnis des Betreibers."
     },
@@ -58,7 +83,12 @@
     },
     {
       "strasse": "Sihlfeldstrasse",
-      "bbox": [8.5148, 47.3725, 8.5178, 47.3825],
+      "bbox": [
+        8.5148,
+        47.3725,
+        8.5178,
+        47.3825
+      ],
       "netz": "vorzug",
       "grund": "Velostrasse durchs Quartier, durchgehend Tempo 30, für Velos angenehm und direkt zwischen Bullingerplatz und Hardplatz. Die Velonetzplanung der Stadt erfasst sie dort nur teilweise, weshalb die Route ohne diese Korrektur auf die Hardstrasse ausweicht, obwohl diese streckenweise Tempo 50 und Hauptstrassencharakter hat. Ortskenntnis des Betreibers."
     },
@@ -69,7 +99,12 @@
     },
     {
       "strasse": "Hardstrasse",
-      "bbox": [8.5095, 47.3775, 8.5155, 47.383],
+      "bbox": [
+        8.5095,
+        47.3775,
+        8.5155,
+        47.383
+      ],
       "stress": 4,
       "grund": "Hardstrasse zwischen Albisriederplatz und Hardplatz ist eine breite, verkehrsorientierte Hauptstrasse, für Velos unangenehm. Parallel dazu liegt die ruhige Sihlfeldstrasse (Velostrasse, Tempo 30) bis zum Hardplatz, die immer vorzuziehen ist. Ortskenntnis des Betreibers."
     },
@@ -102,13 +137,23 @@
     },
     {
       "strasse": "Badenerstrasse",
-      "bbox": [8.5187, 47.3742, 8.5217, 47.3753],
+      "bbox": [
+        8.5187,
+        47.3742,
+        8.5217,
+        47.3753
+      ],
       "stress": 4,
       "grund": "Die Badenerstrasse-Brücke über die Seebahn beim Lochergut und das Stück davor bis zur Kalkbreitestrasse: Tramgleise in der Fahrbahn, viel Verkehr, enge Spuren - mit dem Velo der unangenehmste Ort im Quartier. Der Datensatz stufte die Brücke je nach Richtung auf 1 bzw. 3 ein, weil in einer Richtung ein Streifen markiert ist; das entspricht nicht der Realität. Ortskenntnis des Betreibers."
     },
     {
       "strasse": "Kalkbreitestrasse",
-      "bbox": [8.52, 47.3737, 8.5218, 47.3746],
+      "bbox": [
+        8.52,
+        47.3737,
+        8.5218,
+        47.3746
+      ],
       "stress": 1,
       "veloweg": true,
       "grund": "Der Abschnitt beim Kalkbreiteplatz hat Velowege, ist also trotz der Tramgleise daneben gut zu fahren. Der Datensatz stufte ihn allein wegen der Gleise auf 3 bzw. 4 ein, was 'Komfort' unnötig auf Umwege schickte. Ortskenntnis des Betreibers."
@@ -120,7 +165,12 @@
     },
     {
       "strasse": "Sihlstrasse Überquerung",
-      "bbox": [8.53, 47.371, 8.541, 47.379],
+      "bbox": [
+        8.53,
+        47.371,
+        8.541,
+        47.379
+      ],
       "stress": 4,
       "grund": "Gleicher Ausschnitt und Grund wie bei der Sihlstrasse im Kreis 1: viel Autoverkehr. Die Querung ist eher unangenehmer als die Strasse selbst, stand aber auf Stufe 1."
     },
@@ -157,7 +207,12 @@
     },
     {
       "strasse": "Langstrasse",
-      "bbox": [8.5278, 47.3802, 8.5296, 47.382],
+      "bbox": [
+        8.5278,
+        47.3802,
+        8.5296,
+        47.382
+      ],
       "fussgaenger": false,
       "grund": "Langstrassenunterführung: breite, velofreundliche Passage unter den Gleisen, im Datensatz aber wie eine gewöhnliche Fussgängerzone eingestuft. Das bremst das Zeitmodell künstlich (auf Fussgängertempo gedeckelt plus Unbehagens-Aufschlag), obwohl man hier zügig durchfährt, und lässt 'Schnell' auf einen langsameren Umweg über die Strasse ausweichen. Ortskenntnis des Betreibers."
     },
@@ -170,12 +225,73 @@
       "strasse": "Herterbrücke",
       "gesperrt": true,
       "grund": "Die Herterbrücke hat Treppen ohne fahrbare Velorampe und ist mit dem Velo nicht befahrbar."
+    },
+    {
+      "strasse": "Hardplatz",
+      "stressMax": 3,
+      "grund": "Der gepflasterte Bogen zwischen Hardstrasse und Hirzelstrasse landet wegen Tempo 50 plus Kopfsteinpflaster auf der hoechsten Stufe. Er ist ruppig, aber kurz und ohne Gleise; Stufe 3 trifft es. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Wipkingerplatz",
+      "stressMax": 3,
+      "grund": "Der Wipkingerplatz ist unangenehm, aber nicht die haerteste Stufe: breit, uebersichtlich, mit Vorzugsroute darueber. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Geroldstrasse",
+      "stressMax": 3,
+      "grund": "Der Abschnitt dem Gleisfeld entlang hat keinen Velostreifen, dafuer ein breites Trottoir, auf dem man fahren kann. Stufe 3 statt der hoechsten. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Escher-Wyss-Platz",
+      "nurFahrbahn": true,
+      "stressMin": 3,
+      "grund": "Auf dem Escher-Wyss-Platz quert man auf engem Raum etliche Tramgleise; die Datensaetze fuehren die Fahrbahnstuecke trotzdem als ruhig. Nur die Fahrbahn, die Velowege und Trottoirs daneben bleiben, wie sie sind. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Escher-Wyss-Platz Überquerung",
+      "nurFahrbahn": true,
+      "stressMin": 3,
+      "grund": "Die Querungsstuecke ueber den Escher-Wyss-Platz, gleicher Grund wie oben."
+    },
+    {
+      "strasse": "Platzpromenade",
+      "stressMin": 3,
+      "grund": "Der Kiesweg am Limmatufer zwischen Walchebruecke und Stampfenbachplatz ist als Veloweg der staedtischen Velokarte auf Stufe 1 gerechnet. In Wirklichkeit faehrt man dort auf losem Belag zwischen Spaziergaengern durch. Nur der Uferstreifen, die ruhigen Parkwege im Platzspitz bleiben, wie sie sind. Ortskenntnis des Betreibers.",
+      "bbox": [
+        8.54,
+        47.3784,
+        8.542,
+        47.381
+      ]
+    },
+    {
+      "strasse": "Badenerstrasse",
+      "bbox": [
+        8.51,
+        47.372,
+        8.54,
+        47.379
+      ],
+      "nurFahrbahn": true,
+      "stressMin": 3,
+      "grund": "Zwischen Lochergut und Stauffacher liegt die Badenerstrasse auf ganzer Laenge im Tramtrassee, ohne abgetrennten Weg, mit Bussen und viel Autoverkehr. Westlich davon (ab etwa Farbhof) gibt es einen abgetrennten Veloweg, deshalb die Begrenzung auf den inneren Abschnitt. Ortskenntnis des Betreibers."
+    },
+    {
+      "strasse": "Bucheggplatz",
+      "stressMin": 3,
+      "grund": "Der Kreisel am Bucheggplatz hat mehrere Fahrstreifen, einen Autobahnzubringer und eine Tramunterfuehrung; der Velostreifen fuehrt mittendurch. In den Datensaetzen hat nur ein Teil der Ringstuecke eine Spurzahl, deshalb greift die allgemeine Regel fuer mehrspurige Achsen dort nur stueckweise. Ortskenntnis des Betreibers."
     }
   ],
   "verbindungen": [
     {
-      "von": [8.54589, 47.37467],
-      "nach": [8.5458, 47.37506],
+      "von": [
+        8.54589,
+        47.37467
+      ],
+      "nach": [
+        8.5458,
+        47.37506
+      ],
       "name": "Hirschengraben",
       "grund": "Beim Lichtsignal Mühlegasse/Seilergraben fährt man mit dem Velo einfach geradeaus weiter auf den Hirschengraben und von dort hoch auf Auf der Mauer. Im Datensatz sind Fahrbahn- und Fusswegnetz an dieser Kreuzung nicht zusammengeheftet: Die beiden Knoten liegen 44 m auseinander, ohne Kante dazwischen. Der Router musste deshalb 212 m nach Süden ausholen und wieder zurück. Ortskenntnis des Betreibers."
     }
@@ -184,7 +300,12 @@
     {
       "von": "Seilergraben",
       "nach": "Hirschengraben",
-      "bbox": [8.5445, 47.3742, 8.5462, 47.3748],
+      "bbox": [
+        8.5445,
+        47.3742,
+        8.5462,
+        47.3748
+      ],
       "grund": "Kurze, direkte Verbindung vom Mühlegasse/Seilergraben-Ende via Hirschengraben hoch auf Auf der Mauer und weiter zur Uni - real mit dem Velo befahrbar. Das Abbiegeverbot der Stadt gilt hier nur fürs Auto, die Geodaten halten das nicht separat fest. Ohne diese Ausnahme umgeht der Router die Kreuzung komplett und macht stattdessen den grossen Umweg über Central. Ortskenntnis des Betreibers."
     }
   ]

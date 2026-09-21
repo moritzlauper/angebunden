@@ -241,6 +241,16 @@ const STRESS_KOSTEN = [0, 0, 0.15, 1.5, 3.2]
  * für jede Teilkante erneut zahlt.
  */
 const STRESS_EINSTIEG = [0, 0, 0, 25, 60]
+/**
+ * Wie stark die Stufe mindestens zählt, auch wenn der Regler «Verkehr und
+ * Tramgleise meiden» ganz unten steht. Bei «Schnell» steht er auf 0.1, und
+ * damit war eine Kante der Stufe 4 nur rund ein Drittel teurer als eine
+ * ruhige - zu wenig, um einen Umweg von ein paar hundert Metern aufzuwiegen.
+ * Die Rosengartenstrasse, vier Fahrstreifen bergauf, kam so in jeder
+ * hundertsten Suche als Vorschlag heraus. Stufe 4 heisst aber: Das fährt
+ * kaum jemand, egal wie eilig es ist.
+ */
+const STRESS_MINDEST = [0, 0, 0, 0.25, 0.5]
 /** Rabatt für einen abgetrennten Veloweg: den nimmt man gerne, auch mit Umweg. */
 const GETRENNT_RABATT = 0.85
 /**
@@ -310,7 +320,7 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
       const spurig = Math.max(0, g.spuren[e] - 2)
       let faktor =
         1 +
-        STRESS_KOSTEN[stress] * p.sicherheit +
+        STRESS_KOSTEN[stress] * Math.max(p.sicherheit, STRESS_MINDEST[stress]) +
         // Tramgleise entlang der Fahrbahn zählen auch dann, wenn ein Streifen
         // oder Weg daneben liegt: Man quert sie beim Abbiegen, beim Ausweichen
         // und an jeder Haltestelle.
@@ -397,7 +407,8 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
   // Auf eine härtere Strecke einbiegen kostet einmalig, unabhängig davon, wie
   // kurz sie ist. Nur der Sprung nach oben zählt.
   const stressB = stressVon(g, b)
-  if (stressB > stressVon(g, a)) out.kosten += STRESS_EINSTIEG[stressB] * p.sicherheit
+  if (stressB > stressVon(g, a))
+    out.kosten += STRESS_EINSTIEG[stressB] * Math.max(p.sicherheit, STRESS_MINDEST[stressB])
 
   // Jedes Abbiegen kostet: Abbremsen, Schulterblick, Handzeichen. Ohne
   // diesen Zuschlag nimmt der Router in Rasterquartieren eine Treppe durch die

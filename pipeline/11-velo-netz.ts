@@ -301,6 +301,10 @@ type Kante = {
   velostrasse: boolean
   /** Fest vorgegebene Stufe aus den eigenen Korrekturen. */
   stressFest?: number
+  /** Untergrenze aus den eigenen Korrekturen: mindestens so unangenehm. */
+  stressMin?: number
+  /** Obergrenze aus den eigenen Korrekturen: höchstens so unangenehm. */
+  stressMax?: number
   /** Explizit gesperrte Kante, auch vor dem automatischen Lückenschluss. */
   gesperrt?: boolean
   /** Bahnhofshalle, Perron, Ladenpassage, Lift: mit dem Velo tabu. */
@@ -713,6 +717,9 @@ console.log('Eigene Korrekturen')
     velostreifen?: boolean
     gesperrt?: boolean
     stress?: number
+    stressMin?: number
+    stressMax?: number
+    nurFahrbahn?: boolean
     netz?: keyof typeof NETZ
     fussgaenger?: boolean
     grund?: string
@@ -732,7 +739,13 @@ console.log('Eigene Korrekturen')
       if (r.veloweg) k.veloweg = true
       if (r.velostreifen) k.streifen = 'BOTH'
       if (r.gesperrt) k.gesperrt = k.velo = false
+      // Nur die Fahrbahn: Strassenstücke, die man sich mit dem Auto teilt.
+      // Die Trottoirs, Fusswege und abgetrennten Velowege, die unter demselben
+      // Strassennamen laufen, bleiben aussen vor.
+      if (r.nurFahrbahn && !(k.klasse >= KLASSE.wohnstrasse && k.klasse <= KLASSE.haupt)) continue
       if (r.stress !== undefined) k.stressFest = r.stress
+      if (r.stressMin !== undefined) k.stressMin = r.stressMin
+      if (r.stressMax !== undefined) k.stressMax = r.stressMax
       if (r.netz !== undefined) k.netz = NETZ[r.netz]
       if (r.fussgaenger !== undefined) k.fussgaenger = r.fussgaenger
       betroffen++
@@ -976,10 +989,13 @@ function stress(k: Kante, vorwaerts: boolean): number {
   // Dasselbe gilt für Velopiktogramme auf der Fahrbahn.
   const gefuehrt = k.velokarte > 0 || k.piktogramm || k.velostrasse
 
-  // Drei Spuren und mehr ohne eigenen Streifen: Hauptachsen mit Abbiegespuren,
-  // oft mit Autobahnzufahrt. Abbiegespuren an einer Tempo-30-Kreuzung sind
-  // dagegen harmlos, deshalb erst ab Tempo 50.
-  if (k.spuren >= 3 && i === INFRA.keine && k.tempo >= TEMPO.t50) s = 4
+  // Drei Spuren und mehr: Hauptachsen mit Abbiegespuren, oft mit
+  // Autobahnzufahrt. Abbiegespuren an einer Tempo-30-Kreuzung sind dagegen
+  // harmlos, deshalb erst ab Tempo 50. Ein Velostreifen hilft hier wenig:
+  // Am Bucheggplatz führt er als Strich zwischen den Fahrstreifen eines
+  // mehrspurigen Kreisels durch. Erst ein abgetrennter Weg nimmt der Stelle
+  // die Schärfe, deshalb zählt nur er als Schutz.
+  const vielspurig = k.spuren >= 3 && i !== INFRA.getrennt && k.tempo >= TEMPO.t50
   // Tramgleise in der Fahrbahn: das Vorderrad im Rillengleis ist ein häufiger
   // Sturzgrund. Mit eigenem Streifen fährt man neben den Rillen, nicht darin.
   // Auf Tempo 30 wiegt es weniger: Dort wählt man die Linie selbst und quert
@@ -1006,7 +1022,19 @@ function stress(k: Kante, vorwaerts: boolean): number {
     // auch wenn OSM dort Abbiegespuren meldet. Auf den grossen Hauptachsen
     // und bei Tramgleisen bleibt es bei höchstens Stufe 3.
     s = Math.min(s, !k.tram && k.klasse <= KLASSE.sammel ? 1 : 3)
-  }
+    // Drei Fahrstreifen bleiben drei Fahrstreifen, auch wenn die Velokarte
+    // eine Route darüberlegt. Die Fahrbahn des Bucheggplatz-Kreisels stand
+    // deswegen auf Stufe 1, als wäre sie eine ruhige Achse. Dass die Stadt
+    // dort eine Route führt, heisst immerhin, dass man durchkommt - deshalb
+    // Stufe 3 und nicht die höchste.
+    if (vielspurig) s = Math.max(s, 3)
+  } else if (vielspurig) s = Math.max(s, i === INFRA.streifen ? 3 : 4)
+  // Zuletzt die eigenen Ober- und Untergrenzen. Anders als `stress` (das die
+  // Stufe fest setzt) lassen sie die Bewertung stehen und schieben sie nur in
+  // den Bereich, den die Ortskenntnis vorgibt - so bleiben die Fusswege und
+  // Velowege, die unter demselben Strassennamen laufen, unberührt.
+  if (k.stressMin !== undefined) s = Math.max(s, k.stressMin)
+  if (k.stressMax !== undefined) s = Math.min(s, k.stressMax)
   return s
 }
 
