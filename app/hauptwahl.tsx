@@ -7,6 +7,10 @@ type Ui = { fg: string; muted: string; panel: string; border: string; aktiv: str
  * Der Umschalter oben in der Mitte: Vergleichskarte oder Velonavi, beides
  * gleich gross. Beide sind eigene Seiten, die Knöpfe deshalb Links.
  * `unten` nimmt kleinere Unterknöpfe auf (ÖV und Kultur auf der Karte).
+ *
+ * Nur Zürich hat einen Velonavi. In Basel und Bern bliebe von der Reihe ein
+ * einzelner Knopf «Vergleich» übrig, der auf die Seite zeigt, auf der man
+ * schon steht. Der fällt deshalb weg, und `unten` steht allein.
  */
 export function Hauptwahl({
   ui, aktiv, vergleichHref = '/', velonavi = true, unten,
@@ -21,6 +25,8 @@ export function Hauptwahl({
 }) {
   const knopf = 'flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors'
   const stil = (an: boolean) => (an ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted })
+  if (!velonavi)
+    return <div className="pointer-events-auto mx-auto flex w-full max-w-[26rem] flex-col items-center">{unten}</div>
   return (
     <div className="pointer-events-auto mx-auto flex w-full max-w-[26rem] flex-col items-center gap-1.5">
       <div

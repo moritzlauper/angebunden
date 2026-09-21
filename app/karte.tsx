@@ -1417,6 +1417,9 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
   }, [deckung, mobil, blatt])
 
   const ui = dunkel ? uiDunkel : uiHell
+  // Ohne Velonavi fällt die obere Knopfreihe weg, dann steht der
+  // Umschalter ÖV/Kultur allein da und bekommt deren Grösse.
+  const allein = stadt.schluessel !== 'zuerich'
 
   const schliesseBlatt = () => {
     setBlatt(null)
@@ -1493,7 +1496,9 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         </div>
 
         {/* Vergleich und Velonavi gleich gross. Darunter ÖV und Kultur, einzeln
-            oder beide zusammen an; einer bleibt immer an. */}
+            oder beide zusammen an; einer bleibt immer an. Wo es keinen Velonavi
+            gibt, fällt die obere Reihe weg und ÖV/Kultur rückt in deren Grösse
+            nach: Sonst hinge dort ein winziger Umschalter im Nichts. */}
         <Hauptwahl
           ui={ui}
           aktiv="vergleich"
@@ -1501,8 +1506,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           velonavi={stadt.schluessel === 'zuerich'}
           unten={
             <div
-              className="flex gap-0.5 rounded-full border p-0.5 backdrop-blur-md"
-              style={{ background: ui.panel, borderColor: ui.border }}
+              className={`flex rounded-full border backdrop-blur-md ${allein ? 'gap-1 p-1' : 'gap-0.5 p-0.5'}`}
+              style={{ background: ui.panel, borderColor: ui.border, boxShadow: allein ? ui.schatten : undefined }}
             >
               {(['oev', 'kultur'] as const).map((teil) => {
                 const an = modus === teil || modus === 'beide'
@@ -1518,7 +1523,9 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
                     key={teil}
                     onClick={umschalten}
                     aria-pressed={an}
-                    className="whitespace-nowrap rounded-full px-3 py-0.5 text-[11.5px] font-medium transition-colors"
+                    className={`whitespace-nowrap rounded-full font-medium transition-colors ${
+                      allein ? 'px-4 py-1.5 text-[13px]' : 'px-3 py-0.5 text-[11.5px]'
+                    }`}
                     style={an ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted }}
                   >
                     {MODI[teil].kurz}
