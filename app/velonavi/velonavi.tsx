@@ -32,14 +32,26 @@ const STADT = STAEDTE.zuerich
  * die ÖV-Karte lädt der Velonavi damit Bilder von einem fremden Server.
  */
 /**
+ * Wie viel früher die Stadtkarte ihre feine Stufe zeigen soll. Der WMS
+ * entscheidet am Massstab, also an Bildpunkten pro Meter, welche Stufe er
+ * zeichnet: grobe Übersicht oder die feine Karte mit grünen Anlagen,
+ * Gebäudegrundrissen und Hausnummern. Fordern wir mehr Bildpunkte an, als
+ * die Kachel am Ende breit ist, hält er die Ansicht für näher und zeichnet
+ * die feine Karte schon von weiter oben. Bezahlt wird das mit Schrift, die
+ * um denselben Faktor kleiner wird, und mit gut der doppelten Datenmenge je
+ * Kachel - deshalb anderthalb und nicht doppelt.
+ */
+const DETAIL = 1.5
+
+/**
  * Eine Kachel ist 512 Punkte gross. Auf Bildschirmen mit doppelter Pixeldichte
- * holt sie 1024 Pixel, sonst wäre das Bild sichtbar hochgezogen. `DPI=192`
- * sagt dem Server, dass er dafür auch Schrift und Linien doppelt so dick
- * zeichnen soll; ohne das wären die Strassennamen halb so gross.
+ * holt sie doppelt so viele Pixel, sonst wäre das Bild sichtbar hochgezogen.
+ * `DPI=192` sagt dem Server, dass er dafür auch Schrift und Linien doppelt so
+ * dick zeichnen soll; ohne das wären die Strassennamen halb so gross.
  */
 function wms(dienst: string, layer: string, transparent = false) {
   const dicht = typeof window !== 'undefined' && window.devicePixelRatio > 1.5
-  const px = dicht ? 1024 : 512
+  const px = Math.round(512 * (dicht ? 2 : 1) * DETAIL)
   return (
     `https://www.ogd.stadt-zuerich.ch/wms/geoportal/${dienst}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
     `&LAYERS=${layer}&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=${px}&HEIGHT=${px}` +
