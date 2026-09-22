@@ -514,7 +514,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
   const [bereit, setBereit] = useState(false)
   // Dunkelmodus vorerst ausgeblendet – die Grundkarte sieht dunkel noch nicht gut aus.
   const [dunkel] = useState(false)
-  const [zuriStadtkarte, setZuriStadtkarte] = useState(false)
+  const [zuriStadtkarte, setZuriStadtkarte] = useState(true)
   const [modus, setModus] = useState<Modus>('oev')
   const [nebenebene, setNebenebene] = useState(false)
   // Die Karte startet mit hervorgehobenen Top 1000 – ohne Farbe sieht man beim
@@ -671,6 +671,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
                   id: 'zuri-basiskarte',
                   type: 'raster' as const,
                   source: 'zuriBasiskarte',
+                  layout: { visibility: 'none' as const },
                   paint: { 'raster-fade-duration': 150, 'raster-saturation': 0.14, 'raster-contrast': 0.05 },
                 },
                 {
@@ -678,6 +679,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
                   type: 'raster' as const,
                   source: 'zuriGebaeude',
                   minzoom: 15,
+                  layout: { visibility: 'none' as const },
                   paint: {
                     'raster-fade-duration': 150,
                     'raster-saturation': 0.14,
@@ -730,10 +732,6 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       ]
       const [stadtGeo, wasser, strassen, marken, gebaeude, halte, kulturorte, topOev, topKultur, extreme] =
         await Promise.all(namen.map((n) => fetch(`${stadt.daten}/${n}.geojson`).then((r) => r.json())))
-      const gruen = stadt.schluessel === 'zuerich'
-        ? await fetch(`${stadt.daten}/gruen.geojson`).then((r) => r.json())
-        : null
-
       map.addSource('stadt', { type: 'geojson', data: stadtGeo })
       map.addSource('wasser', { type: 'geojson', data: wasser })
       map.addSource('strassen', { type: 'geojson', data: strassen })
@@ -746,7 +744,6 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       map.addSource('top-beide', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addSource('extreme', { type: 'geojson', data: extreme })
       map.addSource('gebaeude', { type: 'geojson', data: gebaeude, generateId: true })
-      if (gruen) map.addSource('gruen', { type: 'geojson', data: gruen })
 
       // Die Sortenwahl rechnet danach auf flachen Reihen weiter; das GeoJSON
       // selbst darf eingesammelt werden, MapLibre hält seine eigene Kopie.
@@ -827,15 +824,6 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         map.addLayer({ id: 'zuri-strassen-haupt', type: 'line', source: 'strassen', filter: ['==', ['get', 'k'], 'haupt'], layout: unsichtbar, paint: { 'line-color': '#c4c4be', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 2, 17, 7] } })
         map.addLayer({ id: 'zuri-gebaeude-grund', type: 'fill', source: 'gebaeude', layout: unsichtbar, paint: { 'fill-color': '#d1d1d1', 'fill-opacity': 0.86 } })
         map.addLayer({ id: 'zuri-gebaeude-grund-kante', type: 'line', source: 'gebaeude', layout: unsichtbar, paint: { 'line-color': '#b7b7b7', 'line-width': ['interpolate', ['linear'], ['zoom'], 14, 0, 17, 0.55] } })
-        if (gruen) {
-          map.addLayer({
-            id: 'zuri-gruen',
-            type: 'fill',
-            source: 'gruen',
-            layout: unsichtbar,
-            paint: { 'fill-color': '#e2efd4', 'fill-opacity': 0.82 },
-          })
-        }
       }
       map.addLayer({
         id: 'stadt-rand',
@@ -1060,7 +1048,6 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     const vectorIds = [
       'zuri-stadt-flaeche', 'zuri-wasser-flaeche', 'zuri-wasser-linie',
       'zuri-strassen-neben', 'zuri-strassen-haupt', 'zuri-gebaeude-grund', 'zuri-gebaeude-grund-kante',
-      'zuri-gruen',
     ]
     const aktualisiere = () => {
       const stadtkarte = zuriStadtkarte
@@ -2022,7 +2009,7 @@ function Panel({
         <div className="flex items-center justify-between border-t py-2.5" style={{ borderColor: ui.border }}>
           <span className="text-[11px]" style={{ color: ui.muted }}>Grundkarte</span>
           <div className="flex rounded-full border p-0.5 text-[11px]" style={{ borderColor: ui.border }}>
-            {([['raster', 'Eingefärbt'], ['stadt', 'Stadtkarte']] as const).map(([art, label]) => {
+            {([['stadt', 'Stadtkarte'], ['raster', 'Eingefärbt']] as const).map(([art, label]) => {
               const an = art === 'stadt' ? zuriStadtkarte : !zuriStadtkarte
               return (
                 <button
