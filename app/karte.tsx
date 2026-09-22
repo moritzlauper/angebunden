@@ -21,12 +21,13 @@ import { SITE_URL } from './site'
 /** Die Grundkarte bleibt schwarzweiss: dunkel = gut, hell = schlecht. */
 const RAMPE_HELL = ['#000000', '#242424', '#4d4d4d', '#7a7a7a', '#a5a5a5', '#c8c8c8']
 const RAMPE_DUNKEL = ['#ffffff', '#dcdcdc', '#b0b0b0', '#828282', '#565656', '#333333']
+const RAMPE_LEICHT = ['#b7b7b7', '#cecece', '#dadada', '#e4e4e4', '#eeeeee']
 
 /**
  * Farbe kommt nur bei der Hervorhebung ins Spiel: kräftiges Dunkelrot für die
  * vordersten Ränge, ausbleichend bis Hellrot am eingestellten Ende.
  */
-const RANG_RAMPE = ['#7f1d1d', '#b91c1c', '#dc2626', '#f87171', '#fecaca']
+const RANG_RAMPE = ['#7f2727', '#b33a3a', '#d94f4f', '#ee8585', '#f4b0b0']
 
 /**
  * Blau für Zeiger, Marken und Bedienelemente. Es liegt weder auf der
@@ -45,6 +46,17 @@ const TOP_PUNKTE = 10000
  * Punktteppich, wie schon immer bei den höheren Rängen.
  */
 const TOP_PUNKTE_ANZEIGE = 20
+
+/** Die helle Zürcher Basiskarte aus dem Velonavi. */
+function zuriWms(dienst: string, layer: string, transparent = false) {
+  const dicht = typeof window !== 'undefined' && window.devicePixelRatio > 1.5
+  const px = Math.round(512 * (dicht ? 2 : 1) * 1.5)
+  return (
+    `https://www.ogd.stadt-zuerich.ch/wms/geoportal/${dienst}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
+    `&LAYERS=${encodeURIComponent(layer)}&STYLES=&CRS=EPSG:3857&BBOX={bbox-epsg-3857}&WIDTH=${px}&HEIGHT=${px}` +
+    `&FORMAT=image/png${dicht ? '&DPI=192' : ''}${transparent ? '&TRANSPARENT=true' : ''}`
+  )
+}
 
 type Modus = 'oev' | 'kultur' | 'beide'
 const MODUS_LISTE = ['oev', 'kultur', 'beide'] as const
@@ -634,8 +646,47 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         version: 8,
         // Eigene Glyphen, siehe scripts/fetch-glyphs.mjs – die Karte lädt nichts von aussen.
         glyphs: '/fonts/{fontstack}/{range}.pbf',
-        sources: {},
-        layers: [{ id: 'grund', type: 'background', paint: { 'background-color': '#f7f7f5' } }],
+        sources:
+          stadt.schluessel === 'zuerich'
+            ? {
+                zuriBasiskarte: {
+                  type: 'raster',
+                  tiles: [zuriWms('Basiskarte_Zuerich_Raster', 'Basiskarte Zürich Raster')],
+                  tileSize: 512,
+                },
+                zuriGebaeude: {
+                  type: 'raster',
+                  tiles: [zuriWms('Gebaeude_verkippt', 'Gebäude verkippt', true)],
+                  tileSize: 512,
+                  minzoom: 15,
+                },
+              }
+            : {},
+        layers: [
+          { id: 'grund', type: 'background', paint: { 'background-color': '#f7f7f5' } },
+          ...(stadt.schluessel === 'zuerich'
+            ? [
+                {
+                  id: 'zuri-basiskarte',
+                  type: 'raster' as const,
+                  source: 'zuriBasiskarte',
+                  paint: { 'raster-fade-duration': 150, 'raster-saturation': 0.14, 'raster-contrast': 0.05 },
+                },
+                {
+                  id: 'zuri-gebaeude',
+                  type: 'raster' as const,
+                  source: 'zuriGebaeude',
+                  minzoom: 15,
+                  paint: {
+                    'raster-fade-duration': 150,
+                    'raster-saturation': 0.14,
+                    'raster-contrast': 0.05,
+                    'raster-opacity': ['interpolate', ['linear'], ['zoom'], 16.6, 1, 17.4, 0] as never,
+                  },
+                },
+              ]
+            : []),
+        ],
       },
       center: stadt.center,
       zoom: stadt.zoom,
@@ -660,7 +711,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         // Quellenzeile deckt sonst je nach Breite die Karteikarte zu.
         compact: true,
         customAttribution:
-          'Gebäude, Adressen, Kulturorte © OpenStreetMap-Mitwirkende · Fahrplan: opentransportdata.swiss · Höhen: AWS Terrain Tiles',
+          `${stadt.schluessel === 'zuerich' ? 'Basiskarte © Stadt Zürich · ' : ''}Gebäude, Adressen, Kulturorte © OpenStreetMap-Mitwirkende · Fahrplan: opentransportdata.swiss · Höhen: AWS Terrain Tiles`,
       }),
       'bottom-left'
     )
@@ -711,53 +762,57 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       )
       setDatenBereit(true)
 
-      map.addLayer({
-        id: 'stadt-flaeche',
-        type: 'fill',
-        source: 'stadt',
-        paint: { 'fill-color': '#ffffff', 'fill-opacity': 1 },
-      })
-      map.addLayer({
-        id: 'wasser-flaeche',
-        type: 'fill',
-        source: 'wasser',
-        filter: ['==', ['get', 'kind'], 'area'],
-        paint: { 'fill-color': '#dcdcd6' },
-      })
-      map.addLayer({
-        id: 'wasser-linie',
-        type: 'line',
-        source: 'wasser',
-        filter: ['==', ['get', 'kind'], 'line'],
-        paint: {
-          'line-color': '#dcdcd6',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 14],
-        },
-      })
+      if (stadt.schluessel !== 'zuerich') {
+        map.addLayer({
+          id: 'stadt-flaeche',
+          type: 'fill',
+          source: 'stadt',
+          paint: { 'fill-color': '#ffffff', 'fill-opacity': 1 },
+        })
+        map.addLayer({
+          id: 'wasser-flaeche',
+          type: 'fill',
+          source: 'wasser',
+          filter: ['==', ['get', 'kind'], 'area'],
+          paint: { 'fill-color': '#c7deeb' },
+        })
+        map.addLayer({
+          id: 'wasser-linie',
+          type: 'line',
+          source: 'wasser',
+          filter: ['==', ['get', 'kind'], 'line'],
+          paint: {
+            'line-color': '#c7deeb',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 14],
+          },
+        })
+      }
 
-      // Strassen bleiben bewusst abstrakt: zwei Strichstärken, kein Farbcode,
-      // keine Fahrbahnbreiten. Sie liegen unter den Gebäuden, damit die Daten
-      // im Vordergrund bleiben.
-      map.addLayer({
-        id: 'strassen-neben',
-        type: 'line',
-        source: 'strassen',
-        filter: ['==', ['get', 'k'], 'neben'],
-        paint: {
-          'line-color': '#e3e3de',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.3, 14, 0.8, 17, 3],
-        },
-      })
-      map.addLayer({
-        id: 'strassen-haupt',
-        type: 'line',
-        source: 'strassen',
-        filter: ['==', ['get', 'k'], 'haupt'],
-        paint: {
-          'line-color': '#d5d5ce',
-          'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 2, 17, 7],
-        },
-      })
+      if (stadt.schluessel !== 'zuerich') {
+        // Strassen bleiben bewusst abstrakt: zwei Strichstärken, kein Farbcode,
+        // keine Fahrbahnbreiten. Sie liegen unter den Gebäuden, damit die Daten
+        // im Vordergrund bleiben.
+        map.addLayer({
+          id: 'strassen-neben',
+          type: 'line',
+          source: 'strassen',
+          filter: ['==', ['get', 'k'], 'neben'],
+          paint: {
+            'line-color': '#e3e3de',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.3, 14, 0.8, 17, 3],
+          },
+        })
+        map.addLayer({
+          id: 'strassen-haupt',
+          type: 'line',
+          source: 'strassen',
+          filter: ['==', ['get', 'k'], 'haupt'],
+          paint: {
+            'line-color': '#d5d5ce',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 2, 17, 7],
+          },
+        })
+      }
       map.addLayer({
         id: 'stadt-rand',
         type: 'line',
@@ -765,11 +820,29 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         paint: { 'line-color': '#c9c9c4', 'line-width': 1 },
       })
 
+      if (stadt.schluessel !== 'zuerich') {
+        map.addLayer({
+          id: 'gebaeude-grund',
+          type: 'fill',
+          source: 'gebaeude',
+          paint: { 'fill-color': '#d1d1d1', 'fill-opacity': 0.86 },
+        })
+        map.addLayer({
+          id: 'gebaeude-grund-kante',
+          type: 'line',
+          source: 'gebaeude',
+          paint: {
+            'line-color': '#b7b7b7',
+            'line-width': ['interpolate', ['linear'], ['zoom'], 14, 0, 17, 0.55],
+          },
+        })
+      }
+
       map.addLayer({
         id: 'gebaeude',
         type: 'fill',
         source: 'gebaeude',
-        paint: { 'fill-color': farbAusdruck('oev', false, meta.buildings, null) as never },
+        paint: { 'fill-color': farbAusdruck('oev', false, meta.buildings, null, true) as never },
       })
       // Bei starkem Zoom eine Hauchlinie, damit einzelne Häuser ablesbar bleiben
       map.addLayer({
@@ -777,9 +850,17 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         type: 'line',
         source: 'gebaeude',
         paint: {
-          'line-color': farbAusdruck('oev', false, meta.buildings, null) as never,
+          'line-color': farbAusdruck('oev', false, meta.buildings, null, true) as never,
           'line-width': ['interpolate', ['linear'], ['zoom'], 14, 0, 17, 0.6],
         },
+      })
+      // Unsichtbare Klickfläche: Die sichtbare Gebäudeebene ist transparent,
+      // soll aber weiterhin Häuser für Hover und Auswahl liefern.
+      map.addLayer({
+        id: 'gebaeude-treffer',
+        type: 'fill',
+        source: 'gebaeude',
+        paint: { 'fill-color': '#ffffff', 'fill-opacity': 0.001 },
       })
 
       // Beim Ziehen des Reglers wird bewusst weder `setFilter` noch
@@ -976,7 +1057,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       }
 
       if (fixiert) return
-      const f = map.queryRenderedFeatures(e.point, { layers: ['gebaeude'] })[0]
+      const f = map.queryRenderedFeatures(e.point, { layers: ['gebaeude-treffer'] })[0]
       map.getCanvas().style.cursor = f ? 'crosshair' : ''
       if (!f) {
         setzeAktiv(null)
@@ -988,7 +1069,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     }
 
     const onClick = (e: MapMouseEvent) => {
-      const f = map.queryRenderedFeatures(e.point, { layers: ['gebaeude'] })[0]
+      const f = map.queryRenderedFeatures(e.point, { layers: ['gebaeude-treffer'] })[0]
       if (!f) {
         setFixiert(false)
         setzeAktiv(null)
@@ -1156,7 +1237,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
   useEffect(() => {
     const map = mapRef.current
     if (!map || !bereit) return
-    const ausdruck = farbAusdruck(modus, dunkel, meta.buildings, sicht)
+    const ausdruck = farbAusdruck(modus, dunkel, meta.buildings, sicht, true)
     map.setPaintProperty('gebaeude', 'fill-color', ausdruck as never)
     map.setPaintProperty('gebaeude-kante', 'line-color', ausdruck as never)
     // Die Farbe des aktiven Umrisses hängt davon ab, ob das Haus in der
@@ -1164,8 +1245,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
 
     map.setPaintProperty('grund', 'background-color', dunkel ? '#0b0b0c' : '#f7f7f5')
     map.setPaintProperty('stadt-flaeche', 'fill-color', dunkel ? '#141416' : '#ffffff')
-    map.setPaintProperty('wasser-flaeche', 'fill-color', dunkel ? '#08080a' : '#dcdcd6')
-    map.setPaintProperty('wasser-linie', 'line-color', dunkel ? '#08080a' : '#dcdcd6')
+    map.setPaintProperty('wasser-flaeche', 'fill-color', dunkel ? '#08080a' : '#c7deeb')
+    map.setPaintProperty('wasser-linie', 'line-color', dunkel ? '#08080a' : '#c7deeb')
     map.setPaintProperty('stadt-rand', 'line-color', dunkel ? '#2a2a2e' : '#c9c9c4')
     map.setPaintProperty('strassen-neben', 'line-color', dunkel ? '#232327' : '#e3e3de')
     map.setPaintProperty('strassen-haupt', 'line-color', dunkel ? '#303036' : '#d5d5ce')
@@ -1654,21 +1735,29 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
  * spreizt die Unterschiede über die ganze Stadt. Bei den Minuten liegen zwei
  * Drittel aller Häuser zwischen 26 und 34 – die Karte wäre fast einfarbig.
  */
-function farbAusdruck(modus: Modus, dunkel: boolean, gesamt: number, sicht: Sicht | null) {
-  const rampe = dunkel ? RAMPE_DUNKEL : RAMPE_HELL
-  if (modus === 'oev')
-    return [
-      'interpolate',
-      ['linear'],
-      ['/', ['get', 'r'], gesamt],
-      ...rampe.flatMap((c, i) => [i / (rampe.length - 1), c]),
-    ]
-  // Bei der Kultur hängt der Rang an der Sortenwahl und steht deshalb nicht in
-  // der Kachel. Gefärbt wird nach dem Indexwert, die Stufen kommen aber aus
-  // den Quantilen – das Bild bleibt dasselbe wie beim Färben nach Rang.
-  const liste = ranglisteFuer(modus, sicht)
-  if (!liste || !sicht || sicht.gewaehlt.length === 0) return rampe[rampe.length - 1]
-  return ['interpolate', ['linear'], liste.ausdruck, ...quantilStufen(liste.absteigend, rampe)]
+function farbAusdruck(
+  modus: Modus,
+  dunkel: boolean,
+  gesamt: number,
+  sicht: Sicht | null,
+  mitGraustufen: boolean
+) {
+  if (mitGraustufen) {
+    const rampe = dunkel ? RAMPE_DUNKEL : RAMPE_LEICHT
+    if (modus === 'oev')
+      return [
+        'interpolate',
+        ['linear'],
+        ['/', ['get', 'r'], gesamt],
+        ...rampe.flatMap((c, i) => [i / (rampe.length - 1), c]),
+      ]
+    const liste = ranglisteFuer(modus, sicht)
+    if (!liste || !sicht || sicht.gewaehlt.length === 0) return rampe[rampe.length - 1]
+    return ['interpolate', ['linear'], liste.ausdruck, ...quantilStufen(liste.absteigend, rampe)]
+  }
+  // Die Grundebene bleibt leer. Sichtbar werden nur die Häuser der roten
+  // Highlight-Ebene, damit die übrige Stadtkarte ruhig und lesbar bleibt.
+  return 'rgba(0,0,0,0)'
 }
 
 const uiHell = {
@@ -1844,7 +1933,7 @@ function Panel({
       <div className="mt-3">
         <div
           className="h-2.5 w-full rounded-sm"
-          style={{ background: `linear-gradient(to right, ${ui.rampe.join(',')})` }}
+          style={{ background: `linear-gradient(to right, ${RANG_RAMPE.join(',')})` }}
         />
         <div className="mt-1 flex justify-between text-[11px]" style={{ color: ui.muted }}>
           {skala.map((t, i) => (
