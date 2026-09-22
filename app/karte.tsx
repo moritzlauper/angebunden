@@ -1438,6 +1438,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
 
       if (!sichtbar) {
         map.setPaintProperty('top-flaeche', 'fill-color', 'rgba(0,0,0,0)' as never)
+        map.setPaintProperty('top-flaeche', 'fill-opacity', 0)
         // Ohne Hervorhebung liegt jedes Haus auf der Graustufen-Karte – blau.
         map.setPaintProperty('gebaeude-aktiv', 'line-color', AKZENT)
       } else {
@@ -1470,6 +1471,34 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         // über 47'000 Gebäude bei jedem Bildaufbau.
         map.setPaintProperty('top-flaeche', 'fill-color', [
           'case', innerhalb, farbeFlaeche, 'rgba(0,0,0,0)',
+        ] as never)
+
+        // Die besten 1'000 Ränge bleiben voll sichtbar. Danach läuft die
+        // Deckkraft langsam und nur bis zu einem leichten Schleier aus.
+        const fadeStart = Math.min(1000, meta.buildings)
+        const deckkraft = n <= fadeStart
+          ? 1
+          : kulturSicht
+          ? [
+              'interpolate',
+              ['linear'],
+              kulturSicht.ausdruck,
+              kulturSicht.schwelle(n),
+              0.2,
+              kulturSicht.schwelle(Math.min(fadeStart, n)),
+              1,
+            ]
+          : [
+              'interpolate',
+              ['linear'],
+              ['get', 'r'],
+              Math.min(fadeStart, n),
+              1,
+              n,
+              0.2,
+            ]
+        map.setPaintProperty('top-flaeche', 'fill-opacity', [
+          'case', innerhalb, deckkraft, 0,
         ] as never)
 
         // Der Umriss des gewählten Hauses ist über der roten Hervorhebung schwarz.
@@ -1526,7 +1555,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       )
         setStossAn((v) => v + 1)
     })
-  }, [topN, rangHighlight, modus, bereit, stossAn, sicht, dunkel])
+  }, [topN, rangHighlight, modus, bereit, stossAn, sicht, dunkel, meta.buildings])
 
   // Wird die Hervorhebung ausgeschaltet, muss der rote Belag sofort weg – ohne
   // auf den gedrosselten Effekt oben zu warten, der beim schnellen Umschalten
@@ -1721,8 +1750,6 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
               sicht={sicht}
               artenAn={artenAn}
               setArtenAn={setArtenAn}
-              zuriStadtkarte={zuriStadtkarte}
-              setZuriStadtkarte={setZuriStadtkarte}
             />
           ) : blatt === 'ort' && treffer ? (
             <Karteikarte
@@ -1767,8 +1794,6 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
               sicht={sicht}
               artenAn={artenAn}
               setArtenAn={setArtenAn}
-              zuriStadtkarte={zuriStadtkarte}
-              setZuriStadtkarte={setZuriStadtkarte}
             />
           </Tafel>
 
@@ -1936,7 +1961,6 @@ function TeilenSymbol() {
 function Panel({
   meta, stadt, ui, modus, nebenebene, setNebenebene, topN, setTopN, waehleXY,
   rangHighlight, setRangHighlight, wegModus, setWegModus, mobil, sicht, artenAn, setArtenAn,
-  zuriStadtkarte, setZuriStadtkarte,
 }: {
   meta: Meta
   stadt: Stadt
@@ -1955,8 +1979,6 @@ function Panel({
   sicht: Sicht | null
   artenAn: boolean[]
   setArtenAn: (a: boolean[]) => void
-  zuriStadtkarte: boolean
-  setZuriStadtkarte: (stadtkarte: boolean) => void
 }) {
   const [offen, setOffen] = useState(false)
   const kultur = modus === 'kultur'
@@ -2037,29 +2059,6 @@ function Panel({
         setAktiv={setRangHighlight}
         gesamt={meta.buildings}
       />
-
-      {stadt.schluessel === 'zuerich' && (
-        <div className="flex items-center justify-between border-t py-2.5" style={{ borderColor: ui.border }}>
-          <span className="text-[11px]" style={{ color: ui.muted }}>Grundkarte</span>
-          <div className="flex rounded-full border p-0.5 text-[11px]" style={{ borderColor: ui.border }}>
-            {([['stadt', 'Stadtkarte'], ['raster', 'Eingefärbt']] as const).map(([art, label]) => {
-              const an = art === 'stadt' ? zuriStadtkarte : !zuriStadtkarte
-              return (
-                <button
-                  key={art}
-                  type="button"
-                  onClick={() => setZuriStadtkarte(art === 'stadt')}
-                  aria-pressed={an}
-                  className="rounded-full px-2 py-1"
-                  style={an ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted }}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
 
       <div className="flex items-center gap-4 border-t py-2.5" style={{ borderColor: ui.border }}>
         <Schalter ui={ui} checked={nebenebene} onChange={setNebenebene} label={MODI[modus].schalter} />
