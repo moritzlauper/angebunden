@@ -1674,11 +1674,11 @@ function farbAusdruck(modus: Modus, dunkel: boolean, gesamt: number, sicht: Sich
 const uiHell = {
   bg: '#f7f7f5',
   fg: '#18181b',
-  panel: 'rgba(255,255,255,0.82)',
+  panel: '#ffffff',
   border: 'rgba(24,24,27,0.07)',
   muted: '#71717a',
   weich: 'rgba(24,24,27,0.045)',
-  aktiv: '#ffffff',
+  aktiv: '#e8e8e5',
   ring: 'rgba(37,99,235,0.35)',
   schatten:
     '0 1px 1px rgba(24,24,27,0.03), 0 10px 30px -12px rgba(24,24,27,0.22)',
@@ -1687,11 +1687,11 @@ const uiHell = {
 const uiDunkel = {
   bg: '#0b0b0c',
   fg: '#f4f4f5',
-  panel: 'rgba(24,24,27,0.82)',
+  panel: '#18181b',
   border: 'rgba(255,255,255,0.08)',
   muted: '#a1a1aa',
   weich: 'rgba(255,255,255,0.06)',
-  aktiv: 'rgba(255,255,255,0.14)',
+  aktiv: '#303036',
   ring: 'rgba(96,165,250,0.4)',
   schatten: '0 1px 1px rgba(0,0,0,0.3), 0 10px 30px -12px rgba(0,0,0,0.7)',
   rampe: RAMPE_DUNKEL,
