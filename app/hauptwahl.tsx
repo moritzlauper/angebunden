@@ -13,7 +13,7 @@ type Ui = { fg: string; muted: string; panel: string; border: string; aktiv: str
  * schon steht. Der fällt deshalb weg, und `unten` steht allein.
  */
 export function Hauptwahl({
-  ui, aktiv, vergleichHref = '/', velonavi = true, unten,
+  ui, aktiv, vergleichHref = '/', velonavi = true, velonaviOnClick, velonaviAktiv = false, unten,
 }: {
   ui: Ui
   aktiv: 'vergleich' | 'velonavi'
@@ -21,6 +21,9 @@ export function Hauptwahl({
   vergleichHref?: string
   /** Nur Zürich hat einen Velonavi. */
   velonavi?: boolean
+  /** Optionaler Grundkarten-Schalter innerhalb der Vergleichskarte. */
+  velonaviOnClick?: () => void
+  velonaviAktiv?: boolean
   unten?: ReactNode
 }) {
   const knopf = 'flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors'
@@ -43,12 +46,17 @@ export function Hauptwahl({
             Vergleich
           </Link>
         )}
-        {velonavi && (
+        {velonavi && (velonaviOnClick ? (
+          <button type="button" className={knopf} style={stil(velonaviAktiv)} onClick={velonaviOnClick} aria-pressed={velonaviAktiv}>
+            <VeloSymbol />
+            {velonaviAktiv ? 'Stadtkarte' : 'Velonavi'}
+          </button>
+        ) : (
           <Link href="/velonavi" className={knopf} style={stil(aktiv === 'velonavi')}>
             <VeloSymbol />
             Velonavi
           </Link>
-        )}
+        ))}
       </div>
       {unten}
     </div>

@@ -8,7 +8,7 @@ Ein Script von [GoatCounter](https://www.goatcounter.com) auf jeder Seite
 (`app/besucher-zaehler.tsx`) meldet jeden Aufruf. GoatCounter zählt cookielos: die
 Besucher-Kennung ist ein Hash aus IP, Browser und einem täglich wechselnden Salt,
 den GoatCounter nur im Arbeitsspeicher hält. GoatCounter speichert nichts
-Personenbezogenes, ein Consent-Banner braucht es nicht.
+Personenbezogenes, ein Consent-Banner![alt text](image.png) braucht es nicht.
 
 Die GitHub-Action `.github/workflows/besucher-zahlen.yml` läuft täglich um 04:17 UTC,
 holt über die GoatCounter-API die Zahlen der abgeschlossenen Tage und committet sie auf

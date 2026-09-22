@@ -21,7 +21,7 @@ import { SITE_URL } from './site'
 /** Die Grundkarte bleibt schwarzweiss: dunkel = gut, hell = schlecht. */
 const RAMPE_HELL = ['#000000', '#242424', '#4d4d4d', '#7a7a7a', '#a5a5a5', '#c8c8c8']
 const RAMPE_DUNKEL = ['#ffffff', '#dcdcdc', '#b0b0b0', '#828282', '#565656', '#333333']
-const RAMPE_LEICHT = ['#b7b7b7', '#cecece', '#dadada', '#e4e4e4', '#eeeeee']
+const RAMPE_LEICHT = ['#b0b0b0', '#cccccc', '#dadada', '#e6e6e6', '#eeeeee']
 
 /**
  * Farbe kommt nur bei der Hervorhebung ins Spiel: kräftiges Dunkelrot für die
@@ -514,6 +514,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
   const [bereit, setBereit] = useState(false)
   // Dunkelmodus vorerst ausgeblendet – die Grundkarte sieht dunkel noch nicht gut aus.
   const [dunkel] = useState(false)
+  const [zuriStadtkarte, setZuriStadtkarte] = useState(false)
   const [modus, setModus] = useState<Modus>('oev')
   const [nebenebene, setNebenebene] = useState(false)
   // Die Karte startet mit hervorgehobenen Top 1000 – ohne Farbe sieht man beim
@@ -729,6 +730,9 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       ]
       const [stadtGeo, wasser, strassen, marken, gebaeude, halte, kulturorte, topOev, topKultur, extreme] =
         await Promise.all(namen.map((n) => fetch(`${stadt.daten}/${n}.geojson`).then((r) => r.json())))
+      const gruen = stadt.schluessel === 'zuerich'
+        ? await fetch(`${stadt.daten}/gruen.geojson`).then((r) => r.json())
+        : null
 
       map.addSource('stadt', { type: 'geojson', data: stadtGeo })
       map.addSource('wasser', { type: 'geojson', data: wasser })
@@ -742,6 +746,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       map.addSource('top-beide', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addSource('extreme', { type: 'geojson', data: extreme })
       map.addSource('gebaeude', { type: 'geojson', data: gebaeude, generateId: true })
+      if (gruen) map.addSource('gruen', { type: 'geojson', data: gruen })
 
       // Die Sortenwahl rechnet danach auf flachen Reihen weiter; das GeoJSON
       // selbst darf eingesammelt werden, MapLibre hält seine eigene Kopie.
@@ -798,7 +803,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           source: 'strassen',
           filter: ['==', ['get', 'k'], 'neben'],
           paint: {
-            'line-color': '#e3e3de',
+            'line-color': '#d2d2cd',
             'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.3, 14, 0.8, 17, 3],
           },
         })
@@ -808,10 +813,29 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           source: 'strassen',
           filter: ['==', ['get', 'k'], 'haupt'],
           paint: {
-            'line-color': '#d5d5ce',
+            'line-color': '#c4c4be',
             'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 2, 17, 7],
           },
         })
+      }
+      if (stadt.schluessel === 'zuerich') {
+        const unsichtbar = { visibility: 'none' as const }
+        map.addLayer({ id: 'zuri-stadt-flaeche', type: 'fill', source: 'stadt', layout: unsichtbar, paint: { 'fill-color': '#ffffff' } })
+        map.addLayer({ id: 'zuri-wasser-flaeche', type: 'fill', source: 'wasser', filter: ['==', ['get', 'kind'], 'area'], layout: unsichtbar, paint: { 'fill-color': '#c7deeb' } })
+        map.addLayer({ id: 'zuri-wasser-linie', type: 'line', source: 'wasser', filter: ['==', ['get', 'kind'], 'line'], layout: unsichtbar, paint: { 'line-color': '#c7deeb', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 14] } })
+        map.addLayer({ id: 'zuri-strassen-neben', type: 'line', source: 'strassen', filter: ['==', ['get', 'k'], 'neben'], layout: unsichtbar, paint: { 'line-color': '#d2d2cd', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.3, 14, 0.8, 17, 3] } })
+        map.addLayer({ id: 'zuri-strassen-haupt', type: 'line', source: 'strassen', filter: ['==', ['get', 'k'], 'haupt'], layout: unsichtbar, paint: { 'line-color': '#c4c4be', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 2, 17, 7] } })
+        map.addLayer({ id: 'zuri-gebaeude-grund', type: 'fill', source: 'gebaeude', layout: unsichtbar, paint: { 'fill-color': '#d1d1d1', 'fill-opacity': 0.86 } })
+        map.addLayer({ id: 'zuri-gebaeude-grund-kante', type: 'line', source: 'gebaeude', layout: unsichtbar, paint: { 'line-color': '#b7b7b7', 'line-width': ['interpolate', ['linear'], ['zoom'], 14, 0, 17, 0.55] } })
+        if (gruen) {
+          map.addLayer({
+            id: 'zuri-gruen',
+            type: 'fill',
+            source: 'gruen',
+            layout: unsichtbar,
+            paint: { 'fill-color': '#e2efd4', 'fill-opacity': 0.82 },
+          })
+        }
       }
       map.addLayer({
         id: 'stadt-rand',
@@ -944,23 +968,24 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         id: 'strassennamen',
         type: 'symbol',
         source: 'strassen',
-        minzoom: 15,
+        minzoom: stadt.schluessel === 'zuerich' ? 11 : 15,
         filter: ['has', 'name'],
         layout: {
-          'symbol-placement': 'line',
+          'symbol-placement': 'line-center',
           'text-field': ['get', 'name'],
           'text-font': ['Noto Sans Regular'],
-          'text-size': ['interpolate', ['linear'], ['zoom'], 15, 9, 18, 12],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 11, 8, 18, 12],
           'text-max-angle': 30,
           'text-padding': 4,
+          'text-allow-overlap': false,
         },
-        paint: { 'text-color': '#6a6a66', 'text-halo-color': '#ffffff', 'text-halo-width': 1.4 },
+        paint: { 'text-color': '#6a6a66', 'text-halo-color': '#ffffff', 'text-halo-width': 2.2 },
       })
       map.addLayer({
         id: 'marke-platz',
         type: 'symbol',
         source: 'marken',
-        minzoom: 14,
+        minzoom: stadt.schluessel === 'zuerich' ? 12 : 14,
         filter: ['==', ['get', 'art'], 'platz'],
         layout: {
           'text-field': ['get', 'name'],
@@ -1027,6 +1052,29 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       mapRef.current = null
     }
   }, [meta.buildings])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !bereit || stadt.schluessel !== 'zuerich') return
+    const rasterIds = ['zuri-basiskarte', 'zuri-gebaeude']
+    const vectorIds = [
+      'zuri-stadt-flaeche', 'zuri-wasser-flaeche', 'zuri-wasser-linie',
+      'zuri-strassen-neben', 'zuri-strassen-haupt', 'zuri-gebaeude-grund', 'zuri-gebaeude-grund-kante',
+      'zuri-gruen',
+    ]
+    const aktualisiere = () => {
+      const stadtkarte = zuriStadtkarte
+      for (const id of rasterIds) map.setLayoutProperty(id, 'visibility', stadtkarte ? 'none' : 'visible')
+      for (const id of vectorIds) map.setLayoutProperty(id, 'visibility', stadtkarte ? 'visible' : 'none')
+      for (const id of ['strassennamen', 'marke-platz', 'marke-bahnhof', 'marke-stadtteil'])
+        map.setLayoutProperty(id, 'visibility', stadtkarte ? 'visible' : 'none')
+    }
+    aktualisiere()
+    map.on('zoom', aktualisiere)
+    return () => {
+      map.off('zoom', aktualisiere)
+    }
+  }, [bereit, stadt.schluessel, zuriStadtkarte])
 
   // --- Hover und Klick
   useEffect(() => {
@@ -1248,8 +1296,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     map.setPaintProperty('wasser-flaeche', 'fill-color', dunkel ? '#08080a' : '#c7deeb')
     map.setPaintProperty('wasser-linie', 'line-color', dunkel ? '#08080a' : '#c7deeb')
     map.setPaintProperty('stadt-rand', 'line-color', dunkel ? '#2a2a2e' : '#c9c9c4')
-    map.setPaintProperty('strassen-neben', 'line-color', dunkel ? '#232327' : '#e3e3de')
-    map.setPaintProperty('strassen-haupt', 'line-color', dunkel ? '#303036' : '#d5d5ce')
+    map.setPaintProperty('strassen-neben', 'line-color', dunkel ? '#232327' : '#d2d2cd')
+    map.setPaintProperty('strassen-haupt', 'line-color', dunkel ? '#303036' : '#c4c4be')
 
     const kontur = dunkel ? '#0e0e10' : '#ffffff'
     for (const ebene of ['strassennamen', 'marke-platz', 'marke-bahnhof']) {
@@ -1586,33 +1634,35 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           vergleichHref={stadt.pfad}
           velonavi={stadt.schluessel === 'zuerich'}
           unten={
-            <div
-              className={`flex rounded-full border backdrop-blur-md ${allein ? 'gap-1 p-1' : 'gap-0.5 p-0.5'}`}
-              style={{ background: ui.panel, borderColor: ui.border, boxShadow: allein ? ui.schatten : undefined }}
-            >
-              {(['oev', 'kultur'] as const).map((teil) => {
-                const an = modus === teil || modus === 'beide'
-                const umschalten = () => {
-                  const oev = teil === 'oev' ? !an : modus !== 'kultur'
-                  const kultur = teil === 'kultur' ? !an : modus !== 'oev'
-                  if (oev && kultur) setModus('beide')
-                  else if (oev) setModus('oev')
-                  else if (kultur) setModus('kultur')
-                }
-                return (
-                  <button
-                    key={teil}
-                    onClick={umschalten}
-                    aria-pressed={an}
-                    className={`whitespace-nowrap rounded-full font-medium transition-colors ${
-                      allein ? 'px-4 py-1.5 text-[13px]' : 'px-3 py-0.5 text-[11.5px]'
-                    }`}
-                    style={an ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted }}
-                  >
-                    {MODI[teil].kurz}
-                  </button>
-                )
-              })}
+            <div className="flex items-center gap-1.5">
+              <div
+                className={`flex rounded-full border backdrop-blur-md ${allein ? 'gap-1 p-1' : 'gap-0.5 p-0.5'}`}
+                style={{ background: ui.panel, borderColor: ui.border, boxShadow: allein ? ui.schatten : undefined }}
+              >
+                {(['oev', 'kultur'] as const).map((teil) => {
+                  const an = modus === teil || modus === 'beide'
+                  const umschalten = () => {
+                    const oev = teil === 'oev' ? !an : modus !== 'kultur'
+                    const kultur = teil === 'kultur' ? !an : modus !== 'oev'
+                    if (oev && kultur) setModus('beide')
+                    else if (oev) setModus('oev')
+                    else if (kultur) setModus('kultur')
+                  }
+                  return (
+                    <button
+                      key={teil}
+                      onClick={umschalten}
+                      aria-pressed={an}
+                      className={`whitespace-nowrap rounded-full font-medium transition-colors ${
+                        allein ? 'px-4 py-1.5 text-[13px]' : 'px-3 py-0.5 text-[11.5px]'
+                      }`}
+                      style={an ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted }}
+                    >
+                      {MODI[teil].kurz}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           }
         />
@@ -1651,6 +1701,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
               sicht={sicht}
               artenAn={artenAn}
               setArtenAn={setArtenAn}
+              zuriStadtkarte={zuriStadtkarte}
+              setZuriStadtkarte={setZuriStadtkarte}
             />
           ) : blatt === 'ort' && treffer ? (
             <Karteikarte
@@ -1695,6 +1747,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
               sicht={sicht}
               artenAn={artenAn}
               setArtenAn={setArtenAn}
+              zuriStadtkarte={zuriStadtkarte}
+              setZuriStadtkarte={setZuriStadtkarte}
             />
           </Tafel>
 
@@ -1862,6 +1916,7 @@ function TeilenSymbol() {
 function Panel({
   meta, stadt, ui, modus, nebenebene, setNebenebene, topN, setTopN, waehleXY,
   rangHighlight, setRangHighlight, wegModus, setWegModus, mobil, sicht, artenAn, setArtenAn,
+  zuriStadtkarte, setZuriStadtkarte,
 }: {
   meta: Meta
   stadt: Stadt
@@ -1880,6 +1935,8 @@ function Panel({
   sicht: Sicht | null
   artenAn: boolean[]
   setArtenAn: (a: boolean[]) => void
+  zuriStadtkarte: boolean
+  setZuriStadtkarte: (stadtkarte: boolean) => void
 }) {
   const [offen, setOffen] = useState(false)
   const kultur = modus === 'kultur'
@@ -1960,6 +2017,29 @@ function Panel({
         setAktiv={setRangHighlight}
         gesamt={meta.buildings}
       />
+
+      {stadt.schluessel === 'zuerich' && (
+        <div className="flex items-center justify-between border-t py-2.5" style={{ borderColor: ui.border }}>
+          <span className="text-[11px]" style={{ color: ui.muted }}>Grundkarte</span>
+          <div className="flex rounded-full border p-0.5 text-[11px]" style={{ borderColor: ui.border }}>
+            {([['raster', 'Eingefärbt'], ['stadt', 'Stadtkarte']] as const).map(([art, label]) => {
+              const an = art === 'stadt' ? zuriStadtkarte : !zuriStadtkarte
+              return (
+                <button
+                  key={art}
+                  type="button"
+                  onClick={() => setZuriStadtkarte(art === 'stadt')}
+                  aria-pressed={an}
+                  className="rounded-full px-2 py-1"
+                  style={an ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center gap-4 border-t py-2.5" style={{ borderColor: ui.border }}>
         <Schalter ui={ui} checked={nebenebene} onChange={setNebenebene} label={MODI[modus].schalter} />
