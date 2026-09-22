@@ -21,7 +21,7 @@ import { SITE_URL } from './site'
 /** Die Grundkarte bleibt schwarzweiss: dunkel = gut, hell = schlecht. */
 const RAMPE_HELL = ['#000000', '#242424', '#4d4d4d', '#7a7a7a', '#a5a5a5', '#c8c8c8']
 const RAMPE_DUNKEL = ['#ffffff', '#dcdcdc', '#b0b0b0', '#828282', '#565656', '#333333']
-const RAMPE_LEICHT = ['#b0b0b0', '#cccccc', '#dadada', '#e6e6e6', '#eeeeee']
+const RAMPE_LEICHT = ['#777777', '#d5d5d5', '#dddddd', '#e0e0e0', '#e2e2e2']
 
 /**
  * Farbe kommt nur bei der Hervorhebung ins Spiel: kräftiges Dunkelrot für die
