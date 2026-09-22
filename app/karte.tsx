@@ -732,6 +732,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       ]
       const [stadtGeo, wasser, strassen, marken, gebaeude, halte, kulturorte, topOev, topKultur, extreme] =
         await Promise.all(namen.map((n) => fetch(`${stadt.daten}/${n}.geojson`).then((r) => r.json())))
+      const gleise = await fetch(`${stadt.daten}/gleise.geojson`).then((r) => r.json())
+      const gruen = await fetch(`${stadt.daten}/gruen.geojson`).then((r) => r.json())
       map.addSource('stadt', { type: 'geojson', data: stadtGeo })
       map.addSource('wasser', { type: 'geojson', data: wasser })
       map.addSource('strassen', { type: 'geojson', data: strassen })
@@ -744,6 +746,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       map.addSource('top-beide', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addSource('extreme', { type: 'geojson', data: extreme })
       map.addSource('gebaeude', { type: 'geojson', data: gebaeude, generateId: true })
+      map.addSource('gleise', { type: 'geojson', data: gleise })
+      map.addSource('gruen', { type: 'geojson', data: gruen })
 
       // Die Sortenwahl rechnet danach auf flachen Reihen weiter; das GeoJSON
       // selbst darf eingesammelt werden, MapLibre hält seine eigene Kopie.
@@ -826,10 +830,38 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         map.addLayer({ id: 'zuri-gebaeude-grund-kante', type: 'line', source: 'gebaeude', layout: unsichtbar, paint: { 'line-color': '#b7b7b7', 'line-width': ['interpolate', ['linear'], ['zoom'], 14, 0, 17, 0.55] } })
       }
       map.addLayer({
+        id: 'gruen',
+        type: 'fill',
+        source: 'gruen',
+        paint: { 'fill-color': '#dceccf', 'fill-opacity': 0.9 },
+      })
+      map.addLayer({
         id: 'stadt-rand',
         type: 'line',
         source: 'stadt',
         paint: { 'line-color': '#c9c9c4', 'line-width': 1 },
+      })
+      map.addLayer({
+        id: 'gleise-huelle',
+        type: 'line',
+        source: 'gleise',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.7, 14, 1.8, 18, 3],
+          'line-opacity': 0.65,
+        },
+      })
+      map.addLayer({
+        id: 'gleise',
+        type: 'line',
+        source: 'gleise',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+            'line-color': '#d0d0d0',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.3, 14, 0.8, 18, 1.4],
+          'line-opacity': 0.55,
+        },
       })
 
       if (stadt.schluessel !== 'zuerich') {
@@ -1048,6 +1080,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     const vectorIds = [
       'zuri-stadt-flaeche', 'zuri-wasser-flaeche', 'zuri-wasser-linie',
       'zuri-strassen-neben', 'zuri-strassen-haupt', 'zuri-gebaeude-grund', 'zuri-gebaeude-grund-kante',
+      'gruen',
     ]
     const aktualisiere = () => {
       const stadtkarte = zuriStadtkarte
