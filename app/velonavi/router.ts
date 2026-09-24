@@ -543,61 +543,80 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
 
 export type Einrastung = { kante: number; t: number; lon: number; lat: number; d: number }
 
+/** Wie viel weiter als die nächste eine Kante liegen darf, um mitzuspielen. */
+const SPANNE = 30
+/** Mehr Kandidaten bringen nichts und kosten Suchzeit. */
+const HOECHSTENS = 6
+
 /**
- * Nächster Punkt auf einer befahrbaren (oder, wenn erlaubt, schiebbaren)
- * Kante. `t` ist der Längenanteil ab `von`.
+ * Alle Kanten, auf die ein Punkt vernünftigerweise passt, die nächste zuerst.
+ * `t` ist je Kante der Längenanteil ab `von`.
  *
  * `strasse` ist der Strassenname der Adresse. Er entscheidet bei Eckhäusern:
  * Die Werdstrasse 21 liegt 20 m vom Stauffacherquai und 25 m von der
- * Werdstrasse entfernt, gemeint ist aber die Werdstrasse. Ohne diesen Hinweis
- * führt die Route einmal um den Block.
+ * Werdstrasse entfernt, gemeint ist aber die Werdstrasse.
+ *
+ * Eine Adresse liegt oft zwischen mehreren Linien: Fahrbahn, Veloweg,
+ * Trottoir, Gegenfahrbahn. Welche davon die richtige ist, zeigt sich erst an
+ * der Route. Der Bahnhofquai etwa ist eine Einbahn; wer auf ihrer Mitte
+ * einrastet, muss vom anderen Ende her anfahren und fährt einmal um den
+ * Block, obwohl der Veloweg zwanzig Meter daneben in beide Richtungen offen
+ * ist. Deshalb bekommt die Suche alle Kandidaten und wählt selbst.
  */
-export function einrasten(g: Graph, lon: number, lat: number, schieben: boolean, strasse?: string): Einrastung | null {
+export function einrastenAlle(
+  g: Graph,
+  lon: number,
+  lat: number,
+  schieben: boolean,
+  strasse?: string
+): Einrastung[] {
   const x = (lon - 8.54) * g.MX
   const y = (lat - g.LAT0) * g.MY
   const cx = Math.floor(x / g.ZELLE)
   const cy = Math.floor(y / g.ZELLE)
-  let beste = null as Einrastung | null
-  let passend = null as Einrastung | null
   const gesucht = strasse?.toLowerCase()
+  // Je Kante nur der nächste Fusspunkt.
+  const proKante = new Map<number, Einrastung & { rang: number }>()
+  let naechste = Infinity
   for (let r = 0; r <= 8; r++) {
     for (let dx = -r; dx <= r; dx++)
       for (let dy = -r; dy <= r; dy++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue
         for (const i of g.raster.get((cx + dx + 1000) * 4000 + cy + dy + 1000) ?? []) {
           const e = g.punktKante[i]
-          const nutzbar =
-            veloErlaubt(g, 2 * e) || veloErlaubt(g, 2 * e + 1) ||
-            (schieben && (schiebenErlaubt(g, 2 * e) || schiebenErlaubt(g, 2 * e + 1)))
-          if (!nutzbar) continue
+          const fahrbar = veloErlaubt(g, 2 * e) || veloErlaubt(g, 2 * e + 1)
+          if (!fahrbar && !(schieben && (schiebenErlaubt(g, 2 * e) || schiebenErlaubt(g, 2 * e + 1)))) continue
           const ax = g.px(i), ay = g.py(i), bx = g.px(i + 1), by = g.py(i + 1)
           const ddx = bx - ax, ddy = by - ay
           const l2 = ddx * ddx + ddy * ddy
-          const s = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * ddx + (y - ay) * ddy) / l2)) : 0
-          const qx = ax + s * ddx, qy = ay + s * ddy
-          // Velokanten leicht bevorzugt: wer neben einer Strasse klickt, meint
-          // selten den Fussweg dahinter.
-          const d = Math.hypot(qx - x, qy - y) + (veloErlaubt(g, 2 * e) || veloErlaubt(g, 2 * e + 1) ? 0 : 15)
-          const gleicheStrasse =
-            gesucht !== undefined && (g.meta.namen[g.kanteName[e]] ?? '').toLowerCase() === gesucht
-          if ((!beste || d < beste.d) || (gleicheStrasse && (!passend || d < passend.d))) {
-            // Anteil der Kantenlänge bis zum Fusspunkt.
-            let bis = 0
-            for (let j = g.kantePunkte[e]; j < i; j++) bis += Math.hypot(g.px(j + 1) - g.px(j), g.py(j + 1) - g.py(j))
-            bis += Math.sqrt(l2) * s
-            const treffer = { kante: e, t: Math.min(1, bis / Math.max(g.laenge[e], 1e-6)), lon: qx / g.MX + 8.54, lat: qy / g.MY + g.LAT0, d }
-            if (!beste || d < beste.d) beste = treffer
-            if (gleicheStrasse && (!passend || d < passend.d)) passend = treffer
-          }
+          const t = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * ddx + (y - ay) * ddy) / l2)) : 0
+          const qx = ax + t * ddx, qy = ay + t * ddy
+          const d = Math.hypot(qx - x, qy - y) + (fahrbar ? 0 : 15)
+          const vorhanden = proKante.get(e)
+          if (vorhanden && vorhanden.d <= d) continue
+          let bis = 0
+          for (let j = g.kantePunkte[e]; j < i; j++) bis += Math.hypot(g.px(j + 1) - g.px(j), g.py(j + 1) - g.py(j))
+          bis += Math.sqrt(l2) * t
+          // Der Strassenname der Adresse zieht eine Kante nach vorn, ohne sie
+          // zur einzigen zu machen - dieselbe Regel wie bei `einrasten`.
+          const gleich = gesucht !== undefined && (g.meta.namen[g.kanteName[e]] ?? '').toLowerCase() === gesucht
+          proKante.set(e, {
+            kante: e,
+            t: Math.min(1, bis / Math.max(g.laenge[e], 1e-6)),
+            lon: qx / g.MX + 8.54,
+            lat: qy / g.MY + g.LAT0,
+            d,
+            rang: gleich ? d - 60 : d,
+          })
+          if (d < naechste) naechste = d
         }
       }
-    // Der Ring r deckt garantiert alles bis (r·ZELLE) ab.
-    if (beste && beste.d <= r * g.ZELLE) break
+    if (Number.isFinite(naechste) && naechste + SPANNE <= r * g.ZELLE) break
   }
-  // Die Kante mit dem Strassennamen der Adresse gewinnt, solange sie nicht
-  // unverhältnismässig weiter weg liegt.
-  if (passend && (!beste || passend.d < beste.d + 60)) return passend
-  return beste
+  const alle = [...proKante.values()].sort((a, b) => a.rang - b.rang)
+  if (!alle.length) return []
+  const grenze = alle[0].rang + SPANNE
+  return alle.filter((k) => k.rang <= grenze).slice(0, HOECHSTENS).map(({ rang, ...k }) => k)
 }
 
 // ------------------------------------------------------------ Suche
@@ -680,10 +699,22 @@ export type Route = {
 }
 
 /**
- * Route von `start` nach `ziel`. Liefert null, wenn es keine Verbindung gibt
- * (zum Beispiel, wenn Schieben aus ist und das Ziel nur zu Fuss erreichbar).
+ * Route von `start` nach `ziel`. Beide dürfen mehrere Kandidaten sein - dann
+ * sucht die Rechnung sich den günstigsten selbst aus, statt sich auf die
+ * nächstgelegene Linie festzunageln. Liefert null, wenn es keine Verbindung
+ * gibt (zum Beispiel, wenn Schieben aus ist und das Ziel nur zu Fuss
+ * erreichbar).
  */
-export function route(g: Graph, p: Profil, start: Einrastung, ziel: Einrastung, k?: Kosten): Route | null {
+export function route(
+  g: Graph,
+  p: Profil,
+  start: Einrastung | Einrastung[],
+  ziel: Einrastung | Einrastung[],
+  k?: Kosten
+): Route | null {
+  const starts = Array.isArray(start) ? start : [start]
+  const ziele = Array.isArray(ziel) ? ziel : [ziel]
+  if (!starts.length || !ziele.length) return null
   const { kosten } = k ?? kantenKosten(g, p)
   const A = 2 * g.E
   const best = new Float64Array(A).fill(Infinity)
@@ -691,34 +722,56 @@ export function route(g: Graph, p: Profil, start: Einrastung, ziel: Einrastung, 
   const eintritt = new Float32Array(A).fill(NaN)
   const erledigt = new Uint8Array(A)
   const heap = new Heap()
-  const zx = (ziel.lon - 8.54) * g.MX
-  const zy = (ziel.lat - g.LAT0) * g.MY
+  // Gepeilt wird auf den nächsten Zielkandidaten. Damit die Schätzung auch
+  // für die übrigen eine Untergrenze bleibt, kommt ihr grösster Abstand
+  // wieder weg.
+  const zx = (ziele[0].lon - 8.54) * g.MX
+  const zy = (ziele[0].lat - g.LAT0) * g.MY
+  let streuung = 0
+  for (const zk of ziele)
+    streuung = Math.max(streuung, Math.hypot((zk.lon - ziele[0].lon) * g.MX, (zk.lat - ziele[0].lat) * g.MY))
   const hK = (n: number) =>
-    (Math.hypot((g.knotenKoord[2 * n] / 1e6 - 8.54) * g.MX - zx, (g.knotenKoord[2 * n + 1] / 1e6 - g.LAT0) * g.MY - zy) / VMAX) *
+    (Math.max(
+      0,
+      Math.hypot(
+        (g.knotenKoord[2 * n] / 1e6 - 8.54) * g.MX - zx,
+        (g.knotenKoord[2 * n + 1] / 1e6 - g.LAT0) * g.MY - zy
+      ) - streuung
+    ) /
+      VMAX) *
     MIN_FAKTOR
 
-  const se = start.kante
-  const ze = ziel.kante
-  const saat = (a: number, c: number) => {
+  // Von welchem Startkandidaten eine gesäte Kante stammt.
+  const startIndex = new Map<number, number>()
+  const saat = (a: number, c: number, si: number) => {
     if (!Number.isFinite(c) || c >= best[a]) return
     best[a] = c
     vorher[a] = -1
+    startIndex.set(a, si)
     heap.push(c + hK(g.kopf(a)), a)
   }
-  saat(2 * se, (1 - start.t) * kosten[2 * se])
-  saat(2 * se + 1, start.t * kosten[2 * se + 1])
+  starts.forEach((sk, si) => {
+    saat(2 * sk.kante, (1 - sk.t) * kosten[2 * sk.kante], si)
+    saat(2 * sk.kante + 1, sk.t * kosten[2 * sk.kante + 1], si)
+  })
 
   // Start und Ziel auf derselben Kante: direkt, falls die Richtung erlaubt ist.
   let bestesZiel = Infinity
   let zielVon = -1 // gerichtete Kante, über die das Ziel erreicht wird
-  let zielDirekt = false
-  if (se === ze) {
-    const c = ziel.t >= start.t ? (ziel.t - start.t) * kosten[2 * se] : (start.t - ziel.t) * kosten[2 * se + 1]
-    if (Number.isFinite(c)) {
-      bestesZiel = c
-      zielDirekt = true
+  let zielDirekt = -1 // Index des Startkandidaten bei direkter Fahrt
+  let zielK = ziele[0]
+  let startK = starts[0]
+  for (const sk of starts)
+    for (const zk of ziele) {
+      if (sk.kante !== zk.kante) continue
+      const c = zk.t >= sk.t ? (zk.t - sk.t) * kosten[2 * sk.kante] : (sk.t - zk.t) * kosten[2 * sk.kante + 1]
+      if (Number.isFinite(c) && c < bestesZiel) {
+        bestesZiel = c
+        zielDirekt = 1
+        zielK = zk
+        startK = sk
+      }
     }
-  }
 
   const ue: Uebergang = { kosten: 0, zeit: 0, ampel: -1, manoever: null, eintritt: NaN }
   while (heap.n > 0) {
@@ -731,14 +784,16 @@ export function route(g: Graph, p: Profil, start: Einrastung, ziel: Einrastung, 
     const ea = a >> 1
 
     // Ziel erreicht: von hier noch das Stück auf der Zielkante.
-    if (ea !== ze) {
+    for (const zk of ziele) {
+      const ze = zk.kante
+      if (ea === ze) continue
       if (v === g.kanteVon[ze]) {
-        const c = ga + ziel.t * kosten[2 * ze]
-        if (c < bestesZiel) (bestesZiel = c), (zielVon = a), (zielDirekt = false)
+        const c = ga + zk.t * kosten[2 * ze]
+        if (c < bestesZiel) (bestesZiel = c), (zielVon = a), (zielDirekt = -1), (zielK = zk)
       }
       if (v === g.kanteNach[ze]) {
-        const c = ga + (1 - ziel.t) * kosten[2 * ze + 1]
-        if (c < bestesZiel) (bestesZiel = c), (zielVon = a), (zielDirekt = false)
+        const c = ga + (1 - zk.t) * kosten[2 * ze + 1]
+        if (c < bestesZiel) (bestesZiel = c), (zielVon = a), (zielDirekt = -1), (zielK = zk)
       }
     }
 
@@ -765,21 +820,23 @@ export function route(g: Graph, p: Profil, start: Einrastung, ziel: Einrastung, 
 
   // Kette zurückverfolgen.
   const stuecke: Stueck[] = []
-  if (zielDirekt) {
-    if (ziel.t >= start.t) stuecke.push({ a: 2 * se, von: start.t, bis: ziel.t, ampel: -1, manoever: null })
-    else stuecke.push({ a: 2 * se + 1, von: 1 - start.t, bis: 1 - ziel.t, ampel: -1, manoever: null })
+  if (zielDirekt >= 0) {
+    const se = startK.kante
+    if (zielK.t >= startK.t) stuecke.push({ a: 2 * se, von: startK.t, bis: zielK.t, ampel: -1, manoever: null })
+    else stuecke.push({ a: 2 * se + 1, von: 1 - startK.t, bis: 1 - zielK.t, ampel: -1, manoever: null })
   } else {
     const kette: number[] = []
     for (let a = zielVon; a >= 0; a = vorher[a]) kette.push(a)
     kette.reverse()
+    const sk = starts[startIndex.get(kette[0]) ?? 0]
     kette.forEach((a, i) => {
-      const e = a >> 1
-      const vonAnteil = i === 0 ? (a & 1 ? 1 - start.t : start.t) : 0
+      const vonAnteil = i === 0 ? (a & 1 ? 1 - sk.t : sk.t) : 0
       stuecke.push({ a, von: vonAnteil, bis: 1, ampel: -1, manoever: null })
     })
+    const ze = zielK.kante
     const letzte = kette[kette.length - 1]
     const zv = g.kopf(letzte) === g.kanteVon[ze]
-    stuecke.push({ a: zv ? 2 * ze : 2 * ze + 1, von: 0, bis: zv ? ziel.t : 1 - ziel.t, ampel: -1, manoever: null })
+    stuecke.push({ a: zv ? 2 * ze : 2 * ze + 1, von: 0, bis: zv ? zielK.t : 1 - zielK.t, ampel: -1, manoever: null })
   }
   return auswerten(g, p, stuecke, bestesZiel)
 }

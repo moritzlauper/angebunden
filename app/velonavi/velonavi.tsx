@@ -18,7 +18,7 @@ import { Wortmarke } from '../marke'
 import { STAEDTE } from '../staedte'
 import { nf } from '../site'
 import {
-  ladeGraph, einrasten, route, kantenKosten, alsGpx, verbinde, VOREINSTELLUNGEN, reinZeitlich,
+  ladeGraph, einrastenAlle, route, kantenKosten, alsGpx, verbinde, VOREINSTELLUNGEN, reinZeitlich,
   veloErlaubt, stressVon, netzVon, NETZ, VMAX,
   type Graph, type Profil, type Route, type VeloMeta,
 } from './router'
@@ -442,16 +442,18 @@ export default function Velonavi() {
     const rechne = (mitSchieben: boolean) => {
       // Start, Zwischenziele und Ziel der Reihe nach; jedes Teilstück wird
       // einzeln gesucht und danach zu einer Route zusammengesetzt.
+      // Jeder Halt bekommt alle Kanten, die in Frage kommen; welche davon die
+      // richtige ist, entscheidet die Suche.
       const halte = [start, ...zwischen.filter((z): z is Punkt => !!z), ziel].map((h) =>
-        einrasten(g, h.lon, h.lat, mitSchieben, strasseVon(h.titel))
+        einrastenAlle(g, h.lon, h.lat, mitSchieben, strasseVon(h.titel))
       )
-      if (halte.some((h) => !h)) return null
+      if (halte.some((h) => !h.length)) return null
       /** Eine Strecke über alle Halte mit einem Profil. */
       const suche = (pr: Profil) => {
         const k = kantenKosten(g, pr)
         const teile: Route[] = []
         for (let i = 0; i + 1 < halte.length; i++) {
-          const r = route(g, pr, halte[i]!, halte[i + 1]!, k)
+          const r = route(g, pr, halte[i], halte[i + 1], k)
           if (!r) return null
           teile.push(r)
         }
