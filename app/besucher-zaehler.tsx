@@ -23,9 +23,14 @@ import { SITE_URL } from './site'
  * sollen die Statistik nicht verwässern (localhost filtert `count.js` ohnehin).
  */
 
-/** Subdomain vor `.goatcounter.com`; muss zur GitHub-Action passen. */
-const GC_CODE = process.env.NEXT_PUBLIC_GOATCOUNTER || 'angebunden'
 const PROD_HOST = new URL(SITE_URL).host
+
+/**
+ * Subdomain vor `.goatcounter.com`; muss zur GitHub-Action passen. Ohne
+ * Angabe zählt nur angebunden.ch in sein eigenes Konto. Ein Deployment unter
+ * einer anderen Domain zählt gar nicht, bis es `NEXT_PUBLIC_GOATCOUNTER` setzt.
+ */
+const GC_CODE = process.env.NEXT_PUBLIC_GOATCOUNTER || (PROD_HOST === 'angebunden.ch' ? 'angebunden' : '')
 
 declare global {
   interface Window {
@@ -42,7 +47,7 @@ export function BesucherZaehler() {
 
   useEffect(() => {
     const host = window.location.host
-    setAktiv(host === PROD_HOST || host.endsWith('.' + PROD_HOST))
+    setAktiv(!!GC_CODE && (host === PROD_HOST || host.endsWith('.' + PROD_HOST)))
   }, [])
 
   useEffect(() => {

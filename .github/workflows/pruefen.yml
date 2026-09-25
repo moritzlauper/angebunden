@@ -1,0 +1,45 @@
+name: Prüfen
+
+# Läuft bei jedem Pull Request und jedem Push auf main. Bricht ab, wenn die
+# Velonetz-Korrekturen ungültig sind, die Typen nicht stimmen oder der
+# statische Build scheitert. Die Pipeline selbst läuft hier nicht, sie braucht
+# rund 330 MB Rohdaten und ist Sache von velodaten.yml und lokalen Läufen.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: pruefen-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Die pnpm-Version kommt aus `packageManager` in der package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Abhängigkeiten
+        run: pnpm install --frozen-lockfile
+
+      - name: Velonetz-Korrekturen
+        run: pnpm korrekturen:pruefen
+
+      - name: Typen
+        run: pnpm typecheck
+
+      - name: Statischer Build
+        run: pnpm export

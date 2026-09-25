@@ -21,6 +21,7 @@
     "daten:dem": "node pipeline/01b-fetch-dem.ts",
     "daten:velo": "node pipeline/10-velo-daten.ts && node pipeline/11-velo-netz.ts",
     "verify": "node pipeline/verify.ts",
+    "korrekturen:pruefen": "node pipeline/korrekturen-pruefen.ts",
     "typecheck": "next typegen && tsc --noEmit -p tsconfig.json && tsc --noEmit -p pipeline/tsconfig.json",
     "export": "STATISCH=1 next build"
   },
@@ -39,6 +40,9 @@
     "pngjs": "^7.0.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=22.18"
   },
   "packageManager": "pnpm@10.30.1"
 }

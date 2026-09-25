@@ -39,6 +39,10 @@ stehen unter deren Lizenzen:
   mit Quellenangabe.
 - Höhenmodell: swisstopo (swissALTI3D / DHM) als Open Government Data sowie
   AWS Terrain Tiles.
+- Velonavi (public/data/zuerich/velo.*): zusätzlich Open Government Data der
+  Stadt Zürich (Fuss- und Velowegnetz, Verkehrsknoten mit Lichtsignalanlage,
+  signalisierte Geschwindigkeiten, Velonetzplanung, Strassenverkehrsunfälle),
+  https://data.stadt-zuerich.ch, unter den dort genannten Nutzungsbedingungen.
 
 Die Rohdaten dieser Quellen liegen nicht im Repository; sie werden von der
 Pipeline geladen und dort verarbeitet.

@@ -1,4 +1,5 @@
 {
+  "$schema": "./velo-korrekturen.schema.json",
   "hinweis": "Eigene Korrekturen am Velonetz, angewendet in 11-velo-netz.ts nach dem Einlesen. Jede Regel in 'regeln' trifft alle Kanten mit dem angegebenen Strassennamen, optional begrenzt auf einen Ausschnitt (bbox: minLon, minLat, maxLon, maxLat) und mit 'nurFahrbahn' auf die Strassenstuecke, die man sich mit dem Auto teilt. Erlaubte Felder: beideRichtungen, veloweg, velostreifen, gesperrt, offen, stress (1-4, setzt die Stufe fest), stressMin / stressMax (lassen die Bewertung stehen und begrenzen sie nur nach unten bzw. oben), netz (keins/basis/haupt/vorzug), fussgaenger (true/false), nurFahrbahn. 'abbiegeverbotAusnahmen' entfernt einzelne Abbiegeverbote fuers Velo (von-Strasse -> nach-Strasse, optional bbox um den Kreuzungsknoten), fuer Verbote, die laut Geodaten fuers Auto gelten, in Wahrheit aber nicht fuers Velo.",
   "regeln": [
     {

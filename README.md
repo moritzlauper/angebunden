@@ -12,6 +12,13 @@ Drei Städte, je eine Route: Zürich auf `/` (47'085 Häuser), Basel auf `/basel
 Bern auf `/bern` (20'540). Im Bedienfeld ganz unten wechselt man zwischen ihnen. Alle drei
 laufen durch dieselbe Pipeline. Die Zahlen und Beispiele weiter unten sind die von Zürich.
 
+Dazu kommt für Zürich der **Velonavi** auf `/velonavi`, ein Velorouter, der ruhige Strecken,
+Steigung, Lichtsignale und Belag abwägt. Er rechnet vollständig im Browser, siehe
+[Velonavi](#velonavi).
+
+Wer Daten korrigieren oder die Seite selbst betreiben will, findet die Anleitungen unter
+[`docs/daten-anpassen.md`](docs/daten-anpassen.md) und [`docs/betreiben.md`](docs/betreiben.md).
+
 Die Karte ist schwarzweiss. Dunkel heisst gut angeschlossen, hell schlecht. Farbe kommt
 dazu, wenn man die Bestplatzierten hervorhebt: Ein Verlauf von kräftigem Dunkelrot bei
 Rang 1 nach Hellrot am eingestellten Ende. Beim Öffnen sind die Top 1000 hervorgehoben, der
@@ -208,6 +215,30 @@ Bewusste Vereinfachungen:
 * **Haltestellen** beziehungsweise **Kulturorte** blendet die zugrunde liegenden Punkte ein,
   **Dunkel** dreht die Karte um.
 
+## Velonavi
+
+Grundlage ist das Fuss- und Velowegnetz der Stadt Zürich aus dem Geoportal, rund 40'000
+Kanten mit Velofreigabe, Einbahnen, Velostreifen und Abbiegeverboten. Die Pipeline ergänzt
+jede Kante mit dem signalisierten Tempo, den Lichtsignalen, der Velonetzplanung
+(Vorzugsrouten, Hauptnetz), den polizeilich registrierten Velounfällen der letzten zehn Jahre
+und aus OpenStreetMap mit Strassenklasse, Belag, Tramgleisen und Hindernissen. Daraus
+entsteht je Richtung eine Stressstufe von 1 (abgetrennt oder ruhig) bis 4 (Mischverkehr ab
+Tempo 50), angelehnt an das Level-of-Traffic-Stress-Schema.
+
+Der Graph landet als Binärdatei in `public/data/zuerich/velo.bin`. Der Router in
+`app/velonavi/router.ts` sucht darauf im Browser mit A* über gerichtete Kanten. So kennt er
+Abbiegeverbote und rechnet an Lichtsignalen je nach Manöver unterschiedlich lange Wartezeiten:
+geradeaus im Mittel 24 Sekunden, rechts praktisch keine.
+
+Was in keiner Quelle stimmt, steht mit Begründung in `pipeline/velo-korrekturen.json`. Wie
+man dort etwas ergänzt, beschreibt [`docs/daten-anpassen.md`](docs/daten-anpassen.md). Die
+GitHub-Action `velodaten.yml` baut das Netz am 3. jedes Monats aus frischen Daten neu.
+
+```bash
+pnpm daten:velo            # Rohdaten holen und Graph bauen
+pnpm korrekturen:pruefen   # velo-korrekturen.json prüfen, ohne die Pipeline
+```
+
 ## Aufbau
 
 ```
@@ -223,6 +254,10 @@ pipeline/
   03-build-targets.ts    Gebäude, Adressen, Zielraster, Kartengrundlage
   04-compute-scores.ts   Reisezeitmatrix und Gebäudewerte
   verify.ts              Stichprobe gegen bekannte Verbindungen
+  10-velo-daten.ts       Velonavi: Geodaten der Stadt Zürich, Unfälle, OSM
+  11-velo-netz.ts        Velonavi: Routinggraph mit Stressstufen
+  velo-korrekturen.json  Ortskenntnis, die in keinem Datensatz steht
+  korrekturen-pruefen.ts prüft velo-korrekturen.json gegen das Schema
 app/
   page.tsx               Route /, lädt die Zürcher Kennzahlen
   basel/, bern/          Routen /basel und /bern
@@ -233,6 +268,8 @@ app/
   meta.ts, site.ts, seo.ts   geteilte Metadaten und SEO
   besucher-zaehler.tsx   GoatCounter-Einbindung
   og/                    Vorschaubilder je Stadt, beim Bauen gerendert
+  velonavi/              Route /velonavi, Oberfläche und Router
+docs/                    Daten anpassen, selbst betreiben und einbinden
 scripts/                 MapLibre-Worker und Schriftglyphen ins public-Verzeichnis
 analytics/               Besuche pro Tag, siehe analytics/README.md
 ```
@@ -268,8 +305,8 @@ und die Fusswegparameter stehen in `pipeline/config.ts`. Alles Stadtspezifische 
 Die Seite hat keinen Serveranteil. Alle Daten liegen als Dateien in `public/`, die vier
 Routen (`/`, `/basel`, `/bern`, `/methode`) werden beim Bauen vorgerendert. `pnpm export`
 schreibt einen Ordner `out/` mit reinen statischen Dateien, den jeder Gratis-Hoster
-ausliefert. Mit allen drei Städten sind das gegen 65 MB, das meiste davon die
-Gebäudegrundrisse.
+ausliefert. Mit allen drei Städten und dem Velonavi sind das rund 100 MB, das meiste davon
+Gebäudegrundrisse und der Velograph.
 
 ```bash
 pnpm export
@@ -286,9 +323,10 @@ Drei Wege, vom bequemsten zum dauerhaftesten:
 * **Vercel**: `npx vercel --prod` im Projektordner. Erkennt Next.js von selbst, dafür
   braucht es kein `pnpm export`.
 
-Eine eigene Domain hängt man bei allen dreien in den Projekteinstellungen an. Für GitHub
-Pages muss zusätzlich `basePath` in `next.config.ts` auf den Repository-Namen zeigen, sonst
-finden die Seiten ihre Dateien nicht.
+Eine eigene Domain hängt man bei allen dreien in den Projekteinstellungen an. Die Seite muss
+auf der obersten Ebene einer Domain liegen, weil die Datenpfade absolut sind. Unter einem
+Unterpfad wie bei GitHub Pages (`benutzer.github.io/angebunden/`) findet sie ihre Dateien
+nicht. Weitere Hinweise zu eigenen Deployments stehen in [`docs/betreiben.md`](docs/betreiben.md).
 
 ## Besucherzahlen
 
@@ -311,4 +349,7 @@ Die abgeleiteten Kartendaten unter `public/data/` stammen aus OpenStreetMap und 
 unter der Open Database License (ODbL). Wer sie weiterverwendet, nennt OpenStreetMap und
 stellt abgeleitete Datenbanken wieder unter die ODbL. Der Fahrplan kommt von
 opentransportdata.swiss, die Höhen von swisstopo. Beide sind offen nutzbar mit
-Quellenangabe. Die Rohdaten liegen nicht im Repository, die Pipeline lädt sie.
+Quellenangabe. Der Velonavi nutzt zusätzlich Open Government Data der Stadt Zürich (Fuss-
+und Velowegnetz, Lichtsignale, Tempo, Velonetzplanung, Verkehrsunfälle), die
+Nutzungsbedingungen stehen auf [data.stadt-zuerich.ch](https://data.stadt-zuerich.ch). Die
+Rohdaten liegen nicht im Repository, die Pipeline lädt sie.

@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Korrekturen am Velonetz",
+  "description": "Ortskenntnis, die in keinem Datensatz steht. Angewendet in pipeline/11-velo-netz.ts, geprüft mit `pnpm korrekturen:pruefen`. Jede Korrektur braucht einen `grund`, damit man sie später wieder entfernen kann, wenn die Quelldaten nachgezogen haben.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["regeln"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "hinweis": { "type": "string" },
+    "regeln": {
+      "description": "Jede Regel trifft alle Kanten mit genau diesem Strassennamen, optional begrenzt auf einen Ausschnitt.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/regel" }
+    },
+    "verbindungen": {
+      "description": "Kanten, die im Netz fehlen. Beide Enden werden auf den nächsten Knoten im Umkreis von 20 m gelegt.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/verbindung" }
+    },
+    "abbiegeverbotAusnahmen": {
+      "description": "Abbiegeverbote, die laut Geodaten gelten, fürs Velo aber nicht.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/abbiegeverbotAusnahme" }
+    }
+  },
+  "$defs": {
+    "bbox": {
+      "description": "Ausschnitt als [minLon, minLat, maxLon, maxLat] in WGS84.",
+      "type": "array",
+      "prefixItems": [
+        { "type": "number", "minimum": 8.3, "maximum": 8.8 },
+        { "type": "number", "minimum": 47.2, "maximum": 47.6 },
+        { "type": "number", "minimum": 8.3, "maximum": 8.8 },
+        { "type": "number", "minimum": 47.2, "maximum": 47.6 }
+      ],
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "punkt": {
+      "description": "Koordinate als [lon, lat] in WGS84.",
+      "type": "array",
+      "prefixItems": [
+        { "type": "number", "minimum": 8.3, "maximum": 8.8 },
+        { "type": "number", "minimum": 47.2, "maximum": 47.6 }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "stufe": { "type": "integer", "minimum": 1, "maximum": 4 },
+    "grund": {
+      "description": "Warum die Korrektur nötig ist und woher das Wissen stammt.",
+      "type": "string",
+      "minLength": 10
+    },
+    "regel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strasse", "grund"],
+      "properties": {
+        "strasse": {
+          "description": "Strassenname exakt wie im Fuss- und Velowegnetz der Stadt.",
+          "type": "string",
+          "minLength": 1
+        },
+        "bbox": { "$ref": "#/$defs/bbox" },
+        "beideRichtungen": { "description": "Einbahn fürs Velo aufheben.", "const": true },
+        "veloweg": { "description": "Als abgetrennten Veloweg behandeln.", "const": true },
+        "velostreifen": { "description": "Velostreifen in beiden Richtungen.", "const": true },
+        "gesperrt": { "description": "Fürs Velo sperren. Gilt am Schluss, auch gegen automatische Lückenschliesser.", "const": true },
+        "offen": { "description": "Fürs Velo öffnen, wo der Datensatz nur einen Fussweg führt.", "const": true },
+        "stress": { "description": "Stressstufe fest setzen (1 ruhig bis 4 Mischverkehr Tempo 50).", "$ref": "#/$defs/stufe" },
+        "stressMin": { "description": "Mindestens so unangenehm.", "$ref": "#/$defs/stufe" },
+        "stressMax": { "description": "Höchstens so unangenehm.", "$ref": "#/$defs/stufe" },
+        "netz": {
+          "description": "Zugehörigkeit zur Velonetzplanung.",
+          "enum": ["keins", "basis", "haupt", "vorzug"]
+        },
+        "fussgaenger": { "description": "Fussgängerbereich: Velo nur im Schritttempo.", "type": "boolean" },
+        "nurFahrbahn": {
+          "description": "Nur die Stücke, die man sich mit dem Auto teilt. Trottoirs und abgetrennte Velowege mit demselben Namen bleiben unverändert.",
+          "const": true
+        },
+        "grund": { "$ref": "#/$defs/grund" }
+      }
+    },
+    "verbindung": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["von", "nach", "grund"],
+      "properties": {
+        "von": { "$ref": "#/$defs/punkt" },
+        "nach": { "$ref": "#/$defs/punkt" },
+        "name": { "type": "string" },
+        "stress": { "$ref": "#/$defs/stufe" },
+        "grund": { "$ref": "#/$defs/grund" }
+      }
+    },
+    "abbiegeverbotAusnahme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["von", "nach", "grund"],
+      "properties": {
+        "von": { "description": "Strasse, aus der man kommt.", "type": "string", "minLength": 1 },
+        "nach": { "description": "Strasse, in die man abbiegt.", "type": "string", "minLength": 1 },
+        "bbox": { "$ref": "#/$defs/bbox" },
+        "grund": { "$ref": "#/$defs/grund" }
+      }
+    }
+  }
+}
