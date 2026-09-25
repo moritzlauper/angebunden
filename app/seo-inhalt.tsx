@@ -92,7 +92,7 @@ export function SeoInhalt({ stadt, meta }: { stadt: Stadt; meta: Meta }) {
               braucht der Browser JavaScript.
             </p>
             <p style={{ marginTop: '0.75rem' }}>
-              <a href="/methode" style={{ color: '#2563eb' }}>
+              <a href="/methode" style={{ color: '#18181b', textDecoration: 'underline' }}>
                 Wie das gerechnet ist
               </a>{' '}
               steht auch ohne Karte zum Nachlesen bereit.

@@ -77,7 +77,7 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#f7f7f5' },
-    { media: '(prefers-color-scheme: dark)', color: '#0b0b0c' },
+    { media: '(prefers-color-scheme: dark)', color: '#0f0f11' },
   ],
 }
 
@@ -86,7 +86,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
     <html
       lang="de-CH"
       className="h-full"
-      /* Das Velonavi setzt `data-vn-thema` schon vor dem Hydrieren, damit das
+      /* Das Velonavi setzt `data-thema` schon vor dem Hydrieren, damit das
          dunkle Thema nicht sichtbar aufblitzt. Serverseitig steht das Attribut
          deshalb noch nicht da - React soll das nicht als Fehler melden. */
       suppressHydrationWarning

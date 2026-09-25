@@ -59,7 +59,7 @@ async function ladeVeloMeta(): Promise<VeloMeta> {
  */
 const THEMA_SKRIPT = `try{
 var w=localStorage.getItem('velonavi.thema'),v=w?JSON.parse(w):'auto',h=new Date().getHours();
-document.documentElement.dataset.vnThema=
+document.documentElement.dataset.thema=
   v==='dunkel'||(v==='auto'&&(h>=20||h<7||matchMedia('(prefers-color-scheme: dark)').matches))?'dunkel':'hell';
 }catch(e){}`
 

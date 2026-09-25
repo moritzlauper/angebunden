@@ -131,28 +131,15 @@ body {
   }
 }
 
-/* Zoomknöpfe und Quellenangabe sollen so leise sein wie das Bedienfeld. */
+/*
+ * Zoomknöpfe und Quellenangabe sollen so leise sein wie das Bedienfeld – und
+ * denselben Radius haben wie alles, was schwebt.
+ */
 .maplibregl-ctrl-group {
-  border-radius: 10px !important;
+  border-radius: 16px !important;
   box-shadow:
     0 1px 2px rgb(20 20 20 / 0.06),
     0 8px 24px -10px rgb(20 20 20 / 0.25) !important;
-}
-.dunkel .maplibregl-ctrl-group {
-  background: rgb(24 24 26 / 0.85);
-}
-.dunkel .maplibregl-ctrl-group button + button {
-  border-top-color: rgb(255 255 255 / 0.1);
-}
-.dunkel .maplibregl-ctrl-icon {
-  filter: invert(1);
-}
-.dunkel .maplibregl-ctrl-attrib {
-  background: rgb(24 24 26 / 0.7) !important;
-  color: #9c9c9e;
-}
-.dunkel .maplibregl-ctrl-attrib a {
-  color: #c9c9cb;
 }
 
 /* Schwebendes Namensschild für den Kulturort unter dem Zeiger. */
@@ -164,9 +151,9 @@ body {
   font-size: 12px;
   font-weight: 500;
   line-height: 1.3;
-  border-radius: 6px;
-  background: rgb(255 255 255 / 0.96);
-  color: #18181b;
+  border-radius: 8px;
+  background: var(--ab-blatt);
+  color: var(--ab-tinte);
   box-shadow:
     0 1px 2px rgb(20 20 20 / 0.08),
     0 6px 20px -10px rgb(20 20 20 / 0.35);
@@ -174,56 +161,65 @@ body {
 .ort-label .maplibregl-popup-tip {
   display: none;
 }
-.dunkel .ort-label .maplibregl-popup-content {
-  background: rgb(24 24 26 / 0.92);
-  color: #f4f4f5;
-}
 
 /*
- * Farben des Velonavi, hell und dunkel. Die Oberfläche greift ausschliesslich
- * über diese Variablen darauf zu, damit ein Themenwechsel ohne Durchreichen
- * durch jede Komponente auskommt. Gesetzt wird `data-vn-thema` am <html> –
- * vor dem ersten Bild durch das Skript in `velonavi/page.tsx`, danach von der
- * Oberfläche selbst.
+ * Papier und Tinte, hell und dunkel. Die Oberfläche beider Karten greift
+ * ausschliesslich über diese Variablen auf ihre Farben zu, damit ein
+ * Themenwechsel ohne Durchreichen durch jede Komponente auskommt. Gesetzt
+ * wird `data-thema` am <html> – im Velonavi vor dem ersten Bild durch das
+ * Skript in `velonavi/page.tsx`, danach von der Oberfläche selbst.
+ *
+ * Karmin steht hier nur für die Oberfläche (Rang-Zahl, Regler). Die Rampe
+ * selbst und alles, was MapLibre zeichnet, stehen als Werte in `farben.ts`.
  */
 :root {
-  --vn-bg: #f7f7f5;
-  --vn-fg: #18181b;
-  --vn-panel: rgba(255, 255, 255, 0.88);
-  --vn-border: rgba(24, 24, 27, 0.07);
-  --vn-muted: #71717a;
-  --vn-weich: rgba(24, 24, 27, 0.045);
-  --vn-aktiv: #ffffff;
-  --vn-ring: rgba(37, 99, 235, 0.35);
-  --vn-akzent: #2563eb;
-  --vn-spur: rgba(24, 24, 27, 0.14);
-  --vn-schatten: 0 1px 1px rgba(24, 24, 27, 0.03), 0 10px 30px -12px rgba(24, 24, 27, 0.22);
+  --ab-papier: #f7f7f5;
+  --ab-blatt: rgba(255, 255, 255, 0.92);
+  --ab-weich: #eeeeeb;
+  --ab-linie: #e4e4e0;
+  --ab-leise: #71717a;
+  --ab-tinte: #18181b;
+  /* Aktive Segmente eines Umschalters. */
+  --ab-aktiv: #ffffff;
+  /* Schiene der Schalter. */
+  --ab-spur: #e4e4e0;
+  /*
+   * Die Scheibe des Reglers. Sie bleibt in beiden Themen weiss: Sie liegt
+   * entweder auf Karmin oder auf der Schiene, und beide sind dunkler.
+   */
+  --ab-knopf: #ffffff;
+  --ab-ring: rgba(24, 24, 27, 0.28);
+  --ab-karmin: #9e2a2d;
+  --ab-punkt: #c8403f;
+  --ab-schatten: 0 1px 1px rgba(24, 24, 27, 0.03), 0 10px 30px -12px rgba(24, 24, 27, 0.22);
 }
 
-html[data-vn-thema='dunkel'] {
-  --vn-bg: #101013;
-  --vn-fg: #ececef;
-  --vn-panel: rgba(26, 26, 30, 0.9);
-  --vn-border: rgba(255, 255, 255, 0.1);
-  --vn-muted: #9b9ba4;
-  --vn-weich: rgba(255, 255, 255, 0.06);
-  --vn-aktiv: #26262c;
-  --vn-ring: rgba(122, 162, 255, 0.45);
-  /* Das Blau von hell hat auf dunklem Grund zu wenig Kontrast für Text. */
-  --vn-akzent: #7aa2ff;
-  --vn-spur: rgba(255, 255, 255, 0.16);
-  --vn-schatten: 0 1px 1px rgba(0, 0, 0, 0.35), 0 10px 30px -12px rgba(0, 0, 0, 0.75);
+html[data-thema='dunkel'] {
+  --ab-papier: #0f0f11;
+  --ab-blatt: rgba(26, 26, 30, 0.9);
+  --ab-weich: rgba(255, 255, 255, 0.06);
+  --ab-linie: rgba(255, 255, 255, 0.1);
+  --ab-leise: #9b9ba4;
+  --ab-tinte: #ececef;
+  --ab-aktiv: #26262c;
+  --ab-spur: rgba(255, 255, 255, 0.16);
+  --ab-knopf: #ffffff;
+  --ab-ring: rgba(236, 236, 239, 0.35);
+  /* Das Karmin von hell hat auf dunklem Grund zu wenig Kontrast für Text. */
+  --ab-karmin: #e5776d;
+  --ab-punkt: #e5534b;
+  --ab-schatten: 0 1px 1px rgba(0, 0, 0, 0.35), 0 10px 30px -12px rgba(0, 0, 0, 0.75);
 }
 
 /* Die Bedienelemente von MapLibre sind für helle Karten gezeichnet. */
-html[data-vn-thema='dunkel'] .maplibregl-ctrl-group {
-  background: var(--vn-panel);
+html[data-thema='dunkel'] .maplibregl-ctrl-group {
+  background: var(--ab-blatt);
   filter: invert(1) hue-rotate(180deg);
 }
-html[data-vn-thema='dunkel'] .maplibregl-ctrl-attrib {
-  background: var(--vn-panel);
-  color: var(--vn-muted);
+html[data-thema='dunkel'] .maplibregl-ctrl-attrib {
+  background: var(--ab-blatt);
+  color: var(--ab-leise);
 }
-html[data-vn-thema='dunkel'] .maplibregl-ctrl-attrib a {
-  color: var(--vn-muted);
+html[data-thema='dunkel'] .maplibregl-ctrl-attrib a {
+  color: var(--ab-leise);
 }

@@ -15,26 +15,31 @@ import { STADT_LISTE, type Stadt } from './staedte'
 import { Blatt, useMedienabfrage } from './blatt'
 import { Suchleiste, bauIndex, suchen, type Eintrag } from './suche'
 import { Wortmarke } from './marke'
+import { KARMIN, TINTE, GRUND } from './farben'
 import { Hauptwahl } from './hauptwahl'
 import { SITE_URL } from './site'
 
 /** Die Grundkarte bleibt schwarzweiss: dunkel = gut, hell = schlecht. */
-const RAMPE_HELL = ['#000000', '#242424', '#4d4d4d', '#7a7a7a', '#a5a5a5', '#c8c8c8']
 const RAMPE_DUNKEL = ['#ffffff', '#dcdcdc', '#b0b0b0', '#828282', '#565656', '#333333']
-const RAMPE_LEICHT = ['#777777', '#d5d5d5', '#dddddd', '#e0e0e0', '#e2e2e2']
-
-/**
- * Farbe kommt nur bei der Hervorhebung ins Spiel: kräftiges Dunkelrot für die
- * vordersten Ränge, ausbleichend bis Hellrot am eingestellten Ende.
+/*
+ * Die Stufen der Grundkarte, gleichmässig nach Helligkeit (oklch L 0.63 →
+ * 0.845) und leicht warm getönt wie der übrige Kartengrund. Die frühere Rampe
+ * sprang von #777777 gleich auf #d5d5d5 und lag danach fast still: Drei
+ * Viertel aller Häuser unterschieden sich um zwei Prozent Helligkeit und
+ * standen als ein einziges Hellgrau da, kaum vom Papier zu trennen. Das
+ * dunkle Ende bleibt über dem Karmin, das helle klar unter dem Papier.
  */
-const RANG_RAMPE = ['#7f2727', '#b33a3a', '#d94f4f', '#ee8585', '#f4b0b0']
+const RAMPE_LEICHT = ['#8d8882', '#9d9993', '#aea9a3', '#bfbab4', '#d0cbc5']
 
-/**
- * Blau für Zeiger, Marken und Bedienelemente. Es liegt weder auf der
- * Graustufen-Skala der Karte noch auf dem roten Verlauf der Hervorhebung
- * und ist deshalb nie mit einem Datenwert zu verwechseln.
+/*
+ * Farbe kommt nur bei der Hervorhebung ins Spiel: kräftiges Karmin für die
+ * vordersten Ränge, ausbleichend bis Hellkarmin am eingestellten Ende. Die
+ * Rampe steht in `farben.ts`, weil der Velonavi und die Marke denselben Ton
+ * brauchen.
+ *
+ * Alles andere auf der Karte, was keinen Datenwert trägt – Umriss des
+ * gewählten Hauses, Haltestellen, Kulturorte, Extrempunkte –, ist Tinte.
  */
-const AKZENT = '#2563eb'
 
 /** So viele Ränge liegen als Punktebene vor. Darüber zeigt nur noch die Fläche. */
 const TOP_PUNKTE = 10000
@@ -488,7 +493,7 @@ function aufsteigendeStufen(paare: (readonly [number, string])[]) {
  * Karte gleichmässig eingefärbt, egal wie schief eine Auswahl liegt – genau
  * das, was beim Färben nach Rang von selbst herauskam.
  */
-function quantilStufen(absteigend: Float64Array, rampe: string[]) {
+function quantilStufen(absteigend: Float64Array, rampe: readonly string[]) {
   const n = absteigend.length
   return aufsteigendeStufen(
     rampe.map((c, i) => [absteigend[Math.round((i / (rampe.length - 1)) * (n - 1))], c] as const)
@@ -496,7 +501,7 @@ function quantilStufen(absteigend: Float64Array, rampe: string[]) {
 }
 
 /** Dasselbe, aber nur über die vordersten `n` Ränge – für die Hervorhebung. */
-function rangStufen(absteigend: Float64Array, rampe: string[], n: number) {
+function rangStufen(absteigend: Float64Array, rampe: readonly string[], n: number) {
   const bis = Math.min(Math.max(n, 1), absteigend.length)
   return aufsteigendeStufen(
     rampe.map((c, i) => [absteigend[Math.round(((bis - 1) * i) / (rampe.length - 1))], c] as const)
@@ -543,6 +548,17 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
 
   // Ab dieser Breite steht genug Platz für zwei feste Karten statt eines Blatts.
   const mobil = !useMedienabfrage('(min-width: 768px)')
+
+  /*
+   * Bedienfeld und Karteikarte lesen ihre Farben aus `data-thema` am <html>.
+   * Das Velonavi setzt dort sein eigenes Thema und lässt es stehen; wer von
+   * dort herüberwechselt, hätte sonst ein dunkles Bedienfeld über einer hellen
+   * Karte. Solange die Grundkarte dunkel nicht gut aussieht (`dunkel` unten),
+   * stellt diese Seite das Attribut deshalb selbst auf hell.
+   */
+  useEffect(() => {
+    document.documentElement.dataset.thema = dunkel ? 'dunkel' : 'hell'
+  }, [dunkel])
 
   // Die Rohdaten liegen in Refs: sie ändern sich nie, und als State würden
   // 47'000 Häuser bei jedem Bildaufbau durch den Vergleich geschleift.
@@ -780,7 +796,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           type: 'fill',
           source: 'wasser',
           filter: ['==', ['get', 'kind'], 'area'],
-          paint: { 'fill-color': '#c7deeb' },
+          paint: { 'fill-color': GRUND.wasser },
         })
         map.addLayer({
           id: 'wasser-linie',
@@ -788,7 +804,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           source: 'wasser',
           filter: ['==', ['get', 'kind'], 'line'],
           paint: {
-            'line-color': '#c7deeb',
+            'line-color': GRUND.wasser,
             'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 14],
           },
         })
@@ -804,7 +820,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           source: 'strassen',
           filter: ['==', ['get', 'k'], 'neben'],
           paint: {
-            'line-color': '#d2d2cd',
+            'line-color': GRUND.strasseNeben,
             'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.3, 14, 0.8, 17, 3],
           },
         })
@@ -814,7 +830,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           source: 'strassen',
           filter: ['==', ['get', 'k'], 'haupt'],
           paint: {
-            'line-color': '#c4c4be',
+            'line-color': GRUND.strasseHaupt,
             'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 2, 17, 7],
           },
         })
@@ -822,24 +838,24 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       if (stadt.schluessel === 'zuerich') {
         const unsichtbar = { visibility: 'none' as const }
         map.addLayer({ id: 'zuri-stadt-flaeche', type: 'fill', source: 'stadt', layout: unsichtbar, paint: { 'fill-color': '#ffffff' } })
-        map.addLayer({ id: 'zuri-wasser-flaeche', type: 'fill', source: 'wasser', filter: ['==', ['get', 'kind'], 'area'], layout: unsichtbar, paint: { 'fill-color': '#c7deeb' } })
-        map.addLayer({ id: 'zuri-wasser-linie', type: 'line', source: 'wasser', filter: ['==', ['get', 'kind'], 'line'], layout: unsichtbar, paint: { 'line-color': '#c7deeb', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 14] } })
-        map.addLayer({ id: 'zuri-strassen-neben', type: 'line', source: 'strassen', filter: ['==', ['get', 'k'], 'neben'], layout: unsichtbar, paint: { 'line-color': '#d2d2cd', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.3, 14, 0.8, 17, 3] } })
-        map.addLayer({ id: 'zuri-strassen-haupt', type: 'line', source: 'strassen', filter: ['==', ['get', 'k'], 'haupt'], layout: unsichtbar, paint: { 'line-color': '#c4c4be', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 2, 17, 7] } })
-        map.addLayer({ id: 'zuri-gebaeude-grund', type: 'fill', source: 'gebaeude', layout: unsichtbar, paint: { 'fill-color': '#d1d1d1', 'fill-opacity': 0.86 } })
-        map.addLayer({ id: 'zuri-gebaeude-grund-kante', type: 'line', source: 'gebaeude', layout: unsichtbar, paint: { 'line-color': '#b7b7b7', 'line-width': ['interpolate', ['linear'], ['zoom'], 14, 0, 17, 0.55] } })
+        map.addLayer({ id: 'zuri-wasser-flaeche', type: 'fill', source: 'wasser', filter: ['==', ['get', 'kind'], 'area'], layout: unsichtbar, paint: { 'fill-color': GRUND.wasser } })
+        map.addLayer({ id: 'zuri-wasser-linie', type: 'line', source: 'wasser', filter: ['==', ['get', 'kind'], 'line'], layout: unsichtbar, paint: { 'line-color': GRUND.wasser, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 2, 16, 14] } })
+        map.addLayer({ id: 'zuri-strassen-neben', type: 'line', source: 'strassen', filter: ['==', ['get', 'k'], 'neben'], layout: unsichtbar, paint: { 'line-color': GRUND.strasseNeben, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.3, 14, 0.8, 17, 3] } })
+        map.addLayer({ id: 'zuri-strassen-haupt', type: 'line', source: 'strassen', filter: ['==', ['get', 'k'], 'haupt'], layout: unsichtbar, paint: { 'line-color': GRUND.strasseHaupt, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 0.8, 14, 2, 17, 7] } })
+        map.addLayer({ id: 'zuri-gebaeude-grund', type: 'fill', source: 'gebaeude', layout: unsichtbar, paint: { 'fill-color': GRUND.gebaeude, 'fill-opacity': 0.86 } })
+        map.addLayer({ id: 'zuri-gebaeude-grund-kante', type: 'line', source: 'gebaeude', layout: unsichtbar, paint: { 'line-color': GRUND.gebaeudeKante, 'line-width': ['interpolate', ['linear'], ['zoom'], 14, 0, 17, 0.55] } })
       }
       map.addLayer({
         id: 'gruen',
         type: 'fill',
         source: 'gruen',
-        paint: { 'fill-color': '#dceccf', 'fill-opacity': 0.9 },
+        paint: { 'fill-color': GRUND.gruen, 'fill-opacity': 0.9 },
       })
       map.addLayer({
         id: 'stadt-rand',
         type: 'line',
         source: 'stadt',
-        paint: { 'line-color': '#c9c9c4', 'line-width': 1 },
+        paint: { 'line-color': GRUND.stadtRand, 'line-width': 1 },
       })
       map.addLayer({
         id: 'gleise-huelle',
@@ -869,14 +885,14 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           id: 'gebaeude-grund',
           type: 'fill',
           source: 'gebaeude',
-          paint: { 'fill-color': '#d1d1d1', 'fill-opacity': 0.86 },
+          paint: { 'fill-color': GRUND.gebaeude, 'fill-opacity': 0.86 },
         })
         map.addLayer({
           id: 'gebaeude-grund-kante',
           type: 'line',
           source: 'gebaeude',
           paint: {
-            'line-color': '#b7b7b7',
+            'line-color': GRUND.gebaeudeKante,
             'line-width': ['interpolate', ['linear'], ['zoom'], 14, 0, 17, 0.55],
           },
         })
@@ -919,12 +935,23 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       })
 
       map.addLayer({
+        id: 'gebaeude-aktiv-flaeche',
+        type: 'fill',
+        source: 'gebaeude',
+        paint: {
+          'fill-color': TINTE,
+          'fill-opacity': ['case', ['boolean', ['feature-state', 'aktiv'], false], 1, 0],
+        },
+      })
+      map.addLayer({
         id: 'gebaeude-aktiv',
         type: 'line',
         source: 'gebaeude',
         paint: {
-          'line-color': AKZENT,
-          'line-width': 2,
+          'line-color': TINTE,
+          // Ein Saum um die Fläche: Auf kleinen Zoomstufen ist ein einzelnes
+          // Haus sonst nur ein Pixel gross.
+          'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3.5, 16, 2],
           'line-opacity': ['case', ['boolean', ['feature-state', 'aktiv'], false], 1, 0],
         },
       })
@@ -936,7 +963,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         layout: { visibility: 'none' },
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 1.4, 16, 4],
-          'circle-color': AKZENT,
+          'circle-color': TINTE,
           'circle-opacity': 0.85,
         },
       })
@@ -947,7 +974,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         layout: { visibility: 'none' },
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 1.6, 16, 4.5],
-          'circle-color': AKZENT,
+          'circle-color': TINTE,
           'circle-opacity': 0.85,
         },
       })
@@ -959,7 +986,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           source: MODI[m].punktQuelle,
           paint: {
             'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 3, 14, 5, 17, 8],
-            'circle-color': AKZENT,
+            'circle-color': TINTE,
             'circle-opacity': 0,
             'circle-stroke-color': '#ffffff',
             'circle-stroke-width': 1.2,
@@ -976,8 +1003,8 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         filter: ['==', ['get', 'modus'], 'oev'],
         paint: {
           'circle-radius': 6,
-          'circle-color': '#18181b',
-          'circle-stroke-color': '#18181b',
+          'circle-color': TINTE,
+          'circle-stroke-color': TINTE,
           'circle-stroke-width': 2,
         },
       })
@@ -1059,7 +1086,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           'text-anchor': 'bottom',
           'text-allow-overlap': true,
         },
-        paint: { 'text-color': '#18181b', 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
+        paint: { 'text-color': TINTE, 'text-halo-color': '#ffffff', 'text-halo-width': 2 },
       })
 
       setBereit(true)
@@ -1308,16 +1335,14 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     const ausdruck = farbAusdruck(modus, dunkel, meta.buildings, sicht, true)
     map.setPaintProperty('gebaeude', 'fill-color', ausdruck as never)
     map.setPaintProperty('gebaeude-kante', 'line-color', ausdruck as never)
-    // Die Farbe des aktiven Umrisses hängt davon ab, ob das Haus in der
-    // Hervorhebung liegt – das weiss nur der gedrosselte Regler-Effekt.
 
     map.setPaintProperty('grund', 'background-color', dunkel ? '#0b0b0c' : '#f7f7f5')
     map.setPaintProperty('stadt-flaeche', 'fill-color', dunkel ? '#141416' : '#ffffff')
-    map.setPaintProperty('wasser-flaeche', 'fill-color', dunkel ? '#08080a' : '#c7deeb')
-    map.setPaintProperty('wasser-linie', 'line-color', dunkel ? '#08080a' : '#c7deeb')
-    map.setPaintProperty('stadt-rand', 'line-color', dunkel ? '#2a2a2e' : '#c9c9c4')
-    map.setPaintProperty('strassen-neben', 'line-color', dunkel ? '#232327' : '#d2d2cd')
-    map.setPaintProperty('strassen-haupt', 'line-color', dunkel ? '#303036' : '#c4c4be')
+    map.setPaintProperty('wasser-flaeche', 'fill-color', dunkel ? '#08080a' : GRUND.wasser)
+    map.setPaintProperty('wasser-linie', 'line-color', dunkel ? '#08080a' : GRUND.wasser)
+    map.setPaintProperty('stadt-rand', 'line-color', dunkel ? '#2a2a2e' : GRUND.stadtRand)
+    map.setPaintProperty('strassen-neben', 'line-color', dunkel ? '#232327' : GRUND.strasseNeben)
+    map.setPaintProperty('strassen-haupt', 'line-color', dunkel ? '#303036' : GRUND.strasseHaupt)
 
     const kontur = dunkel ? '#0e0e10' : '#ffffff'
     for (const ebene of ['strassennamen', 'marke-platz', 'marke-bahnhof']) {
@@ -1331,7 +1356,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     map.setPaintProperty('extreme-text', 'text-halo-color', kontur)
 
     // Beide Extrempunkte und ihre Beschriftungen bleiben schwarz.
-    const zeigerFarbe = '#18181b'
+    const zeigerFarbe = TINTE
     map.setPaintProperty('extreme-text', 'text-color', zeigerFarbe)
     map.setPaintProperty('extreme-punkt', 'circle-stroke-color', zeigerFarbe)
     map.setPaintProperty('extreme-punkt', 'circle-color', zeigerFarbe)
@@ -1439,8 +1464,6 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       if (!sichtbar) {
         map.setPaintProperty('top-flaeche', 'fill-color', 'rgba(0,0,0,0)' as never)
         map.setPaintProperty('top-flaeche', 'fill-opacity', 0)
-        // Ohne Hervorhebung liegt jedes Haus auf der Graustufen-Karte – blau.
-        map.setPaintProperty('gebaeude-aktiv', 'line-color', AKZENT)
       } else {
         // Die Fläche kennt bei der Kultur keinen Rang – dort steht der Indexwert
         // in der Kachel, und die Grenze des Regler ist der Wert des n-ten Hauses.
@@ -1451,19 +1474,19 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           : ['<=', ['get', 'r'], n]
         const farbeFlaeche =
           n <= 1
-            ? RANG_RAMPE[0]
+            ? KARMIN[0]
             : kulturSicht
               ? [
                   'interpolate',
                   ['linear'],
                   kulturSicht.ausdruck,
-                  ...rangStufen(kulturSicht.absteigend, RANG_RAMPE, n),
+                  ...rangStufen(kulturSicht.absteigend, KARMIN, n),
                 ]
               : [
                   'interpolate',
                   ['linear'],
                   ['get', 'r'],
-                  ...RANG_RAMPE.flatMap((c, i) => [1 + ((n - 1) * i) / (RANG_RAMPE.length - 1), c]),
+                  ...KARMIN.flatMap((c, i) => [1 + ((n - 1) * i) / (KARMIN.length - 1), c]),
                 ]
 
         // Farbe und Grenze in einem Ausdruck statt in zwei getrennten
@@ -1474,7 +1497,9 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
         ] as never)
 
         // Die besten 1'000 Ränge bleiben voll sichtbar. Danach läuft die
-        // Deckkraft langsam und nur bis zu einem leichten Schleier aus.
+        // Deckkraft langsam aus, aber nur bis zur Hälfte: Der Kartengrund ist
+        // hell, und ein dünnerer Schleier liess die hinteren Ränge wieder grau
+        // werden.
         const fadeStart = Math.min(1000, meta.buildings)
         const deckkraft = n <= fadeStart
           ? 1
@@ -1484,7 +1509,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
               ['linear'],
               kulturSicht.ausdruck,
               kulturSicht.schwelle(n),
-              0.2,
+              0.5,
               kulturSicht.schwelle(Math.min(fadeStart, n)),
               1,
             ]
@@ -1495,26 +1520,21 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
               Math.min(fadeStart, n),
               1,
               n,
-              0.2,
+              0.5,
             ]
         map.setPaintProperty('top-flaeche', 'fill-opacity', [
           'case', innerhalb, deckkraft, 0,
         ] as never)
 
-        // Der Umriss des gewählten Hauses ist über der roten Hervorhebung schwarz.
-        map.setPaintProperty('gebaeude-aktiv', 'line-color', [
-          'case', innerhalb, '#18181b', AKZENT,
-        ] as never)
-
         if (punkteSichtbar) {
           const farbe =
             n <= 1
-              ? RANG_RAMPE[0]
+              ? KARMIN[0]
               : [
                   'interpolate',
                   ['linear'],
                   ['get', 'r'],
-                  ...RANG_RAMPE.flatMap((c, i) => [1 + ((n - 1) * i) / (RANG_RAMPE.length - 1), c]),
+                  ...KARMIN.flatMap((c, i) => [1 + ((n - 1) * i) / (KARMIN.length - 1), c]),
                 ]
           map.setPaintProperty(`top-punkt-${m}`, 'circle-color', farbe as never)
 
@@ -1568,7 +1588,6 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
       map.setPaintProperty(`top-punkt-${m}`, 'circle-opacity', 0)
       map.setPaintProperty(`top-punkt-${m}`, 'circle-stroke-opacity', 0)
     }
-    map.setPaintProperty('gebaeude-aktiv', 'line-color', AKZENT)
   }, [rangHighlight, bereit])
 
   // --- MapLibre-Kontrollen weichen auf Mobile der Rang-Leiste aus. Auf dem
@@ -1594,7 +1613,6 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     }
   }, [deckung, mobil, blatt])
 
-  const ui = dunkel ? uiDunkel : uiHell
   // Ohne Velonavi fällt die obere Knopfreihe weg, dann steht der
   // Umschalter ÖV/Kultur allein da und bekommt deren Grösse.
   const allein = stadt.schluessel !== 'zuerich'
@@ -1611,7 +1629,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
 
   return (
     <div
-      className={`relative h-full w-full overflow-hidden ${dunkel ? 'dunkel' : ''}`}
+      className="relative h-full w-full overflow-hidden"
       style={{ background: ui.bg }}
     >
       <div ref={containerRef} className="h-full w-full" />
@@ -1662,7 +1680,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
                   className="pointer-events-auto grid h-12 w-12 shrink-0 place-items-center rounded-full border backdrop-blur-md"
                   style={
                     blatt === 'einstellungen'
-                      ? { background: AKZENT, borderColor: AKZENT, color: '#fff' }
+                      ? { background: ui.fg, borderColor: ui.fg, color: ui.bg }
                       : { background: ui.panel, borderColor: ui.border, color: ui.fg, boxShadow: ui.schatten }
                   }
                 >
@@ -1703,7 +1721,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
                       onClick={umschalten}
                       aria-pressed={an}
                       className={`whitespace-nowrap rounded-full font-medium transition-colors ${
-                        allein ? 'px-4 py-1.5 text-[13px]' : 'px-3 py-0.5 text-[11.5px]'
+                        allein ? 'px-4 py-1.5 text-[13px]' : 'px-3 py-0.5 text-[11px]'
                       }`}
                       style={an ? { background: ui.aktiv, color: ui.fg } : { color: ui.muted }}
                     >
@@ -1859,32 +1877,30 @@ function farbAusdruck(
   return 'rgba(0,0,0,0)'
 }
 
-const uiHell = {
-  bg: '#f7f7f5',
-  fg: '#18181b',
-  panel: '#ffffff',
-  border: 'rgba(24,24,27,0.07)',
-  muted: '#71717a',
-  weich: 'rgba(24,24,27,0.045)',
-  aktiv: '#e8e8e5',
-  ring: 'rgba(37,99,235,0.35)',
-  schatten:
-    '0 1px 1px rgba(24,24,27,0.03), 0 10px 30px -12px rgba(24,24,27,0.22)',
-  rampe: RAMPE_HELL,
+/**
+ * Die Oberfläche liest ihre Farben als CSS-Variablen (definiert in
+ * `globals.css`), nicht als feste Werte – wie im Velonavi. So wechselt das
+ * Thema, indem am <html> `data-thema` umgesetzt wird, und der Umschalter oben
+ * sieht auf beiden Seiten gleich aus.
+ */
+const ui = {
+  bg: 'var(--ab-papier)',
+  fg: 'var(--ab-tinte)',
+  panel: 'var(--ab-blatt)',
+  border: 'var(--ab-linie)',
+  muted: 'var(--ab-leise)',
+  weich: 'var(--ab-weich)',
+  aktiv: 'var(--ab-aktiv)',
+  /** Schiene der Schalter. */
+  spur: 'var(--ab-spur)',
+  /** Die Scheibe des Reglers. */
+  knopf: 'var(--ab-knopf)',
+  ring: 'var(--ab-ring)',
+  /** Nur für Datenwerte: Rang-Zahl und Füllung des Rang-Reglers. */
+  karmin: 'var(--ab-karmin)',
+  schatten: 'var(--ab-schatten)',
 }
-const uiDunkel = {
-  bg: '#0b0b0c',
-  fg: '#f4f4f5',
-  panel: '#18181b',
-  border: 'rgba(255,255,255,0.08)',
-  muted: '#a1a1aa',
-  weich: 'rgba(255,255,255,0.06)',
-  aktiv: '#303036',
-  ring: 'rgba(96,165,250,0.4)',
-  schatten: '0 1px 1px rgba(0,0,0,0.3), 0 10px 30px -12px rgba(0,0,0,0.7)',
-  rampe: RAMPE_DUNKEL,
-}
-type Ui = typeof uiHell
+type Ui = typeof ui
 
 /**
  * Der Zustand steht im URL-Fragment (`#haus=…`), nicht in der Query. Fragmente
@@ -2031,10 +2047,10 @@ function Panel({
 
       <div className="mt-3">
         <div
-          className="h-2.5 w-full rounded-sm"
-          style={{ background: `linear-gradient(to right, ${RANG_RAMPE.join(',')})` }}
+          className="h-2.5 w-full rounded-full"
+          style={{ background: `linear-gradient(to right, ${KARMIN.join(',')})` }}
         />
-        <div className="mt-1 flex justify-between text-[11px]" style={{ color: ui.muted }}>
+        <div className="mt-1 flex justify-between text-[11px] tabular-nums" style={{ color: ui.muted }}>
           {skala.map((t, i) => (
             <span key={i}>{t}</span>
           ))}
@@ -2241,7 +2257,7 @@ function StadtWechsel({ ui, stadt, modus }: { ui: Ui; stadt: Stadt; modus: Modus
         aria-label="angebunden · Wie das gerechnet ist"
         className="inline-flex shrink-0 transition-opacity hover:opacity-70"
       >
-        <Wortmarke size={13} style={{ color: '#18181b' }} />
+        <Wortmarke size={13} style={{ color: ui.fg }} />
       </Link>
     </div>
   )
@@ -2278,7 +2294,11 @@ function RangRegler({
   return (
     <div className="mt-3 border-t pb-3 pt-2.5" style={{ borderColor: ui.border }}>
       <div className="mb-2 flex items-baseline justify-between text-[11px]">
-        <span style={{ color: ui.muted }}>Bestplatzierte hervorheben</span>
+        <span className="tabular-nums" style={{ color: ui.muted }}>
+          {aktiv && topN > 0
+            ? `${topN === 1 ? 'Rang 1' : `Top ${nf(topN)}`} hervorheben`
+            : 'Bestplatzierte hervorheben'}
+        </span>
         <Schalter ui={ui} checked={aktiv} onChange={setAktiv} label="Rang-Highlight" />
       </div>
 
@@ -2294,27 +2314,12 @@ function RangRegler({
         className={`regler ${aktiv ? '' : 'cursor-not-allowed opacity-40'}`}
         style={
           {
-            '--fuellung': `linear-gradient(to right, ${RANG_RAMPE[0]} ${prozent}%, ${ui.weich} ${prozent}%)`,
-            '--knopf': ui.aktiv,
+            '--fuellung': `linear-gradient(to right, ${ui.karmin} ${prozent}%, ${ui.weich} ${prozent}%)`,
+            '--knopf': ui.knopf,
             '--ring': ui.ring,
           } as React.CSSProperties
         }
       />
-
-      {aktiv && topN > 0 && (
-        <div className="mt-2.5 flex items-center gap-2">
-          <div
-            className="h-1 flex-1 rounded-full"
-            style={{ background: `linear-gradient(to right, ${RANG_RAMPE.join(',')})` }}
-          />
-        </div>
-      )}
-      {aktiv && topN > 0 && (
-        <div className="mt-1 flex justify-between text-[11px]" style={{ color: ui.muted }}>
-          <span>Rang 1</span>
-          <span>Rang {nf(topN)}</span>
-        </div>
-      )}
     </div>
   )
 }
@@ -2349,7 +2354,7 @@ function MobileRangLeiste({
 
   return (
     <div
-      className="absolute inset-x-3 bottom-3 z-20 rounded-lg border px-3 pb-2 pt-2 backdrop-blur-md"
+      className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border px-3 pb-2 pt-2 backdrop-blur-md"
       style={{ background: ui.panel, borderColor: ui.border, color: ui.fg, boxShadow: ui.schatten }}
     >
       <div className="flex items-center justify-between gap-3 text-[12px]">
@@ -2373,7 +2378,7 @@ function MobileRangLeiste({
         disabled={!aktiv}
         aria-label="Anzahl hervorgehobener Ränge"
         className={`regler mt-1 ${aktiv ? '' : 'cursor-not-allowed opacity-40'}`}
-        style={{ '--fuellung': `linear-gradient(to right, ${RANG_RAMPE[0]} ${prozent}%, ${ui.weich} ${prozent}%)`, '--knopf': ui.aktiv, '--ring': ui.ring } as React.CSSProperties}
+        style={{ '--fuellung': `linear-gradient(to right, ${ui.karmin} ${prozent}%, ${ui.weich} ${prozent}%)`, '--knopf': ui.knopf, '--ring': ui.ring } as React.CSSProperties}
       />
       {aktiv && (
         <p className="mt-1 text-[11px]" style={{ color: ui.muted }}>
@@ -2415,8 +2420,8 @@ function SortenWahl({
             aria-label="Was die Sorten umfassen"
             className="flex h-[13px] w-[13px] items-center justify-center rounded-full border text-[9px] font-semibold leading-none transition-colors"
             style={{
-              borderColor: infoOffen ? AKZENT : ui.border,
-              color: infoOffen ? AKZENT : ui.muted,
+              borderColor: infoOffen ? ui.fg : ui.border,
+              color: infoOffen ? ui.fg : ui.muted,
             }}
           >
             i
@@ -2427,7 +2432,7 @@ function SortenWahl({
             <button
               onClick={() => setAn(arten.map(() => true))}
               className="transition-opacity hover:opacity-60"
-              style={{ color: AKZENT }}
+              style={{ color: ui.fg }}
             >
               alle
             </button>
@@ -2436,7 +2441,7 @@ function SortenWahl({
             <button
               onClick={() => setAn(arten.map(() => false))}
               className="transition-opacity hover:opacity-60"
-              style={{ color: AKZENT }}
+              style={{ color: ui.fg }}
             >
               keine
             </button>
@@ -2466,8 +2471,8 @@ function SortenWahl({
             <span
               className="flex h-3 w-3 shrink-0 items-center justify-center rounded-[3px] border"
               style={{
-                borderColor: an[i] ? AKZENT : ui.border,
-                background: an[i] ? AKZENT : 'transparent',
+                borderColor: an[i] ? ui.fg : ui.border,
+                background: an[i] ? ui.fg : 'transparent',
               }}
             >
               {an[i] && (
@@ -2475,7 +2480,7 @@ function SortenWahl({
                   <path
                     d="M1.5 5.2 3.9 7.5 8.5 2.6"
                     fill="none"
-                    stroke="#ffffff"
+                    stroke={ui.bg}
                     strokeWidth="1.8"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -2514,12 +2519,12 @@ function Schalter({
     >
       <span
         className="relative inline-block h-[18px] w-[30px] shrink-0 rounded-full transition-colors"
-        style={{ background: checked ? ui.fg : ui.weich }}
+        style={{ background: checked ? ui.fg : ui.spur }}
       >
         <span
           className="absolute top-0.5 h-[14px] w-[14px] rounded-full transition-all"
           style={{
-            background: '#ffffff',
+            background: ui.bg,
             left: checked ? '14px' : '2px',
             boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
           }}
@@ -2542,7 +2547,7 @@ function Extrempunkt({
   return (
     <button
       onClick={onWaehlen}
-      className="zeile flex w-full items-baseline gap-2 rounded-md px-1.5 -mx-1.5 py-[3px] text-left text-[12px]"
+      className="zeile flex w-full items-baseline gap-2 rounded-lg px-1.5 -mx-1.5 py-[3px] text-left text-[12px]"
       style={{ '--weich': ui.weich } as React.CSSProperties}
     >
       <span className="shrink-0 tabular-nums" style={{ color: ui.fg }}>{k}:</span>
@@ -2679,7 +2684,12 @@ function Karteikarte({
 
       <div className="mt-3 border-t pt-2.5" style={{ borderColor: ui.border }}>
         <div className="flex items-baseline gap-1.5">
-          <span className="text-[15px] font-semibold tabular-nums" style={{ color: AKZENT }}>
+          <span
+            aria-hidden
+            className="h-2 w-2 shrink-0 self-center rounded-full"
+            style={{ background: ui.karmin }}
+          />
+          <span className="text-[15px] font-semibold tabular-nums" style={{ color: ui.karmin }}>
             Rang {nf(rang)}
           </span>
           <span className="text-[12px]" style={{ color: ui.muted }}>
@@ -2700,42 +2710,43 @@ function Karteikarte({
         {rangFolgt ? (
           <p className="mt-2 text-[12px] leading-relaxed" style={{ color: ui.muted }}>
             {beide
-              ? 'Rot heisst bei ÖV und Kultur zusammen besser als dieses Haus, Schwarz schlechter. Je dunkler das Rot, desto besser der Rang.'
+              ? 'Karmin heisst bei ÖV und Kultur zusammen besser als dieses Haus, Grau schlechter. Je kräftiger das Karmin, desto besser der Rang.'
               : kultur
-              ? 'Rot heisst mehr Kultur in der Nähe als bei diesem Haus, Schwarz weniger. Je dunkler das Rot, desto besser der Rang.'
-              : 'Rot heisst besser angebunden als dieses Haus, Schwarz schlechter. Je dunkler das Rot, desto besser der Rang.'}
+              ? 'Karmin heisst mehr Kultur in der Nähe als bei diesem Haus, Grau weniger. Je kräftiger das Karmin, desto besser der Rang.'
+              : 'Karmin heisst besser angebunden als dieses Haus, Grau schlechter. Je kräftiger das Karmin, desto besser der Rang.'}
           </p>
-        ) : fixiert ? (
-          <button
-            type="button"
-            onClick={onAusrichten}
-            className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] transition-opacity hover:opacity-70"
-            style={{ borderColor: AKZENT, color: AKZENT }}
-          >
-            Auf der Karte vergleichen
-            {!mobil && (
-              <kbd
-                className="rounded border px-1 text-[10px] leading-[1.5]"
-                style={{ borderColor: ui.border, color: ui.muted }}
-              >
-                Enter
-              </kbd>
-            )}
-          </button>
         ) : null}
       </div>
 
       <div className="mt-3 border-t pt-3" style={{ borderColor: ui.border }}>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => (kannNativ ? onTeilenNativ() : setMenuOffen((v) => !v))}
             aria-expanded={kannNativ ? undefined : menuOffen}
-            className="flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-medium text-white transition-opacity hover:opacity-90"
-            style={{ background: AKZENT }}
+            className="flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-medium transition-opacity hover:opacity-90"
+            style={{ background: ui.fg, color: ui.bg }}
           >
             <TeilenSymbol />
             Teilen
           </button>
+          {!rangFolgt && fixiert && (
+            <button
+              type="button"
+              onClick={onAusrichten}
+              className="flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-medium transition-opacity hover:opacity-70"
+              style={{ borderColor: ui.border, color: ui.fg }}
+            >
+              Vergleichen
+              {!mobil && (
+                <kbd
+                  className="rounded px-1.5 text-[10px] leading-[1.6]"
+                  style={{ background: ui.weich, color: ui.muted }}
+                >
+                  Enter
+                </kbd>
+              )}
+            </button>
+          )}
           {geteilt && <span className="text-[12px]" style={{ color: ui.muted }}>Link kopiert</span>}
         </div>
 

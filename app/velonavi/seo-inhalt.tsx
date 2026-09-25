@@ -92,7 +92,7 @@ export function SeoInhalt({ statistik }: { statistik: VeloMeta['statistik'] }) {
               im Browser, dafür braucht er JavaScript.
             </p>
             <p style={{ marginTop: '0.75rem' }}>
-              <a href="/methode#velonavi" style={{ color: '#2563eb' }}>
+              <a href="/methode#velonavi" style={{ color: '#18181b', textDecoration: 'underline' }}>
                 Wie das gerechnet ist
               </a>{' '}
               steht auch ohne Karte zum Nachlesen bereit.

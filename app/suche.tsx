@@ -346,7 +346,7 @@ export function Suchleiste({
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px]" style={{ color: ui.fg }}>
+                  <span className="block truncate text-[13px]" style={{ color: ui.fg }}>
                     {e.titel}
                   </span>
                   {e.unter && (

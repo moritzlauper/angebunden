@@ -14,7 +14,7 @@ import { PNG } from 'pngjs'
 
 const HG = [24, 24, 27] // #18181b
 const SPUR = [231, 231, 229] // #e7e7e5
-const PUNKT = [220, 38, 38] // #dc2626
+const PUNKT = [204, 57, 52] // #cc3934, KARMIN[2] aus app/farben.ts
 
 /** Deckung eines Punktes in einer Strecke der Halbbreite r, weich an der Kante. */
 function strecke(px, py, ax, ay, bx, by, r) {

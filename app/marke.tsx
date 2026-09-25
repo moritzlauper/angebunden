@@ -1,13 +1,14 @@
 /**
- * Die Wortmarke: «angebunden» klein geschrieben, dahinter ein roter Punkt.
- * Der Punkt ist der Anschlusspunkt ans Netz – dieselbe Farbe, in der die Karte
- * die vordersten Ränge und die beiden Extrempunkte markiert.
+ * Die Wortmarke: «angebunden» klein geschrieben, dahinter ein karminroter
+ * Punkt. Der Punkt ist der Anschlusspunkt ans Netz – dieselbe Farbe, in der
+ * die Vergleichskarte die Ränge einfärbt und der Velonavi das Ziel setzt.
  *
  * Reine Darstellung, keine Hooks: läuft im Server- wie im Client-Baum.
  */
 
-/** Rot der Hervorhebung, deckungsgleich mit RANG_RAMPE[2] in karte.tsx. */
-export const PUNKT = '#dc2626'
+import { PUNKT } from './farben'
+
+export { PUNKT }
 
 export function Wortmarke({
   size = 15,

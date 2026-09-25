@@ -44,7 +44,7 @@ function nf(n: number) {
 
 function Formel({ children }: { children: React.ReactNode }) {
   return (
-    <pre className="mt-4 overflow-x-auto rounded-lg border border-black/10 bg-black/[0.035] px-4 py-3.5 text-[12.5px] leading-relaxed dark:border-white/10 dark:bg-white/[0.04]">
+    <pre className="mt-4 overflow-x-auto rounded-lg border border-black/10 bg-black/[0.035] px-4 py-3.5 text-[12px] leading-relaxed dark:border-white/10 dark:bg-white/[0.04]">
       <code>{children}</code>
     </pre>
   )

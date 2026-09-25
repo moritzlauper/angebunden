@@ -17,6 +17,7 @@ import { Suchleiste, bauIndex, suchen, Sternsymbol, type Eintrag } from '../such
 import { Wortmarke } from '../marke'
 import { STAEDTE } from '../staedte'
 import { nf } from '../site'
+import { PUNKT, TINTE, GRAU } from '../farben'
 import {
   ladeGraph, einrastenAlle, route, kantenKosten, alsGpx, verbinde, VOREINSTELLUNGEN, reinZeitlich,
   veloErlaubt, stressVon, netzVon, NETZ, VMAX,
@@ -63,36 +64,72 @@ function wms(dienst: string, layer: string, transparent = false) {
  * Wie angenehm ein Abschnitt zu fahren ist, Stufe 1 bis 4 in den Statusfarben,
  * Index 0 für geschobene Stücke. Es zählt nicht nur der Autoverkehr: auch
  * Kopfsteinpflaster, Tramgleise und Fussgängerzonen ziehen eine Strecke nach unten.
+ *
+ * Die Ampel bleibt, weil sie beim Velofahren gelernt ist – nur auf gleiche
+ * Sättigung gezogen, damit das Grün nicht die Parks der Stadtkarte schlägt.
+ * «Hart» ist nicht mehr rot, sondern Tinte gestrichelt: Kräftiges Rot heisst in
+ * der Vergleichskarte «gut angebunden», und dieselbe Farbe darf auf der anderen
+ * Seite nicht das Gegenteil sagen. Nebenbei sind «Hart» und «Geschoben» damit
+ * auch für Farbenblinde an der Strichelung zu unterscheiden.
  */
 export const STUFEN = [
-  { farbe: '#8a8a86', name: 'Geschoben', kurz: 'Schieben' },
-  { farbe: '#0ca30c', name: 'Angenehm: ruhig und glatt', kurz: 'Angenehm' },
-  { farbe: '#fab219', name: 'Mässig: etwas Verkehr oder ruppig', kurz: 'Mässig' },
-  { farbe: '#ec835a', name: 'Unangenehm: Velostreifen, Pflaster', kurz: 'Unangenehm' },
-  { farbe: '#d03b3b', name: 'Hart: Mischverkehr, Gleise, grobes Pflaster', kurz: 'Hart' },
+  { farbe: GRAU, name: 'Geschoben', kurz: 'Schieben', strich: [0.6, 1.2] },
+  { farbe: '#2f8a4f', name: 'Angenehm: ruhig und glatt', kurz: 'Angenehm' },
+  { farbe: '#d9a531', name: 'Mässig: etwas Verkehr oder ruppig', kurz: 'Mässig' },
+  { farbe: '#d7784d', name: 'Unangenehm: Velostreifen, Pflaster', kurz: 'Unangenehm' },
+  { farbe: '#3f3f46', name: 'Hart: Mischverkehr, Gleise, grobes Pflaster', kurz: 'Hart', strich: [1.6, 0.8] },
 ] as const
-const VORZUG = '#7c5cd6'
-const AKZENT = '#2563eb'
+
+/** Die Strichelung als `line-dasharray`; durchgezogen heisst bei MapLibre [1, 0]. */
+const strichVon = (i: number) => {
+  const s = STUFEN[i]
+  return 'strich' in s ? s.strich : [1, 0]
+}
+
+/**
+ * Balken und Legende können keine `dasharray`: dort zeichnet die Strichelung
+ * ein Verlauf. Die Werte sind dieselben, gerechnet für fünf Punkte Strichbreite.
+ */
+function stufenBelag(i: number) {
+  const s = STUFEN[i]
+  if (!('strich' in s)) return { background: s.farbe }
+  const [an, aus] = s.strich
+  return {
+    backgroundImage:
+      `repeating-linear-gradient(90deg, ${s.farbe} 0 ${5 * an}px,` +
+      ` transparent ${5 * an}px ${5 * (an + aus)}px)`,
+  }
+}
+
+/** Vorzugsrouten der Stadt: eine Empfehlung, kein Datenwert – deshalb grau. */
+const VORZUG = GRAU
 
 /**
  * Die Oberfläche liest ihre Farben als CSS-Variablen (definiert in
  * `globals.css`), nicht als feste Werte. So wechselt das Thema, indem am
  * <html> ein Attribut umgesetzt wird - ohne die Farben durch jede Komponente
- * durchzureichen und ohne dass ein einziges `style` hier davon weiss.
+ * durchzureichen und ohne dass ein einziges `style` hier davon weiss. Es sind
+ * dieselben Variablen wie in der Vergleichskarte.
+ *
+ * Einen Akzent gibt es nicht mehr: Was man drückt, zieht oder wählt, ist
+ * Tinte (`fg`). Karmin bleibt dem Ziel und der Marke vorbehalten.
  */
 const ui = {
-  bg: 'var(--vn-bg)',
-  fg: 'var(--vn-fg)',
-  panel: 'var(--vn-panel)',
-  border: 'var(--vn-border)',
-  muted: 'var(--vn-muted)',
-  weich: 'var(--vn-weich)',
-  aktiv: 'var(--vn-aktiv)',
-  ring: 'var(--vn-ring)',
-  akzent: 'var(--vn-akzent)',
-  /** Schiene von Reglern und Schaltern. */
-  spur: 'var(--vn-spur)',
-  schatten: 'var(--vn-schatten)',
+  bg: 'var(--ab-papier)',
+  fg: 'var(--ab-tinte)',
+  panel: 'var(--ab-blatt)',
+  border: 'var(--ab-linie)',
+  muted: 'var(--ab-leise)',
+  weich: 'var(--ab-weich)',
+  aktiv: 'var(--ab-aktiv)',
+  ring: 'var(--ab-ring)',
+  /** Schiene der Schalter. */
+  spur: 'var(--ab-spur)',
+  /** Die Scheibe des Reglers. */
+  knopf: 'var(--ab-knopf)',
+  /** Nur für das Ziel und den Punkt der Marke. */
+  punkt: 'var(--ab-punkt)',
+  schatten: 'var(--ab-schatten)',
 }
 
 type Thema = 'hell' | 'dunkel'
@@ -117,7 +154,7 @@ type Themenwahl = Thema | 'auto'
  */
 const KARTE = {
   hell: { grund: '#f7f7f5', hellMin: 0, hellMax: 1, drehung: 0, saettigung: 0, kontrast: 0 },
-  dunkel: { grund: '#0a0a0c', hellMin: 1, hellMax: 0, drehung: 180, saettigung: -0.2, kontrast: -0.05 },
+  dunkel: { grund: '#0f0f11', hellMin: 1, hellMax: 0, drehung: 180, saettigung: -0.2, kontrast: -0.05 },
 } as const
 
 /** Nachts von selbst dunkel: von 20 Uhr bis 7 Uhr. */
@@ -359,7 +396,7 @@ export default function Velonavi() {
   }, [themenwahl])
 
   useEffect(() => {
-    document.documentElement.dataset.vnThema = thema
+    document.documentElement.dataset.thema = thema
   }, [thema])
 
   // --- Zustand aus dem Link übernehmen
@@ -719,7 +756,7 @@ export default function Velonavi() {
         type: 'line',
         source: 'andere',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#9a9a96', 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3, 16, 6] },
+        paint: { 'line-color': GRAU, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3, 16, 6] },
       })
       map.addLayer({
         id: 'andere-name',
@@ -748,7 +785,12 @@ export default function Velonavi() {
         paint: {
           'line-color': ['match', ['get', 'stufe'], 0, STUFEN[0].farbe, 1, STUFEN[1].farbe, 2, STUFEN[2].farbe, 3, STUFEN[3].farbe, STUFEN[4].farbe],
           'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3.5, 16, 7],
-          'line-dasharray': ['case', ['==', ['get', 'stufe'], 0], ['literal', [0.6, 1.2]], ['literal', [1, 0]]],
+          'line-dasharray': [
+            'match', ['get', 'stufe'],
+            0, ['literal', strichVon(0)],
+            4, ['literal', strichVon(4)],
+            ['literal', [1, 0]],
+          ],
         },
       })
       map.addLayer({
@@ -757,8 +799,8 @@ export default function Velonavi() {
         source: 'route-ampeln',
         paint: {
           'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 3, 16, 6],
-          'circle-color': ['case', ['==', ['get', 'geradeaus'], 1], '#18181b', '#ffffff'],
-          'circle-stroke-color': '#18181b',
+          'circle-color': ['case', ['==', ['get', 'geradeaus'], 1], TINTE, '#ffffff'],
+          'circle-stroke-color': TINTE,
           'circle-stroke-width': 1.5,
         },
       })
@@ -766,7 +808,7 @@ export default function Velonavi() {
         id: 'zeiger',
         type: 'circle',
         source: 'zeiger',
-        paint: { 'circle-radius': 6, 'circle-color': AKZENT, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 },
+        paint: { 'circle-radius': 6, 'circle-color': TINTE, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2 },
       })
       setKartenBereit(true)
     })
@@ -917,7 +959,7 @@ export default function Velonavi() {
       return
     }
     const el = document.createElement('div')
-    el.style.cssText = `width:22px;height:22px;border-radius:999px;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:grab;background:${art === 'start' ? '#18181b' : AKZENT}`
+    el.style.cssText = `width:22px;height:22px;border-radius:999px;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:grab;background:${art === 'start' ? TINTE : PUNKT}`
     el.setAttribute('aria-label', art === 'start' ? 'Start' : 'Ziel')
     const mk = new Marker({ element: el, draggable: true }).setLngLat([p.lon, p.lat]).addTo(map)
     mk.on('dragend', () => {
@@ -946,7 +988,9 @@ export default function Velonavi() {
     viaMarken.current = zwischen.flatMap((z, i) => {
       if (!z) return []
       const el = document.createElement('div')
-      el.style.cssText = `width:16px;height:16px;border-radius:999px;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:grab;background:${VORZUG}`
+      // Der Zwischenhalt ist ein Ring: weiss mit Tinte-Rand, damit er neben
+      // Start und Ziel keine dritte Farbe braucht.
+      el.style.cssText = `width:10px;height:10px;margin:0 3px;border-radius:999px;border:3px solid ${TINTE};box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:grab;background:#fff`
       el.setAttribute('aria-label', `Zwischenziel ${i + 1}`)
       const mk = new Marker({ element: el, draggable: true }).setLngLat([z.lon, z.lat]).addTo(map)
       mk.on('dragend', () => {
@@ -1165,7 +1209,7 @@ export default function Velonavi() {
               setZwischenText((alt) => alt.map((t, j) => (j === i ? p.titel : t)))
               merken(p)
             }}
-            links={<Marke farbe={VORZUG} />}
+            links={<Marke farbe={ui.fg} ring />}
             rechts={
               <button
                 onClick={() => {
@@ -1196,7 +1240,7 @@ export default function Velonavi() {
             merken(p)
           }}
           platzhalter="Ziel"
-          links={<Marke farbe={AKZENT} />}
+          links={<Marke farbe={ui.punkt} />}
           rechts={
             <button
               onClick={() => {
@@ -1275,7 +1319,7 @@ export default function Velonavi() {
       {fehler && <Hinweis>{fehler}</Hinweis>}
       {ergebnis && 'fehler' in ergebnis && <Hinweis>{ergebnis.fehler}</Hinweis>}
       {routen?.notSchieben && (
-        <p className="rounded-2xl px-3 py-2 text-[12.5px] leading-snug" style={{ background: ui.weich, color: ui.muted }}>
+        <p className="rounded-2xl px-3 py-2 text-[12px] leading-snug" style={{ background: ui.weich, color: ui.muted }}>
           Fahrend gibt es keinen Weg. Diese Route enthält ein kurzes Stück, auf dem du das Velo schiebst.
         </p>
       )}
@@ -1299,7 +1343,7 @@ export default function Velonavi() {
       )}
       {einstellungen}
       <Legende />
-      <p className="text-[11.5px] leading-snug" style={{ color: ui.muted }}>
+      <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
         Grundlage ist das Fuss- und Velowegnetz der Stadt Zürich, ergänzt um Ampeln, Tempo,
         Velonetzplanung und Unfalldaten der Stadt sowie Belag und Tramgleise aus OpenStreetMap.{' '}
         <Link href="/methode#velonavi" className="underline underline-offset-2">
@@ -1339,7 +1383,7 @@ export default function Velonavi() {
             color: ui.fg,
           }}
         >
-          <div className="max-w-[14rem] truncate px-3 pt-2 text-[11.5px]" style={{ color: ui.muted }}>
+          <div className="max-w-[14rem] truncate px-3 pt-2 text-[11px]" style={{ color: ui.muted }}>
             {klickOrt.p.titel}
           </div>
           {(
@@ -1395,7 +1439,7 @@ export default function Velonavi() {
       ) : (
         <>
           <div
-            className="absolute bottom-3 left-3 top-3 z-30 flex w-[24rem] flex-col overflow-hidden rounded-3xl border backdrop-blur-md"
+            className="absolute bottom-3 left-3 top-3 z-30 flex w-[24rem] flex-col overflow-hidden rounded-2xl border backdrop-blur-md"
             style={{ background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten }}
           >
             <div className="px-4 pb-3 pt-4">
@@ -1507,7 +1551,7 @@ function Ergebnis({
       {/* Ohne Profilpunkte wären min und max unendlich und jede Koordinate NaN. */}
       {r.profil.length > 0 && <Hoehenprofil r={r} hover={hover} setHover={setHover} />}
 
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[12.5px]">
+      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[12px]">
         {fakten.map((f) => (
           <div key={f.titel} className="contents">
             <dt style={{ color: ui.muted }}>{f.titel}</dt>
@@ -1559,15 +1603,15 @@ function Variantenwahl({
             aria-pressed={an}
             className="rounded-2xl border px-2.5 py-2 text-left transition-colors"
             style={{
-              borderColor: an ? ui.akzent : ui.border,
-              background: an ? 'rgba(37,99,235,0.06)' : 'transparent',
-              boxShadow: an ? `0 0 0 1px ${ui.akzent}` : undefined,
+              borderColor: an ? ui.fg : ui.border,
+              background: an ? ui.weich : 'transparent',
+              boxShadow: an ? `0 0 0 1px ${ui.fg}` : undefined,
             }}
           >
-            <div className="truncate text-[11.5px] font-medium" style={{ color: an ? ui.akzent : ui.muted }}>
+            <div className="truncate text-[11px] font-medium" style={{ color: an ? ui.fg : ui.muted }}>
               {k.titel}
             </div>
-            <div className="mt-0.5 text-[17px] font-semibold leading-tight tabular-nums">{minuten(k.r.zeit)}</div>
+            <div className="mt-0.5 text-[15px] font-semibold leading-tight tabular-nums">{minuten(k.r.zeit)}</div>
             <div className="mt-0.5 text-[11px] leading-snug tabular-nums" style={{ color: ui.muted }}>
               {km(k.r.distanz)} · ↑{Math.round(k.r.hoch)} m
               <br />
@@ -1590,11 +1634,11 @@ function StressBalken({ r }: { r: Route }) {
           <div
             key={t.i}
             title={`${STUFEN[t.i].name}: ${km(t.m)} (${prozent(t.m, r.distanz)})`}
-            style={{ width: `${(100 * t.m) / r.distanz}%`, background: STUFEN[t.i].farbe, minWidth: 3 }}
+            style={{ width: `${(100 * t.m) / r.distanz}%`, minWidth: 3, ...stufenBelag(t.i) }}
           />
         ))}
       </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11.5px]" style={{ color: ui.muted }}>
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px]" style={{ color: ui.muted }}>
         {teile.map((t) => (
           <span key={t.i} className="flex items-center gap-1 tabular-nums">
             <span className="inline-block h-2 w-2 rounded-full" style={{ background: STUFEN[t.i].farbe }} />
@@ -1635,7 +1679,7 @@ function Hoehenprofil({ r, hover, setHover }: { r: Route; hover: number | null; 
   const h = hover !== null ? r.profil[hover] : null
   return (
     <figure className="m-0">
-      <figcaption className="mb-1 flex justify-between text-[11.5px]" style={{ color: ui.muted }}>
+      <figcaption className="mb-1 flex justify-between text-[11px]" style={{ color: ui.muted }}>
         <span>Höhenprofil</span>
         {h && (
           <span className="tabular-nums">
@@ -1667,12 +1711,12 @@ function Hoehenprofil({ r, hover, setHover }: { r: Route; hover: number | null; 
         <text x={P.l} y={H - 3} fontSize="9.5" fill={ui.muted}>
           0
         </text>
-        <path d={flaeche} fill="rgba(37,99,235,0.1)" />
-        <path d={linie} fill="none" stroke={AKZENT} strokeWidth="2" strokeLinejoin="round" />
+        <path d={flaeche} fill={ui.fg} fillOpacity="0.08" />
+        <path d={linie} fill="none" stroke={ui.fg} strokeWidth="2" strokeLinejoin="round" />
         {h && (
           <g>
-            <line x1={x(h[0])} x2={x(h[0])} y1={P.t} y2={H - P.b} stroke="#18181b" strokeWidth="1" strokeOpacity="0.4" />
-            <circle cx={x(h[0])} cy={y(h[1])} r="4" fill={AKZENT} stroke="#fff" strokeWidth="2" />
+            <line x1={x(h[0])} x2={x(h[0])} y1={P.t} y2={H - P.b} stroke={ui.fg} strokeWidth="1" strokeOpacity="0.4" />
+            <circle cx={x(h[0])} cy={y(h[1])} r="4" fill={ui.fg} stroke={ui.bg} strokeWidth="2" />
           </g>
         )}
       </svg>
@@ -1692,11 +1736,11 @@ function Wegbeschreibung({ r }: { r: Route }) {
   }
   return (
     <div>
-      <button onClick={() => setOffen(!offen)} className="text-[12.5px] font-medium" style={{ color: ui.akzent }}>
+      <button onClick={() => setOffen(!offen)} className="text-[12px] font-medium underline underline-offset-2" style={{ color: ui.fg }}>
         {offen ? 'Strassenfolge ausblenden' : `Strassenfolge (${zeilen.length})`}
       </button>
       {offen && (
-        <ol className="mt-2 flex flex-col gap-1 text-[12.5px]">
+        <ol className="mt-2 flex flex-col gap-1 text-[12px]">
           {zeilen.map((z, i) => (
             <li key={i} className="flex justify-between gap-3">
               <span className="truncate">{z.name}</span>
@@ -1728,16 +1772,16 @@ function Einstellungen({
 }) {
   return (
     <section className="flex flex-col gap-2.5">
-      <button onClick={() => setFeinOffen(!feinOffen)} className="self-start text-[12.5px] font-medium" style={{ color: ui.akzent }}>
+      <button onClick={() => setFeinOffen(!feinOffen)} className="self-start text-[12px] font-medium underline underline-offset-2" style={{ color: ui.fg }}>
         {feinOffen ? 'Feineinstellung ausblenden' : 'Komfort-Route selbst gewichten'}
       </button>
       {feinOffen && (
         <div className="flex flex-col gap-2.5">
-          <p className="text-[11.5px]" style={{ color: ui.muted }}>
+          <p className="text-[11px]" style={{ color: ui.muted }}>
             Gilt für die Variante «Komfort». «Schnell» bleibt fest.
           </p>
           {REGLER.map((rg) => (
-            <label key={rg.id} className="block text-[12.5px]">
+            <label key={rg.id} className="block text-[12px]">
               <span className="flex justify-between">
                 <span>{rg.titel}</span>
                 <span className="tabular-nums" style={{ color: ui.muted }}>
@@ -1754,8 +1798,8 @@ function Einstellungen({
                 className="regler mt-1"
                 style={
                   {
-                    '--fuellung': `linear-gradient(to right, ${ui.akzent} ${gewichte[rg.id] * 100}%, ${ui.spur} ${gewichte[rg.id] * 100}%)`,
-                    '--knopf': '#ffffff',
+                    '--fuellung': `linear-gradient(to right, ${ui.fg} ${gewichte[rg.id] * 100}%, ${ui.weich} ${gewichte[rg.id] * 100}%)`,
+                    '--knopf': ui.knopf,
                     '--ring': ui.ring,
                   } as React.CSSProperties
                 }
@@ -1798,7 +1842,7 @@ function Zuhausezeile({
       style={{ background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten }}
     >
       <button onClick={waehlen} className="flex items-center gap-1.5 py-1 text-[12px]" style={{ color: ui.fg }}>
-        <span style={{ color: '#eab308' }}>
+        <span style={{ color: ui.fg }}>
           <Sternsymbol />
         </span>
         <span className="max-w-[12rem] truncate">{zuhause.titel}</span>
@@ -1840,7 +1884,7 @@ function Themenschalter({ wahl, setWahl }: { wahl: Themenwahl; setWahl: (v: Them
   ]
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-[12.5px]" style={{ color: ui.fg }}>
+      <span className="text-[12px]" style={{ color: ui.fg }}>
         Darstellung
       </span>
       <div
@@ -1856,10 +1900,10 @@ function Themenschalter({ wahl, setWahl }: { wahl: Themenwahl; setWahl: (v: Them
               key={k.id}
               onClick={() => setWahl(k.id)}
               aria-pressed={an}
-              className="rounded-full px-2.5 py-1 text-[11.5px] font-medium transition-colors"
+              className="rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors"
               style={{
                 background: an ? ui.aktiv : 'transparent',
-                color: an ? ui.akzent : ui.muted,
+                color: an ? ui.fg : ui.muted,
                 boxShadow: an ? ui.schatten : undefined,
               }}
             >
@@ -1874,7 +1918,7 @@ function Themenschalter({ wahl, setWahl }: { wahl: Themenwahl; setWahl: (v: Them
 
 function Schalter({ an, setAn, titel, hilfe }: { an: boolean; setAn: (v: boolean) => void; titel: string; hilfe?: string }) {
   return (
-    <button onClick={() => setAn(!an)} className="flex items-center justify-between gap-3 text-left text-[12.5px]" role="switch" aria-checked={an}>
+    <button onClick={() => setAn(!an)} className="flex items-center justify-between gap-3 text-left text-[12px]" role="switch" aria-checked={an}>
       <span>
         {titel}
         {hilfe && (
@@ -1883,8 +1927,8 @@ function Schalter({ an, setAn, titel, hilfe }: { an: boolean; setAn: (v: boolean
           </span>
         )}
       </span>
-      <span className="relative h-5 w-9 shrink-0 rounded-full transition-colors" style={{ background: an ? ui.akzent : ui.spur }}>
-        <span className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all" style={{ left: an ? 18 : 2 }} />
+      <span className="relative h-5 w-9 shrink-0 rounded-full transition-colors" style={{ background: an ? ui.fg : ui.spur }}>
+        <span className="absolute top-0.5 h-4 w-4 rounded-full shadow transition-all" style={{ left: an ? 18 : 2, background: ui.bg }} />
       </span>
     </button>
   )
@@ -1892,31 +1936,40 @@ function Schalter({ an, setAn, titel, hilfe }: { an: boolean; setAn: (v: boolean
 
 function Legende() {
   return (
-    <section className="flex flex-col gap-1.5 text-[11.5px]" style={{ color: ui.muted }}>
+    <section className="flex flex-col gap-1.5 text-[11px]" style={{ color: ui.muted }}>
       <div className="grid grid-cols-2 gap-x-3 gap-y-1">
         {[1, 2, 3, 4, 0].map((i) => (
           <span key={i} className="flex items-center gap-1.5">
             <svg width="18" height="6" aria-hidden>
-              <line x1="2" y1="3" x2="16" y2="3" stroke={STUFEN[i].farbe} strokeWidth="4" strokeLinecap="round" strokeDasharray={i === 0 ? '2 4' : undefined} />
+              <line
+                x1="2"
+                y1="3"
+                x2="16"
+                y2="3"
+                stroke={STUFEN[i].farbe}
+                strokeWidth="4"
+                strokeLinecap={i === 0 || i === 4 ? 'butt' : 'round'}
+                strokeDasharray={i === 0 || i === 4 ? strichVon(i).map((v) => 4 * v).join(' ') : undefined}
+              />
             </svg>
             {STUFEN[i].name}
           </span>
         ))}
         <span className="flex items-center gap-1.5">
           <svg width="18" height="6" aria-hidden>
-            <line x1="2" y1="3" x2="16" y2="3" stroke={VORZUG} strokeOpacity="0.6" strokeWidth="4" strokeLinecap="round" />
+            <line x1="2" y1="3" x2="16" y2="3" stroke={VORZUG} strokeOpacity="0.7" strokeWidth="4" strokeLinecap="round" />
           </svg>
           Vorzugsroute
         </span>
         <span className="flex items-center gap-1.5">
           <svg width="18" height="10" aria-hidden>
-            <circle cx="9" cy="5" r="3.5" fill="#18181b" />
+            <circle cx="9" cy="5" r="3.5" fill={ui.fg} />
           </svg>
           Ampel geradeaus
         </span>
         <span className="flex items-center gap-1.5">
           <svg width="18" height="10" aria-hidden>
-            <circle cx="9" cy="5" r="3.5" fill="#fff" stroke="#18181b" strokeWidth="1.5" />
+            <circle cx="9" cy="5" r="3.5" fill={ui.bg} stroke={ui.fg} strokeWidth="1.5" />
           </svg>
           Ampel beim Abbiegen
         </span>
@@ -1944,7 +1997,7 @@ function Leerzustand({ geladen, statistik }: { geladen: boolean; statistik?: Vel
 
 function Hinweis({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-2xl px-3 py-2.5 text-[12.5px]" style={{ background: 'rgba(208,59,59,0.08)', color: '#8f2323' }}>
+    <p className="rounded-2xl border px-3 py-2.5 text-[12px]" style={{ background: ui.panel, borderColor: ui.fg, color: ui.fg }}>
       {children}
     </p>
   )
@@ -1963,8 +2016,19 @@ function KleinKnopf({ onClick, titel, children }: { onClick: () => void; titel: 
   )
 }
 
-function Marke({ farbe }: { farbe: string }) {
-  return <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ background: farbe, boxShadow: `0 0 0 2px ${ui.panel}, 0 0 0 3px ${ui.border}` }} />
+/** Der Punkt vor einem Suchfeld, gefüllt oder – beim Zwischenhalt – als Ring. */
+function Marke({ farbe, ring }: { farbe: string; ring?: boolean }) {
+  return (
+    <span
+      className="inline-block h-3 w-3 shrink-0 rounded-full"
+      style={{
+        background: ring ? ui.bg : farbe,
+        boxShadow:
+          (ring ? `inset 0 0 0 2.5px ${farbe}, ` : '') +
+          `0 0 0 2px ${ui.panel}, 0 0 0 3px ${ui.border}`,
+      }}
+    />
+  )
 }
 
 function OrtungSymbol() {
