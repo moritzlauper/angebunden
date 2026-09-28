@@ -85,7 +85,12 @@ function svg(inhalt: string) {
  * Datei klein.
  */
 function stadt(ordner: string, datei: string, mitte: Pos, meterJePixel: number) {
-  const P = projektion(mitte[0], mitte[1], meterJePixel, 900, 315)
+  const inhalt = stadtInhalt(ordner, projektion(mitte[0], mitte[1], meterJePixel, 900, 315))
+  writeFileSync(wurzel + `app/og/${datei}`, svg(inhalt))
+  console.log(`${datei}: ${(svg(inhalt).length / 1024).toFixed(0)} kB`)
+}
+
+function stadtInhalt(ordner: string, P: (x: Pos) => Pos) {
   const RASTER = 9
   const zellen = new Map<number, { n: number; p: number }>()
   const haeuser = lies(`public/data/${ordner}/buildings.geojson`).features as { properties: { x: number; y: number; p: number } }[]
@@ -116,14 +121,13 @@ function stadt(ordner: string, datei: string, mitte: Pos, meterJePixel: number) 
     const [f, s] = key.split('-').map(Number)
     punkte += `<path d="${d}" stroke="${OG.rampe[f]}" stroke-width="${breite[s]}" stroke-linecap="round"/>`
   }
-  const inhalt =
+  return (
     `<rect width="${W}" height="${H}" fill="${OG.grund}"/>` +
     `<path d="${pfade(wasser, P, (f) => (f as { properties: { kind: string } }).properties.kind === 'area')}" fill="${OG.wasser}"/>` +
     `<path d="${pfade(wasser, P, (f) => (f as { properties: { kind: string } }).properties.kind === 'line')}" stroke="${OG.wasser}" stroke-width="3" fill="none"/>` +
     `<path d="${pfade(strassen, P)}" stroke="${OG.strasse}" stroke-width="1" fill="none"/>` +
     punkte
-  writeFileSync(wurzel + `app/og/${datei}`, svg(inhalt))
-  console.log(`${datei}: ${zellen.size} Rasterpunkte, ${(svg(inhalt).length / 1024).toFixed(0)} kB`)
+  )
 }
 
 stadt('zuerich', 'karte-zuerich.svg', [8.528, 47.378], 19)
@@ -131,6 +135,8 @@ stadt('bern', 'karte-bern.svg', [7.44, 46.948], 15)
 stadt('basel', 'karte-basel.svg', [7.598, 47.557], 13)
 
 // ------------------------------------------------------------ Velonavi
+
+let velonaviInhalt: (cx: number, cy: number, breite: number, hoehe: number) => string
 
 {
   const meta = lies('public/data/zuerich/velo.json') as VeloMeta
@@ -144,59 +150,86 @@ stadt('basel', 'karte-basel.svg', [7.598, 47.557], 13)
   if (!r) throw new Error('keine Route')
   console.log(`Velonavi: ${Math.round(r.distanz)} m, ${Math.round(r.zeit / 60)} min, ${r.strassen.map((s) => s.name).join(' > ')}`)
 
-  // Die Route bleibt rechts, der Text links liegt über leerer Karte.
-  const xs = r.koordinaten.map((c) => c[0])
-  const ys = r.koordinaten.map((c) => c[1])
-  const mitte: Pos = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
-  const breiteM = (Math.max(...xs) - Math.min(...xs)) * 111320 * Math.cos((mitte[1] * Math.PI) / 180)
-  const hoeheM = (Math.max(...ys) - Math.min(...ys)) * 111133
-  const mpp = Math.max(breiteM / 430, hoeheM / 460)
-  const P = projektion(mitte[0], mitte[1], mpp, 950, 315)
-
   const strassen = lies('public/data/zuerich/streets.geojson').features
   const wasser = lies('public/data/zuerich/water.geojson').features
   const gruen = lies('public/data/zuerich/gruen.geojson').features
   const vorzug = lies('public/data/zuerich/velo-vorzug.geojson').features
   const art = (k: string) => (f: unknown) => (f as { properties: { k?: string; kind?: string } }).properties.k === k || (f as { properties: { kind?: string } }).properties.kind === k
 
-  // Route in Stücke gleicher Stufe.
-  let stuecke = ''
-  let lauf: Pos[] = []
-  let stufe = r.stufen[1] ?? r.stufen[0]
-  const zeichne = () => {
-    if (lauf.length < 2) return
-    const d = linie(lauf.map(P), 0.8)
-    stuecke += `<path d="${d}" stroke="${OG.stufen[stufe]}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
-  }
-  r.koordinaten.forEach((c, i) => {
-    const s = r.stufen[i]
-    if (i > 0 && s !== stufe) {
-      lauf.push(c)
-      zeichne()
-      lauf = [c]
-    } else lauf.push(c)
-    stufe = s
-  })
-  zeichne()
-  const ganz = linie(r.koordinaten.map(P), 0.8)
-  const [sx, sy] = P(r.koordinaten[0])
-  const [zx, zy] = P(r.koordinaten[r.koordinaten.length - 1])
+  /** Die Route, eingepasst in einen Kasten mit Mitte (cx, cy). */
+  velonaviInhalt = (cx: number, cy: number, breite: number, hoehe: number) => {
+    const xs = r.koordinaten.map((c) => c[0])
+    const ys = r.koordinaten.map((c) => c[1])
+    const mitte: Pos = [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]
+    const breiteM = (Math.max(...xs) - Math.min(...xs)) * 111320 * Math.cos((mitte[1] * Math.PI) / 180)
+    const hoeheM = (Math.max(...ys) - Math.min(...ys)) * 111133
+    const mpp = Math.max(breiteM / breite, hoeheM / hoehe)
+    const P = projektion(mitte[0], mitte[1], mpp, cx, cy)
 
-  const inhalt =
-    `<rect width="${W}" height="${H}" fill="${OG.nacht}"/>` +
-    `<path d="${pfade(gruen, P)}" fill="${OG.nachtGruen}"/>` +
-    `<path d="${pfade(wasser, P, art('area'))}" fill="${OG.nachtWasser}"/>` +
-    `<path d="${pfade(wasser, P, art('line'))}" stroke="${OG.nachtWasser}" stroke-width="5" fill="none"/>` +
-    `<path d="${pfade(strassen, P, art('neben'))}" stroke="${OG.nachtStrasse}" stroke-width="1.4" fill="none" stroke-linecap="round"/>` +
-    `<path d="${pfade(strassen, P, art('haupt'))}" stroke="${OG.nachtHaupt}" stroke-width="2.6" fill="none" stroke-linecap="round"/>` +
-    `<path d="${pfade(vorzug, P)}" stroke="${OG.vorzug}" stroke-width="2.2" stroke-dasharray="1 5" stroke-linecap="round" fill="none"/>` +
-    // Leuchten unter der Route, dann ein dunkler Rand, dann die Farben.
-    `<path d="${ganz}" stroke="${OG.stufen[1]}" stroke-opacity="0.22" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
-    `<path d="${ganz}" stroke="${OG.nacht}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
-    stuecke +
-    `<circle cx="${r1(sx)}" cy="${r1(sy)}" r="11" fill="${OG.nacht}" stroke="#ffffff" stroke-width="5"/>` +
-    `<circle cx="${r1(zx)}" cy="${r1(zy)}" r="22" fill="${OG.ziel}" fill-opacity="0.3"/>` +
-    `<circle cx="${r1(zx)}" cy="${r1(zy)}" r="12" fill="${OG.ziel}" stroke="#ffffff" stroke-width="4"/>`
+    // Route in Stücke gleicher Stufe.
+    let stuecke = ''
+    let lauf: Pos[] = []
+    let stufe = r.stufen[1] ?? r.stufen[0]
+    const zeichne = () => {
+      if (lauf.length < 2) return
+      const d = linie(lauf.map(P), 0.8)
+      stuecke += `<path d="${d}" stroke="${OG.stufen[stufe]}" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`
+    }
+    r.koordinaten.forEach((c, i) => {
+      const s = r.stufen[i]
+      if (i > 0 && s !== stufe) {
+        lauf.push(c)
+        zeichne()
+        lauf = [c]
+      } else lauf.push(c)
+      stufe = s
+    })
+    zeichne()
+    const ganz = linie(r.koordinaten.map(P), 0.8)
+    const [sx, sy] = P(r.koordinaten[0])
+    const [zx, zy] = P(r.koordinaten[r.koordinaten.length - 1])
+
+    return (
+      `<rect width="${W}" height="${H}" fill="${OG.nacht}"/>` +
+      `<path d="${pfade(gruen, P)}" fill="${OG.nachtGruen}"/>` +
+      `<path d="${pfade(wasser, P, art('area'))}" fill="${OG.nachtWasser}"/>` +
+      `<path d="${pfade(wasser, P, art('line'))}" stroke="${OG.nachtWasser}" stroke-width="5" fill="none"/>` +
+      `<path d="${pfade(strassen, P, art('neben'))}" stroke="${OG.nachtStrasse}" stroke-width="1.4" fill="none" stroke-linecap="round"/>` +
+      `<path d="${pfade(strassen, P, art('haupt'))}" stroke="${OG.nachtHaupt}" stroke-width="2.6" fill="none" stroke-linecap="round"/>` +
+      `<path d="${pfade(vorzug, P)}" stroke="${OG.vorzug}" stroke-width="2.2" stroke-dasharray="1 5" stroke-linecap="round" fill="none"/>` +
+      // Leuchten unter der Route, dann ein dunkler Rand, dann die Farben.
+      `<path d="${ganz}" stroke="${OG.stufen[1]}" stroke-opacity="0.22" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
+      `<path d="${ganz}" stroke="${OG.nacht}" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>` +
+      stuecke +
+      `<circle cx="${r1(sx)}" cy="${r1(sy)}" r="11" fill="${OG.nacht}" stroke="#ffffff" stroke-width="5"/>` +
+      `<circle cx="${r1(zx)}" cy="${r1(zy)}" r="22" fill="${OG.ziel}" fill-opacity="0.3"/>` +
+      `<circle cx="${r1(zx)}" cy="${r1(zy)}" r="12" fill="${OG.ziel}" stroke="#ffffff" stroke-width="4"/>`
+    )
+  }
+
+  // Die Route bleibt rechts, der Text links liegt über leerer Karte.
+  const inhalt = velonaviInhalt(950, 315, 430, 460)
   writeFileSync(wurzel + 'app/og/karte-velonavi.svg', svg(inhalt))
   console.log(`karte-velonavi.svg: ${(svg(inhalt).length / 1024).toFixed(0)} kB`)
+}
+
+// ------------------------------------------------------------ Beides
+
+/**
+ * Startseite: links die Erreichbarkeit, rechts der Velonavi, je eine Hälfte.
+ * Beide Karten liegen in den oberen zwei Dritteln, darunter stehen die Titel
+ * über einem Verlauf.
+ */
+{
+  const halb = W / 2
+  const links = stadtInhalt('zuerich', projektion(8.528, 47.378, 30, halb / 2, 228))
+  const rechts = velonaviInhalt(halb + halb / 2, 222, 470, 290)
+  const inhalt =
+    `<defs><clipPath id="l"><rect width="${halb}" height="${H}"/></clipPath>` +
+    `<clipPath id="r"><rect x="${halb}" width="${halb}" height="${H}"/></clipPath></defs>` +
+    `<g clip-path="url(#l)">${links}</g>` +
+    `<g clip-path="url(#r)">${rechts}</g>` +
+    `<rect x="${halb - 1}" width="2" height="${H}" fill="rgba(255,255,255,0.22)"/>`
+  writeFileSync(wurzel + 'app/og/karte-beides.svg', svg(inhalt))
+  console.log(`karte-beides.svg: ${(svg(inhalt).length / 1024).toFixed(0)} kB`)
 }

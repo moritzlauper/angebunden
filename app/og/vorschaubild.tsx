@@ -167,6 +167,57 @@ export async function stadtBild(stadtName: string, datei: string) {
   )
 }
 
+/** Titel einer Hälfte im Startbild, unten über dem Verlauf. */
+function Haelfte({ farbe, titel, zeile }: { farbe: string; titel: string; zeile: string }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', width: 600, paddingLeft: 56 }}>
+      <div style={{ display: 'flex', alignItems: 'center', fontSize: 50, fontWeight: 600, letterSpacing: '-0.03em', lineHeight: 1, color: OG.text }}>
+        <div style={{ width: 16, height: 16, borderRadius: 999, background: farbe, marginRight: 18, marginTop: 4 }} />
+        {titel}
+      </div>
+      <div style={{ display: 'flex', fontSize: 24, color: OG.leise, marginTop: 14, marginLeft: 34 }}>{zeile}</div>
+    </div>
+  )
+}
+
+/**
+ * Vorschaubild der Startseite: links die Erreichbarkeit, rechts der
+ * Velonavi, je eine Hälfte. Die Karten liegen oben frei, die Titel stehen
+ * unten, die Wortmarke klein darunter wie in den übrigen Bildern.
+ */
+export async function beidesBild() {
+  const grund = '#0b0a10'
+  return new ImageResponse(
+    (
+      <div style={{ width: '100%', height: '100%', display: 'flex', position: 'relative', background: grund, fontFamily: 'Geist' }}>
+        {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
+        <img src={await karte('karte-beides.svg')} width={1200} height={630} style={{ position: 'absolute', left: 0, top: 0 }} />
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 330,
+            width: 1200,
+            height: 300,
+            backgroundImage: `linear-gradient(180deg, ${grund}00 0%, ${grund}f0 42%, ${grund} 100%)`,
+          }}
+        />
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', width: '100%', height: '100%', paddingBottom: 40 }}>
+          <div style={{ display: 'flex' }}>
+            <Haelfte farbe={OG.rampe[0]} titel="Erreichbarkeitskarte" zeile="Jedes Haus nach ÖV-Reisezeit" />
+            <Haelfte farbe={OG.stufen[1]} titel="Velonavi" zeile="Die schnellste Veloroute" />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', marginTop: 44, paddingLeft: 56 }}>
+            <Wortmarke groesse={40} />
+            <Domain />
+          </div>
+        </div>
+      </div>
+    ),
+    schriften
+  )
+}
+
 /** Vorschaubild des Velonavi: eine echte Route bei Nacht. */
 export async function velonaviBild() {
   return new ImageResponse(
