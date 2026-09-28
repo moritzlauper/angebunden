@@ -119,6 +119,26 @@ export function ladeGraph(meta: VeloMeta, puffer: ArrayBuffer) {
     if ((merkmale[e] & 3) && (k === KLASSE.haupt || k === KLASSE.sammel)) hauptKnoten[kanteVon[e]] = hauptKnoten[kanteNach[e]] = 1
   }
 
+  // Die Strassen, die an einer Ampelkreuzung ankommen: Peilung vom Knoten weg
+  // und Gewicht aus Strassenklasse und Fahrspuren. Daraus schätzt der Router,
+  // wie die Grünzeit zwischen den Achsen verteilt ist (`wartenAchse`).
+  // Kanten innerhalb der Kreuzung zählen nicht als Arm.
+  const armeJe: number[][] = Array.from({ length: meta.ampeln.length }, () => [])
+  for (let v = 0; v < N; v++) {
+    const J = knotenAmpel[v]
+    if (J < 0 || ampelArt[J] !== 0) continue
+    for (let i = grad[v]; i < grad[v + 1]; i++) {
+      const b = ausgehend[i]
+      const e = b >> 1
+      const k = (merkmale[e] >> 11) & 7
+      if (k < KLASSE.wohnstrasse || k > KLASSE.haupt) continue
+      const kopfB = b & 1 ? kanteVon[e] : kanteNach[e]
+      if (knotenAmpel[kopfB] === J && laenge[e] < 40) continue
+      armeJe[J].push(peilStart[b], ARM_GEWICHT[k] * (spuren[e] || 2), spuren[e] || 2)
+    }
+  }
+  const ampelArme = armeJe.map((a) => Float32Array.from(a))
+
   const verbote = new Set<number>()
   for (let i = 0; i < verboteRoh.length; i += 3) verbote.add(verboteRoh[i] * E + verboteRoh[i + 1])
 
@@ -147,7 +167,7 @@ export function ladeGraph(meta: VeloMeta, puffer: ArrayBuffer) {
   return {
     meta, N, E, knotenKoord, knotenAmpel, kanteVon, kanteNach, kantePunkte, punkte, punktHoehe,
     laenge, hoch, runter, merkmale, unfall, unfallAnzahl, huerde, spuren, kanteName, ampelArt, verbote,
-    ausgehend, grad, peilStart, peilEnde, hauptKnoten, raster, ZELLE, punktKante,
+    ausgehend, grad, peilStart, peilEnde, hauptKnoten, ampelArme, raster, ZELLE, punktKante,
     kopf, fuss, px, py, MX, MY, LAT0,
   }
 }
@@ -330,22 +350,90 @@ const SICHER_ZEIT = 0.06
 const EINSTIEG_ZEIT = 0.3
 
 /**
- * Erwartete Wartezeit an einem Lichtsignal in Sekunden, je Manöver.
- * Geradeaus über die Kreuzung wartet man im Mittel eine halbe Rotphase.
+ * Erwartete Wartezeit an einem Lichtsignal in Sekunden.
+ *
+ * Signalpläne veröffentlicht die Stadt nicht, also wird die Grünzeit aus der
+ * Kreuzung geschätzt: Jede Achse bekommt Grün im Verhältnis ihres Gewichts
+ * aus Strassenklasse und Fahrspuren. Wer auf der Nebenachse eine breite
+ * Hauptstrasse quert, hat wenig Grün und wartet lange, auf der Hauptachse
+ * kommt man meist durch. An der Kalkbreite-/Seebahnstrasse wartet man auf
+ * der Kalkbreitestrasse so rund 30 s, an der Kalkbreite-/Zurlindenstrasse mit
+ * zwei gleich breiten Achsen knapp 18 s.
+ *
+ * Breite Strassen verlängern auch den Umlauf, weil das Räumen der Kreuzung
+ * länger dauert. Bei zufälliger Ankunft wartet man im Mittel rot² / (2 ·
+ * Umlauf), dazu kommt das Anhalten und Anfahren, wenn es rot ist.
+ *
  * Rechts abbiegen geht praktisch nie mit Halt: Velos biegen dort in der
  * Praxis unabhängig von der Ampelphase ab, ein kurzer Blick reicht.
  *
  * Links dauert länger als geradeaus, nicht kürzer: Direkt einspuren geht mit
  * dem Velo selten, also fährt man indirekt - erst mit der einen Grünphase
  * über die Kreuzung, dann an der Ecke warten und mit der nächsten über die
- * zweite Achse. Das sind zwei Wartezeiten statt einer, und die zweite Phase
- * liegt fast nie günstig.
+ * zweite Achse. Das sind zwei Wartezeiten statt einer.
  */
 const WARTEN = {
-  knoten: { geradeaus: 24, links: 34, rechts: 1 },
+  /** Umlauf in Sekunden: Grundwert plus je Fahrspur der breitesten Strasse. */
+  umlauf: 70,
+  umlaufJeSpur: 7.5,
+  /** Zwischenzeiten und Anlaufverluste je Umlauf, in niemandes Grün. */
+  verlust: 15,
+  /** Anhalten und wieder Anfahren. */
+  halt: 5,
+  rechts: 1,
   // Einzelne Fussgängerampeln: entlang der Strasse meist grün, beim Queren
   // rot. Wer abbiegt, quert dabei die Fahrbahn und wartet entsprechend.
   einzeln: { entlang: 5, queren: 18, abbiegen: 12 },
+}
+
+/** Gewicht einer Fahrspur je Strassenklasse, für die Verteilung der Grünzeit. */
+const ARM_GEWICHT = [0, 0, 0.5, 1, 2, 3, 0, 0]
+// Querachsen in `wartenAchse`: Peilung und grösstes Gewicht, höchstens vier.
+const querPeil = new Float32Array(4)
+const querGewicht = new Float32Array(4)
+
+/**
+ * Erwartete Wartezeit an Ampelkreuzung J, wenn man sie in Richtung `peil`
+ * überquert. Arme, die weniger als 30° von der eigenen Achse abweichen,
+ * gehören zu ihr, die übrigen werden zu Querachsen zusammengefasst. Ein Weg
+ * ohne passenden Strassenarm (Veloweg quer über die Kreuzung) bekommt so
+ * wenig Grün wie eine kleine Nebenstrasse.
+ */
+function wartenAchse(g: Graph, J: number, peil: number) {
+  const arme = g.ampelArme[J]
+  const achse = (p: number) => ((p % 180) + 180) % 180
+  const abstand = (a: number, b: number) => {
+    const d = Math.abs(achse(a) - achse(b))
+    return Math.min(d, 180 - d)
+  }
+  let eigen = 1
+  let spurenMax = 2
+  let quer = 0
+  for (let i = 0; i < arme.length; i += 3) {
+    const p = arme[i]
+    const w = arme[i + 1]
+    spurenMax = Math.max(spurenMax, arme[i + 2])
+    if (abstand(p, peil) < 30) {
+      eigen = Math.max(eigen, w)
+      continue
+    }
+    let j = 0
+    while (j < quer && abstand(p, querPeil[j]) >= 30) j++
+    if (j === quer) {
+      if (quer === 4) continue
+      querPeil[quer] = p
+      querGewicht[quer++] = 0
+    }
+    querGewicht[j] = Math.max(querGewicht[j], w)
+  }
+  let summe = eigen
+  for (let j = 0; j < quer; j++) summe += querGewicht[j]
+  // Ohne erkennbare Querachse (Kreuzung schlecht erfasst) wie zwei gleiche.
+  if (quer === 0) summe = 2 * eigen
+  const umlauf = WARTEN.umlauf + WARTEN.umlaufJeSpur * Math.min(6, spurenMax)
+  const gruen = ((umlauf - WARTEN.verlust) * eigen) / summe
+  const rot = umlauf - gruen
+  return (rot * rot) / (2 * umlauf) + (WARTEN.halt * rot) / umlauf
 }
 
 type Kosten = { zeit: Float32Array; kosten: Float32Array }
@@ -504,7 +592,9 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
     const mv = manoever(drehung(rein, g.peilStart[b]))
     let warten: number
     if (g.ampelArt[J] === 0) {
-      warten = mv === 'geradeaus' ? WARTEN.knoten.geradeaus : mv === 'links' ? WARTEN.knoten.links : WARTEN.knoten.rechts
+      if (mv === 'geradeaus') warten = wartenAchse(g, J, rein)
+      else if (mv === 'links') warten = wartenAchse(g, J, rein) + wartenAchse(g, J, g.peilStart[b])
+      else warten = WARTEN.rechts
     } else {
       const quer = !istStrasse(g, a >> 1) || !istStrasse(g, b >> 1)
       warten = mv === 'geradeaus' ? (quer ? WARTEN.einzeln.queren : WARTEN.einzeln.entlang) : WARTEN.einzeln.abbiegen

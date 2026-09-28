@@ -362,11 +362,14 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
         <p className="mt-4">
           Gesucht wird im Browser mit A* über gerichtete Wegstücke statt über Kreuzungen. Nur so
           kennt der Router an jeder Kreuzung die Richtung, aus der man kommt. Bei den 419
-          städtischen Signalknoten und den übrigen Ampeln aus OpenStreetMap kostet geradeaus im
-          Mittel 24 Sekunden Warten, links abbiegen 7 und rechts abbiegen 2. Wer nur abbiegt,
-          kommt an den meisten Ampeln ohne Halt vorbei. Jedes Abbiegen kostet zusätzlich einige
-          Sekunden, sonst führt der Weg in Rasterquartieren im Zickzack durch die Blöcke. Eine
-          Hauptstrasse ohne Ampel zu queren kostet ebenfalls.
+          städtischen Signalknoten schätzt er die Grünzeit aus den Strassen, die sich dort kreuzen:
+          Jede Achse bekommt Grün im Verhältnis zu Strassenklasse und Fahrspuren, und breite
+          Strassen verlängern den Umlauf. Wer auf einer Nebenachse eine vierspurige Hauptstrasse
+          quert, wartet so gegen eine Minute, entlang der Hauptachse oft nur wenige Sekunden. Im
+          Mittel sind es 22 Sekunden. Links abbiegen heisst indirekt abbiegen, also zweimal
+          warten, rechts abbiegen kostet 1 Sekunde. Signalpläne veröffentlicht die Stadt nicht.
+          Jedes Abbiegen kostet zusätzlich einige Sekunden, sonst führt der Weg in Rasterquartieren
+          im Zickzack durch die Blöcke. Eine Hauptstrasse ohne Ampel zu queren kostet ebenfalls.
         </p>
         <p className="mt-4">
           Die Fahrzeit rechnet mit 23 km/h in der Ebene, 3.2 Sekunden zusätzlich je Höhenmeter

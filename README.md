@@ -227,8 +227,9 @@ Tempo 50), angelehnt an das Level-of-Traffic-Stress-Schema.
 
 Der Graph landet als Binärdatei in `public/data/zuerich/velo.graph`. Der Router in
 `app/velonavi/router.ts` sucht darauf im Browser mit A* über gerichtete Kanten. So kennt er
-Abbiegeverbote und rechnet an Lichtsignalen je nach Manöver unterschiedlich lange Wartezeiten:
-geradeaus im Mittel 24 Sekunden, rechts praktisch keine.
+Abbiegeverbote und rechnet an Lichtsignalen je nach Manöver unterschiedlich lange Wartezeiten.
+Geradeaus hängt die Wartezeit davon ab, wie breit die gequerte Strasse im Vergleich zur eigenen
+ist (im Mittel 22 Sekunden, von 3 bis 56), rechts abbiegen kostet praktisch nichts.
 
 Was in keiner Quelle stimmt, steht mit Begründung in `pipeline/velo-korrekturen.json`. Wie
 man dort etwas ergänzt, beschreibt [`docs/daten-anpassen.md`](docs/daten-anpassen.md). Die

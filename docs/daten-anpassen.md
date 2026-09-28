@@ -119,7 +119,7 @@ Das Routing läuft vollständig im Browser, die Gewichte stehen als Konstanten i
 
 | Konstante | Bedeutung | Wert |
 | --- | --- | --- |
-| `WARTEN` | Erwartete Wartezeit an Lichtsignalen in Sekunden, je nach Manöver | geradeaus 24, links 34, rechts 1 |
+| `WARTEN`, `ARM_GEWICHT` | Wartezeit an Lichtsignalen: Umlauf und Grünanteil je Achse, geschätzt aus Strassenklasse und Fahrspuren | Umlauf 70 s + 7.5 s je Spur, geradeaus im Mittel 22 s, rechts 1 |
 | `STRESS_KOSTEN` | Zusätzliche gefühlte Zeit je Stressstufe, als Anteil der Fahrzeit | Stufe 3: 1.5, Stufe 4: 3.2 |
 | `STRESS_EINSTIEG` | Fester Aufschlag in Sekunden fürs Einbiegen auf eine harte Strecke | Stufe 3: 25, Stufe 4: 60 |
 | `NETZ_RABATT` | Rabatt auf Basis-, Haupt- und Vorzugsnetz der Velonetzplanung | 0.85, 0.68, 0.58 |
