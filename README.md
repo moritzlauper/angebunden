@@ -225,6 +225,12 @@ und aus OpenStreetMap mit Strassenklasse, Belag, Tramgleisen und Hindernissen. D
 entsteht je Richtung eine Stressstufe von 1 (abgetrennt oder ruhig) bis 4 (Mischverkehr ab
 Tempo 50), angelehnt an das Level-of-Traffic-Stress-Schema.
 
+Die Velofreigabe der Stadt ist lückenhaft. Ein Fussweg wird deshalb auch befahrbar, wenn die
+Velokarte der Stadt über ihn führt oder OSM ihn ausdrücklich fürs Velo freigibt, zusammen
+rund 26 km. Ein Beispiel ist der Weg neben dem Schulhaus Wengi zwischen Kanzlei- und
+Wengistrasse. Trottoirs neben einer befahrbaren Strasse bleiben aussen vor, ebenso die
+Biketrails am Uetliberg, die im Datensatz der Stadt als befahrbar gelten.
+
 Der Graph landet als Binärdatei in `public/data/zuerich/velo.graph`. Der Router in
 `app/velonavi/router.ts` sucht darauf im Browser mit A* über gerichtete Kanten. So kennt er
 Abbiegeverbote und rechnet an Lichtsignalen je nach Manöver unterschiedlich lange Wartezeiten.

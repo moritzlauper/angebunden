@@ -196,6 +196,11 @@
       "grund": "Der Velotunnel ist noch nicht gebaut, nur geplant. Der Datensatz führt ihn bereits als befahrbare Vorzugsroute. Ortskenntnis des Betreibers."
     },
     {
+      "strasse": "Hauptbahnhof Zürich, Ausgang Postbrücke",
+      "gesperrt": true,
+      "grund": "Fussgängerausgang des Hauptbahnhofs. Er liegt direkt neben dem Velotunnel und wird deshalb mit dessen OSM-Linie abgeglichen, die ihn als Veloweg ausweist. Ohne Sperre öffnet ihn die automatische Velofreigabe für Fusswege."
+    },
+    {
       "strasse": "Sihlstrasse",
       "bbox": [
         8.53,

@@ -24,6 +24,12 @@ mit Tempo, Lichtsignalen, Velonetzplanung, Unfällen und OpenStreetMap. Was in k
 Quellen stimmt, etwa ein Umbau, der noch nicht nachgeführt ist, gehört in
 `pipeline/velo-korrekturen.json`. Die Datei hat drei Abschnitte.
 
+Fehlt einem Weg nur die Velofreigabe der Stadt, braucht es meist keinen Eintrag. Die
+Pipeline öffnet Fusswege selbst, wenn die Velokarte der Stadt über sie führt oder OSM sie mit
+`bicycle=yes`, `designated`, `permissive`, `highway=cycleway` oder als Veloroute (`lcn=yes`)
+ausweist. Oft reicht es also, den Weg in OpenStreetMap richtig zu erfassen. Öffnet die
+Automatik etwas, das nicht befahrbar ist, sperrt eine Regel mit `gesperrt` es wieder.
+
 ### `regeln`: Eigenschaften einer Strasse ändern
 
 Eine Regel trifft alle Kanten mit genau diesem Strassennamen. Mit `bbox` lässt sie sich auf

@@ -340,6 +340,16 @@ const INNEN = /Bahnhofshalle|Perron|Rail City|Ladenpassage|Bahnhofpassage|Passag
  */
 const TRAMKOERPER = /^Tram .*(?<!Überquerung)$/i
 
+/**
+ * Kategorien der städtischen Velokarte (`map_velo`). Die Stadt dokumentiert
+ * sie nicht im Datensatz. 1 bis 3 sind die Routen der Karte. 6 sind die
+ * Biketrails am Uetliberg und am Höckler, im Mittel mit 19% Gefälle, 5 eine
+ * Restgruppe aus steilen Wegen und der Bahnhofstrasse. Beide sind keine
+ * Routen für den Alltag und zählen nicht als Velokarte.
+ */
+const VELOKARTE_ROUTE = new Set([1, 2, 3])
+const VELOKARTE_BIKETRAIL = 6
+
 const kanten: Kante[] = []
 for (const f of netz) {
   const p = f.properties
@@ -350,6 +360,10 @@ for (const f of netz) {
   const laenge = laengeVon(xy)
   if (laenge < 0.05) continue
   const e = (p.einbahn ?? '').trim()
+  const mv = Number(p.map_velo) || 0
+  // Ein Biketrail ist fürs Velo offen, aber eine Abfahrt für Mountainbikes.
+  // Der Router soll niemanden auf dem Weg zur Arbeit darüber schicken.
+  const biketrail = mv === VELOKARTE_BIKETRAIL
   const s = (p.velostreifen ?? '').trim()
   kanten.push({
     von: knoten(c[0]),
@@ -358,7 +372,7 @@ for (const f of netz) {
     xy,
     laenge,
     name: (p.name ?? '').trim(),
-    velo: p.velo === 1,
+    velo: p.velo === 1 && !biketrail,
     fuss: p.fuss === 1,
     einbahn: e === 'FT' || e === 'TF' ? e : null,
     streifen: s === 'FT' || s === 'TF' || s === 'BOTH' ? s : null,
@@ -375,7 +389,8 @@ for (const f of netz) {
     unfallAnzahl: 0,
     huerde: 0,
     fussgaenger: false,
-    velokarte: Math.min(3, Number(p.map_velo) || 0),
+    velokarte: VELOKARTE_ROUTE.has(mv) ? mv : 0,
+    gesperrt: biketrail,
     piktogramm: false,
     velostrasse: false,
     innen: INNEN.test((p.name ?? '').trim()) || TRAMKOERPER.test((p.name ?? '').trim()),
@@ -463,6 +478,8 @@ let nVelostrasse = 0
 let nRauh = 0
 let nGetrennt = 0
 const osmTempo = new Int8Array(kanten.length)
+/** Tags der OSM-Linie je Kante, für die Velofreigabe von Fusswegen. */
+const osmTags: (Record<string, string> | undefined)[] = []
 for (const [i, k] of kanten.entries()) {
   const id = abgleich(osmIndex, k.xy, 9, 35, 0.4)
   if (id === null) continue
@@ -473,6 +490,7 @@ for (const [i, k] of kanten.entries()) {
   k.bruecke = !!t.bridge && t.bridge !== 'no'
   k.tunnel = (!!t.tunnel && t.tunnel !== 'no') || t.covered === 'yes'
   osmTempo[i] = tempoAusOsm(t)
+  osmTags[i] = t
   if (t.embedded_rails === 'tram') k.tram = true
   if ((t.indoor && t.indoor !== 'no') || t.highway === 'corridor' || t.highway === 'elevator') k.innen = true
   // In Zürich sind viele Einbahnen für Velos in Gegenrichtung offen. Das Netz
@@ -799,6 +817,32 @@ const HIMMELSRICHTUNG = { nord: 0, ost: 90, sued: 180, west: 270 } as const
   }
 }
 
+/** Gerade, befahrbare Kante zwischen zwei bestehenden Knoten. */
+function verbindungsKante(von: number, nach: number, name: string, stress: number): Kante {
+  const coords = [
+    [knotenLonLat[2 * von], knotenLonLat[2 * von + 1]],
+    [knotenLonLat[2 * nach], knotenLonLat[2 * nach + 1]],
+  ]
+  const xy = projiziere(coords)
+  // Die Höhen sind zu diesem Zeitpunkt längst verteilt, diese Kante gibt es
+  // noch nicht. Sie bekommt die beiden Knotenhöhen; ohne das stünden ihre
+  // Punkte auf null Meter, und das Höhenprofil der Route stürzte dort ab.
+  const h0 = knotenHoehe[von]
+  const h1 = knotenHoehe[nach]
+  return {
+    von, nach, coords, xy, laenge: laengeVon(xy),
+    name, velo: true, fuss: false,
+    einbahn: null, streifen: null, veloweg: false,
+    klasse: KLASSE.neben, belag: BELAG.gut, tempo: TEMPO.t30,
+    tram: false, bruecke: false, tunnel: false, osmVelo: null, netz: NETZ.keins,
+    unfall: 0, unfallAnzahl: 0, huerde: 0, fussgaenger: false, velokarte: 0,
+    piktogramm: false, velostrasse: false, innen: false, spuren: 0, einbahnStreng: false,
+    gegenverkehr: true, gegenStreifen: false,
+    hoehen: [h0, h1], hoch: Math.max(0, h1 - h0), runter: Math.max(0, h0 - h1),
+    stressFest: stress,
+  }
+}
+
 /**
  * Von Hand ergänzte Verbindungen. An manchen Kreuzungen sind Fahrbahn- und
  * Fusswegnetz der Stadt nicht zusammengeheftet: Zwei Knoten liegen wenige
@@ -829,29 +873,9 @@ console.log('Verbindungen von Hand')
       console.log(`  übersprungen: kein Knoten in der Nähe von ${JSON.stringify(v.von)} / ${JSON.stringify(v.nach)}`)
       continue
     }
-    const coords = [
-      [knotenLonLat[2 * von], knotenLonLat[2 * von + 1]],
-      [knotenLonLat[2 * nach], knotenLonLat[2 * nach + 1]],
-    ]
-    const xy = projiziere(coords)
-    // Die Höhen sind zu diesem Zeitpunkt längst verteilt, diese Kante gibt es
-    // noch nicht. Sie bekommt die beiden Knotenhöhen; ohne das stünden ihre
-    // Punkte auf null Meter, und das Höhenprofil der Route stürzte dort ab.
-    const h0 = knotenHoehe[von]
-    const h1 = knotenHoehe[nach]
-    kanten.push({
-      von, nach, coords, xy, laenge: laengeVon(xy),
-      name: v.name ?? '', velo: true, fuss: false,
-      einbahn: null, streifen: null, veloweg: false,
-      klasse: KLASSE.neben, belag: BELAG.gut, tempo: TEMPO.t30,
-      tram: false, bruecke: false, tunnel: false, osmVelo: null, netz: NETZ.keins,
-      unfall: 0, unfallAnzahl: 0, huerde: 0, fussgaenger: false, velokarte: 0,
-      piktogramm: false, velostrasse: false, innen: false, spuren: 0, einbahnStreng: false,
-      gegenverkehr: true, gegenStreifen: false,
-      hoehen: [h0, h1], hoch: Math.max(0, h1 - h0), runter: Math.max(0, h0 - h1),
-      stressFest: v.stress ?? 1,
-    })
-    console.log(`  ${v.name ?? 'Verbindung'}: Knoten ${von} -> ${nach}, ${laengeVon(xy).toFixed(0)} m`)
+    const k = verbindungsKante(von, nach, v.name ?? '', v.stress ?? 1)
+    kanten.push(k)
+    console.log(`  ${v.name ?? 'Verbindung'}: Knoten ${von} -> ${nach}, ${k.laenge.toFixed(0)} m`)
   }
 }
 
@@ -873,6 +897,104 @@ console.log('Vorzugsrouten immer befahrbar')
     n++
   }
   console.log(`  ${n} Kanten auf Vorzugsrouten fürs Velo freigegeben, die im Basisdatensatz nur Fussweg waren`)
+}
+
+/**
+ * Fusswege, auf denen man fahren darf. Die Velofreigabe im Netz der Stadt
+ * fehlt bei manchen Wegen, die andere Quellen fürs Velo ausweisen. Die
+ * Verlängerung der Engelstrasse neben dem Schulhaus Wengi, zwischen Kanzlei-
+ * und Wengistrasse, steht dort als «Fussweg», gleichzeitig aber in der
+ * Velokarte derselben Stadt und in OSM als lokale Veloroute. Ohne sie fuhr
+ * der Router einen Block Umweg über die Schreinerstrasse.
+ *
+ * Geöffnet wird ein Weg, wenn die Velokarte der Stadt (`map_velo`) über ihn
+ * führt oder OSM ihn ausdrücklich fürs Velo freigibt (`bicycle=yes`,
+ * `designated`, `permissive`, `highway=cycleway`, Teil einer Veloroute). Im
+ * zweiten Fall darf kein befahrbares Stück parallel daneben liegen, sonst ist
+ * es ein Trottoir mit «Velo gestattet» neben der Strasse, die man ohnehin
+ * fährt. Treppen und Wege mit `bicycle=no`, `dismount` oder einem Verbot in
+ * einer Richtung bleiben zu.
+ *
+ * Dass OSM an einer Stelle bloss eine Strasse kennt, reicht nicht: Darunter
+ * sind Friedhöfe, Schulareale und Zufahrten mit Zubringerdienst, die die
+ * Stadt mit gutem Grund nur zu Fuss freigibt.
+ */
+console.log('Fusswege mit Velofreigabe aus anderen Quellen')
+{
+  const veloIndex = new LinienIndex(25)
+  kanten.forEach((k, i) => {
+    if (k.velo) veloIndex.add(k.xy, i)
+  })
+  const parallel = (k: Kante) => {
+    const proben = stichproben(k.xy, 8)
+    const n = proben.filter((pr) => veloIndex.naechstes(pr.x, pr.y, pr.r, 15, 35)).length
+    return n / proben.length > 0.5
+  }
+  const geoeffnet: number[] = []
+  let velokarte = 0
+  let osm = 0
+  let trottoir = 0
+  let meter = 0
+  kanten.forEach((k, i) => {
+    if (k.velo || !k.fuss || k.gesperrt || k.innen || k.klasse === KLASSE.treppe) return
+    const t = osmTags[i] ?? {}
+    const verbot = /^(no|dismount|use_sidepath)$/
+    if (verbot.test(t.bicycle ?? '') || verbot.test(t['bicycle:forward'] ?? '') || verbot.test(t['bicycle:backward'] ?? '')) return
+    if (t.highway === 'steps') return
+    // MTB-Trails sind in OSM oft `bicycle=designated`, gemeint ist aber Sport.
+    if (t.mtb_trail_type || parseInt(t['mtb:scale'] ?? '0', 10) >= 2) return
+    if (k.velokarte > 0) velokarte++
+    else if (
+      /^(yes|designated|permissive)$/.test(t.bicycle ?? '') ||
+      t.highway === 'cycleway' ||
+      t.lcn === 'yes' || t.rcn === 'yes' || t.ncn === 'yes'
+    ) {
+      if (parallel(k)) {
+        trottoir++
+        return
+      }
+      osm++
+    } else return
+    k.velo = true
+    geoeffnet.push(i)
+    meter += k.laenge
+  })
+  console.log(`  ${velokarte} Kanten aus der Velokarte, ${osm} mit Velofreigabe in OSM, zusammen ${(meter / 1000).toFixed(1)} km`)
+  console.log(`  ${trottoir} Trottoirs mit Velofreigabe neben einer befahrbaren Strasse nicht geöffnet`)
+
+  // Solche Wege enden oft auf dem Trottoir oder an einem Fussgängerstreifen,
+  // ein paar Meter neben der Fahrbahn und ohne Kante dorthin. Ohne Anschluss
+  // müsste man das letzte Stück schieben, und der Router nähme den Weg nie.
+  const veloGrad = new Uint16Array(N)
+  for (const k of kanten) if (k.velo) veloGrad[k.von]++, veloGrad[k.nach]++
+  const lage = (n: number) => toXY(knotenLonLat[2 * n], knotenLonLat[2 * n + 1])
+  const kandidaten = new LinienIndex(25)
+  kanten.forEach((k, i) => {
+    if (k.velo && !geoeffnet.includes(i)) kandidaten.add(k.xy, i)
+  })
+  let angeschlossen = 0
+  const erledigt = new Set<number>()
+  for (const i of geoeffnet) {
+    for (const n of [kanten[i].von, kanten[i].nach]) {
+      if (veloGrad[n] > 1 || erledigt.has(n)) continue
+      erledigt.add(n)
+      const [x, y] = lage(n)
+      const t = kandidaten.naechstes(x, y, -1, 15, 90)
+      if (!t) continue
+      // Den näheren Endknoten der gefundenen Kante nehmen, nicht irgendeinen
+      // Punkt mitten auf ihr: Knoten sind dort, wo man abbiegen kann.
+      const ziel = kanten[t.linie.id]
+      const [ax, ay] = lage(ziel.von)
+      const [bx, by] = lage(ziel.nach)
+      const da = Math.hypot(ax - x, ay - y)
+      const db = Math.hypot(bx - x, by - y)
+      const m = da <= db ? ziel.von : ziel.nach
+      if (Math.min(da, db) > 15 || m === n) continue
+      kanten.push(verbindungsKante(n, m, kanten[i].name, 1))
+      angeschlossen++
+    }
+  }
+  console.log(`  ${angeschlossen} offene Enden an die nächste befahrbare Kante angeschlossen`)
 }
 
 // ------------------------------------------------------------ Lücken im Velonetz
