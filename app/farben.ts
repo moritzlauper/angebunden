@@ -26,8 +26,14 @@
  */
 export const KARMIN = ['#721313', '#a1201e', '#cc3934', '#f15c52', '#f7958b'] as const
 
-/** Der Punkt der Marke und das Ziel im Velonavi: die Mitte der Rampe. */
+/** Der Punkt der Marke: die Mitte der Rampe. */
 export const PUNKT = KARMIN[2]
+
+/**
+ * Das Ziel im Velonavi. Blau statt Karmin: Rot las sich neben der eingefärbten
+ * Route als Warnung, und Blau kommt auf der Karte sonst nirgends vor.
+ */
+export const ZIEL = '#2563eb'
 
 /** Bedienung, Marker und Umrisse auf der Karte. */
 export const TINTE = '#18181b'

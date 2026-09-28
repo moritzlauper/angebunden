@@ -17,7 +17,7 @@ import { Suchleiste, bauIndex, suchen, Sternsymbol, type Eintrag } from '../such
 import { Wortmarke } from '../marke'
 import { STAEDTE } from '../staedte'
 import { nf } from '../site'
-import { PUNKT, TINTE, GRAU } from '../farben'
+import { ZIEL, TINTE, GRAU } from '../farben'
 import {
   ladeGraph, einrastenAlle, route, kantenKosten, alsGpx, verbinde, VOREINSTELLUNGEN, reinZeitlich,
   veloErlaubt, stressVon, netzVon, NETZ, VMAX,
@@ -112,7 +112,7 @@ const VORZUG = GRAU
  * dieselben Variablen wie in der Vergleichskarte.
  *
  * Einen Akzent gibt es nicht mehr: Was man drückt, zieht oder wählt, ist
- * Tinte (`fg`). Karmin bleibt dem Ziel und der Marke vorbehalten.
+ * Tinte (`fg`). Karmin bleibt der Marke vorbehalten, das Ziel ist blau.
  */
 const ui = {
   bg: 'var(--ab-papier)',
@@ -127,8 +127,8 @@ const ui = {
   spur: 'var(--ab-spur)',
   /** Die Scheibe des Reglers. */
   knopf: 'var(--ab-knopf)',
-  /** Nur für das Ziel und den Punkt der Marke. */
-  punkt: 'var(--ab-punkt)',
+  /** Nur für das Ziel. */
+  ziel: 'var(--ab-ziel)',
   schatten: 'var(--ab-schatten)',
 }
 
@@ -959,7 +959,7 @@ export default function Velonavi() {
       return
     }
     const el = document.createElement('div')
-    el.style.cssText = `width:22px;height:22px;border-radius:999px;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:grab;background:${art === 'start' ? TINTE : PUNKT}`
+    el.style.cssText = `width:22px;height:22px;border-radius:999px;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35);cursor:grab;background:${art === 'start' ? TINTE : ZIEL}`
     el.setAttribute('aria-label', art === 'start' ? 'Start' : 'Ziel')
     const mk = new Marker({ element: el, draggable: true }).setLngLat([p.lon, p.lat]).addTo(map)
     mk.on('dragend', () => {
@@ -1045,10 +1045,17 @@ export default function Velonavi() {
   zielRef.current = ziel
   /** Angetippter Ort samt Bildschirmposition, solange das kleine Menü offen ist. */
   const [klickOrt, setKlickOrt] = useState<{ p: Punkt; x: number; y: number } | null>(null)
+  const klickOrtRef = useRef(klickOrt)
+  klickOrtRef.current = klickOrt
   useEffect(() => {
     const map = mapRef.current
     if (!kartenBereit || !map) return
     const klick = (e: MapMouseEvent) => {
+      // Ein Klick neben das offene Menü schliesst es, statt gleich das nächste zu öffnen.
+      if (klickOrtRef.current) {
+        setKlickOrt(null)
+        return
+      }
       // Klick auf eine graue Variante wählt sie aus, statt das Ziel zu versetzen.
       const { x, y } = e.point
       const f = map.queryRenderedFeatures([[x - 6, y - 6], [x + 6, y + 6]], { layers: ['andere'] })[0]
@@ -1075,11 +1082,16 @@ export default function Velonavi() {
       setBlattOffen(true)
     }
     const zu = () => setKlickOrt(null)
+    const taste = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setKlickOrt(null)
+    }
     map.on('click', klick)
     map.on('movestart', zu)
+    window.addEventListener('keydown', taste)
     return () => {
       map.off('click', klick)
       map.off('movestart', zu)
+      window.removeEventListener('keydown', taste)
     }
   }, [kartenBereit, ortBeim, merken])
 
@@ -1240,7 +1252,7 @@ export default function Velonavi() {
             merken(p)
           }}
           platzhalter="Ziel"
-          links={<Marke farbe={ui.punkt} />}
+          links={<Marke farbe={ui.ziel} />}
           rechts={
             <button
               onClick={() => {
@@ -1383,8 +1395,17 @@ export default function Velonavi() {
             color: ui.fg,
           }}
         >
-          <div className="max-w-[14rem] truncate px-3 pt-2 text-[11px]" style={{ color: ui.muted }}>
-            {klickOrt.p.titel}
+          <div className="flex items-center gap-2 pl-3 pr-1 pt-1">
+            <span className="max-w-[12rem] flex-1 truncate text-[11px]" style={{ color: ui.muted }}>
+              {klickOrt.p.titel}
+            </span>
+            <button
+              onClick={() => setKlickOrt(null)}
+              aria-label="Menü schliessen"
+              className="rounded-full px-2 py-1 text-[16px] leading-none opacity-50 hover:opacity-100"
+            >
+              ×
+            </button>
           </div>
           {(
             [

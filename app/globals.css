@@ -190,7 +190,7 @@ body {
   --ab-knopf: #ffffff;
   --ab-ring: rgba(24, 24, 27, 0.28);
   --ab-karmin: #9e2a2d;
-  --ab-punkt: #c8403f;
+  --ab-ziel: #2563eb;
   --ab-schatten: 0 1px 1px rgba(24, 24, 27, 0.03), 0 10px 30px -12px rgba(24, 24, 27, 0.22);
 }
 
@@ -207,7 +207,7 @@ html[data-thema='dunkel'] {
   --ab-ring: rgba(236, 236, 239, 0.35);
   /* Das Karmin von hell hat auf dunklem Grund zu wenig Kontrast für Text. */
   --ab-karmin: #e5776d;
-  --ab-punkt: #e5534b;
+  --ab-ziel: #6b9bf5;
   --ab-schatten: 0 1px 1px rgba(0, 0, 0, 0.35), 0 10px 30px -12px rgba(0, 0, 0, 0.75);
 }
 
