@@ -350,15 +350,18 @@ const MIN_FAKTOR = 0.45
  * wechseln - die Seebahnbrücke beim Lochergut etwa lässt sich für ein paar
  * Meter umfahren, während der gewichtete Suchlauf gleich die ganze Route
  * nach Norden verlegt.
+ *
+ * `ampeln` ist der Anteil, mit dem die erwartete Wartezeit an Lichtsignalen
+ * in die Kosten eingeht. In der Zeit selbst zählt sie immer voll.
  */
-export function reinZeitlich(p: Profil, mitBogen = false): Profil {
+export function reinZeitlich(p: Profil, mitBogen = false, ampeln = 1): Profil {
   return {
     ...p,
     sicherheit: mitBogen ? SICHER_ZEIT : 0,
     einstieg: mitBogen ? EINSTIEG_ZEIT : 0,
     steigung: 0,
     belag: 0,
-    ampeln: 1,
+    ampeln,
     zeitOptimal: true,
     reineZeit: true,
   }
@@ -642,7 +645,7 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
         mv === 'geradeaus' ? (quer ? queren : WARTEN.einzeln.entlang) : mv === 'links' ? queren : WARTEN.einzeln.rechts
     }
     out.zeit += warten
-    out.kosten += warten * (p.reineZeit ? 1 : 0.3 + 1.6 * p.ampeln)
+    out.kosten += warten * (p.reineZeit ? p.ampeln : 0.3 + 1.6 * p.ampeln)
     out.ampel = J
     out.manoever = mv
     return

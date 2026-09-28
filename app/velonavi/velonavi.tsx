@@ -216,6 +216,16 @@ const aufwand = (r: Route) => r.zeit + r.distanz / VMAX
 const SPIELRAUM = 0.05
 const MINDESTGEWINN = 0.1
 
+/**
+ * Anteil der erwarteten Ampelwartezeit in einem weiteren Vorschlag. Die
+ * Wartezeit ist ein Mittelwert: Bei Grün ist sie null, der Umweg um die Ampeln
+ * herum bleibt aber immer gleich lang. Von der Nussbaumstrasse zur Kalkbreite
+ * fuhr die reine Zeitrechnung deshalb 180 Meter Bogen über Gertrud- und
+ * Meinrad-Lienert-Strasse, um drei Lichtsignale auf der Kalkbreitestrasse zu
+ * umgehen, und landete dabei auf Seebahn- und Badenerstrasse.
+ */
+const AMPEL_ANTEIL = 0.5
+
 function bessergleich(a: Route, b: Route) {
   return a.zeit <= b.zeit && anteilAngenehm(a) >= anteilAngenehm(b) && laestig(a) <= laestig(b)
 }
@@ -512,13 +522,26 @@ export default function Velonavi() {
         const pr = { ...profile.schnell, schieben: mitSchieben }
         const schnellst = suche(reinZeitlich(pr))
         if (schnellst) {
-          const grenze = aufwand(schnellst) * (1 + SPIELRAUM)
-          let beste = schnellst
-          // Der Reihe nach: dieselbe Rechnung mit einem kleinen Gewicht auf
-          // harte Stücke, die Voreinstellung von «Schnell», und «Komfort»
-          // selbst. Wer in den Spielraum passt und spürbar angenehmer ist,
-          // gewinnt.
-          for (const k of [suche(reinZeitlich(pr, true)), out.schnell, out.komfort]) {
+          // Die Vorschläge: dieselbe Rechnung mit einem kleinen Gewicht auf
+          // harte Stücke, die Voreinstellung von «Schnell», «Komfort» selbst
+          // und die Rechnung mit Bogen, in der Ampeln nur halb zählen.
+          const vorschlaege = [
+            suche(reinZeitlich(pr, true)),
+            out.schnell,
+            out.komfort,
+            suche(reinZeitlich(pr, true, AMPEL_ANTEIL)),
+          ]
+          // Massstab ist die Strecke mit dem kleinsten Aufwand, auch wenn sie
+          // nicht aus der reinen Zeitrechnung kommt. Sonst durfte ein
+          // Vorschlag gegenüber einem schnelleren Vorgänger über eine Minute
+          // verlieren, nur weil die reine Zeitrechnung selbst langsamer war.
+          let basis = schnellst
+          for (const k of vorschlaege) if (k && aufwand(k) < aufwand(basis)) basis = k
+          const grenze = aufwand(basis) * (1 + SPIELRAUM)
+          let beste = basis
+          // Der Reihe nach: Wer in den Spielraum passt und spürbar angenehmer
+          // ist, gewinnt.
+          for (const k of vorschlaege) {
             if (!k || aufwand(k) > grenze) continue
             if (laestig(k) <= laestig(beste) * (1 - MINDESTGEWINN)) beste = k
           }
