@@ -23,9 +23,10 @@
  * einer Kreuzung warten muss, entscheidet erst der Router im Browser, weil es
  * vom Abbiegen abhängt: geradeaus über die Kreuzung ja, rechts meist nicht.
  *
- * Ausgabe: `public/data/zuerich/velo.bin` (Graph, binär), `velo.json`
+ * Ausgabe: `public/data/zuerich/velo.graph` (Graph, binär), `velo.json`
  * (Aufbau der Binärdatei, Namen, Ampeln), `velo-vorzug.geojson` (Karte) und
- * `velo-adressen.json` (Suche).
+ * `velo-adressen.json` (Suche). Die Endung ist bewusst nicht `.bin`: Firmen-
+ * Proxys wie der der Stadtverwaltung Zürich blocken `.bin` und `.dat`.
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { Readable } from 'node:stream'
@@ -1380,7 +1381,7 @@ for (const [name, arr] of abschnitte) {
 const bin = Buffer.alloc(offset)
 for (const [name, arr] of abschnitte)
   Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength).copy(bin, aufbau[name].offset)
-writeFileSync(OUT + 'velo.bin', bin)
+writeFileSync(OUT + 'velo.graph', bin)
 
 const stressMeter = [0, 0, 0, 0, 0]
 for (const k of kanten) if (k.velo) stressMeter[stress(k, true)] += k.laenge
@@ -1429,5 +1430,5 @@ for (const g of gebaeude) {
 }
 writeFileSync(OUT + 'velo-adressen.json', JSON.stringify(adressen))
 
-console.log(`  velo.bin ${(bin.length / 1e6).toFixed(1)} MB, ${adressen.length} Adressen`)
+console.log(`  velo.graph ${(bin.length / 1e6).toFixed(1)} MB, ${adressen.length} Adressen`)
 console.log(`  Stress 1–4 (km, vorwärts): ${stressMeter.slice(1).map((m) => Math.round(m / 1000)).join(' / ')}`)

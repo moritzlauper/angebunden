@@ -439,10 +439,10 @@ export default function Velonavi() {
     ;(async () => {
       try {
         // Die Beschreibung immer frisch holen, den Graphen mit ihrem Zeitstempel
-        // als Version: Sonst zeigt ein Browser mit alter velo.bin im Speicher
+        // als Version: Sonst zeigt ein Browser mit altem velo.graph im Speicher
         // Routen nach überholten Daten.
         const meta = (await fetch(`${STADT.daten}/velo.json`, { cache: 'no-cache' }).then((r) => r.json())) as VeloMeta
-        const puffer = await fetch(`${STADT.daten}/velo.bin?v=${encodeURIComponent(meta.erstellt)}`).then((r) => r.arrayBuffer())
+        const puffer = await fetch(`${STADT.daten}/velo.graph?v=${encodeURIComponent(meta.erstellt)}`).then((r) => r.arrayBuffer())
         if (weg) return
         graphRef.current = ladeGraph(meta, puffer)
         setGraphBereit(true)

@@ -65,7 +65,7 @@ jobs:
           git config user.name  "velodaten-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add public/data/zuerich/velo.bin public/data/zuerich/velo.json \
+          git add public/data/zuerich/velo.graph public/data/zuerich/velo.json \
                   public/data/zuerich/velo-vorzug.geojson public/data/zuerich/velo-adressen.json
 
           if git diff --cached --quiet; then
