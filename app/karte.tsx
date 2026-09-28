@@ -545,6 +545,7 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
   // Wie viele Pixel das mobile Blatt am unteren Kartenrand verdeckt – Zoom-
   // Kontrolle und `flyTo`-Ziel weichen entsprechend nach oben aus.
   const [deckung, setDeckung] = useState(0)
+  const [zuerichHinweis, setZuerichHinweis] = useState(false)
 
   // Ab dieser Breite steht genug Platz für zwei feste Karten statt eines Blatts.
   const mobil = !useMedienabfrage('(min-width: 768px)')
@@ -1226,6 +1227,12 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [fixiert, treffer, rangFolgt, richteAus])
 
+  // Vor dem Deep-Link-Effekt lesen: `waehleXY` schreibt das Fragment mit der
+  // eingerasteten Koordinate neu.
+  useEffect(() => {
+    if (stadt.schluessel === 'bern' && paramsAusUrl().get('haus') === FALSCHER_BERN_LINK) setZuerichHinweis(true)
+  }, [stadt.schluessel])
+
   // --- Deep-Link beim Start: #haus=lon,lat&modus=oev|kultur|beide&arten=0,2,5
   useEffect(() => {
     if (!bereit) return
@@ -1733,6 +1740,30 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
             </div>
           }
         />
+
+        {zuerichHinweis && (
+          <div
+            className="pointer-events-auto mx-auto flex w-full max-w-[26rem] items-center gap-2 rounded-2xl border py-2 pl-4 pr-2 text-[13px] backdrop-blur-md"
+            style={{ background: ui.panel, borderColor: ui.border, color: ui.fg, boxShadow: ui.schatten }}
+            role="status"
+          >
+            <span className="min-w-0 flex-1 leading-snug">Dieser Link zeigt eine Adresse in Bern.</span>
+            <Link
+              href={modus !== 'oev' ? { pathname: '/', query: { modus } } : '/'}
+              className="shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-[12px] font-medium"
+              style={{ background: ui.fg, color: ui.bg }}
+            >
+              Zur Karte von Zürich
+            </Link>
+            <button
+              onClick={() => setZuerichHinweis(false)}
+              className="shrink-0 rounded-full px-2 py-1 text-[16px] leading-none opacity-50 hover:opacity-100"
+              aria-label="Hinweis schliessen"
+            >
+              ×
+            </button>
+          </div>
+        )}
       </div>
 
       {mobil && blatt === null && (
@@ -1901,6 +1932,13 @@ const ui = {
   schatten: 'var(--ab-schatten)',
 }
 type Ui = typeof ui
+
+/**
+ * Ein Zürcher Blog hat auf eine Berner Adresse verlinkt
+ * (/bern#haus=7.45131,46.94626). Wer über genau diesen Link kommt, bekommt
+ * oben einen Hinweis mit dem Sprung nach Zürich.
+ */
+const FALSCHER_BERN_LINK = '7.45131,46.94626'
 
 /**
  * Der Zustand steht im URL-Fragment (`#haus=…`), nicht in der Query. Fragmente
