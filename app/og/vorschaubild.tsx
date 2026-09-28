@@ -3,12 +3,13 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { SITE_TAGLINE, SITE_URL } from '../site'
 import { PUNKT } from '../marke'
+import { OG } from './farben'
 
 /**
- * Das feste Vorschaubild einer Seite für WhatsApp, Google und die sozialen
- * Netze: die Wortmarke gross, darunter eine Zeile. Ein Bild pro Route, ohne
- * Serveranteil beim Bauen gerendert. Die Haus-Werte eines geteilten Links stehen
- * im mitgeschickten Text, nicht im Bild.
+ * Die festen Vorschaubilder für WhatsApp, Google und die sozialen Netze: links
+ * Wortmarke und eine Zeile, rechts eine Karte aus echten Daten. Die Karten
+ * zeichnet `pipeline/vorschau-karten.ts` vor, hier kommt nur noch der Text
+ * darüber. Ein Bild pro Route, ohne Serveranteil beim Bauen gerendert.
  *
  * Das Bild gilt nur für das Segment, in dem die Datei liegt: `opengraph-image`
  * vererbt sich nicht an Unterordner. Jede Route, die geteilt werden soll,
@@ -18,8 +19,9 @@ import { PUNKT } from '../marke'
 export const size = { width: 1200, height: 630 }
 export const contentType = 'image/png'
 
-const regular = await readFile(join(process.cwd(), 'app/og/Geist-Regular.ttf'))
-const semibold = await readFile(join(process.cwd(), 'app/og/Geist-SemiBold.ttf'))
+const og = (datei: string) => readFile(join(process.cwd(), 'app/og', datei))
+const regular = await og('Geist-Regular.ttf')
+const semibold = await og('Geist-SemiBold.ttf')
 
 const domain = SITE_URL.replace(/^https?:\/\//, '')
 
@@ -27,86 +29,178 @@ export function altText(stadtName: string) {
   return `angebunden · ${SITE_TAGLINE} in ${stadtName}`
 }
 
-/** Die Zeile unter der Wortmarke auf den Stadtseiten. */
-export function stadtZeile(stadtName: string) {
-  return `Wie gut ist dein Haus in ${stadtName} angebunden?`
+async function karte(datei: string) {
+  return `data:image/svg+xml;base64,${(await og(datei)).toString('base64')}`
 }
 
-export function vorschaubild(zeile: string) {
-  return new ImageResponse(
-    (
+function Wortmarke({ groesse }: { groesse: number }) {
+  const d = Math.round(groesse * 0.24)
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-end',
+        fontSize: groesse,
+        fontWeight: 600,
+        letterSpacing: '-0.035em',
+        lineHeight: 1,
+        color: OG.text,
+      }}
+    >
+      angebunden
       <div
         style={{
-          width: '100%',
-          height: '100%',
+          width: d,
+          height: d,
+          borderRadius: 999,
+          background: PUNKT,
+          marginLeft: Math.round(groesse * 0.03),
+          marginBottom: Math.round(groesse * 0.045),
+        }}
+      />
+    </div>
+  )
+}
+
+function Pille({ farbe, children }: { farbe: string; children: string }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        padding: '10px 20px 10px 16px',
+        borderRadius: 999,
+        background: 'rgba(255,255,255,0.1)',
+        border: '1.5px solid rgba(255,255,255,0.16)',
+        fontSize: 24,
+        color: OG.text,
+        marginRight: 12,
+      }}
+    >
+      <div style={{ width: 14, height: 14, borderRadius: 999, background: farbe, marginRight: 12 }} />
+      {children}
+    </div>
+  )
+}
+
+/** Die Adresse unten links, dort liegt keine Karte darunter. */
+function Domain() {
+  return <div style={{ display: 'flex', fontSize: 22, color: OG.sehrLeise, marginLeft: 44, marginBottom: 2 }}>{domain}</div>
+}
+
+/** Karte als Grund, links ein Verlauf, damit der Text lesbar bleibt. */
+function Rahmen({ bild, grund, children }: { bild: string; grund: string; children: React.ReactNode }) {
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', position: 'relative', background: grund, fontFamily: 'Geist' }}>
+      {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/alt-text */}
+      <img src={bild} width={1200} height={630} style={{ position: 'absolute', left: 0, top: 0 }} />
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          width: 740,
+          height: 630,
+          backgroundImage: `linear-gradient(90deg, ${grund} 0%, ${grund} 50%, ${grund}00 100%)`,
+        }}
+      />
+      <div
+        style={{
+          position: 'relative',
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: '#f7f7f5',
-          color: '#18181b',
-          padding: 90,
-          fontFamily: 'Geist',
+          justifyContent: 'space-between',
+          width: '100%',
+          height: '100%',
+          padding: '64px 72px 56px',
         }}
       >
-        {/* Die Wortmarke: «angebunden» plus der rote Punkt, gross und mittig. */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-end',
-            fontSize: 140,
-            fontWeight: 600,
-            letterSpacing: '-0.035em',
-            lineHeight: 1,
-          }}
-        >
-          angebunden
+        {children}
+      </div>
+    </div>
+  )
+}
+
+const schriften = {
+  ...size,
+  fonts: [
+    { name: 'Geist', data: regular, weight: 400 as const, style: 'normal' as const },
+    { name: 'Geist', data: semibold, weight: 600 as const, style: 'normal' as const },
+  ],
+}
+
+/** Vorschaubild einer Stadtseite: alle Häuser, eingefärbt nach Rang. */
+export async function stadtBild(stadtName: string, datei: string) {
+  return new ImageResponse(
+    (
+      <Rahmen bild={await karte(datei)} grund={OG.grund}>
+        <div style={{ display: 'flex' }}>
+          <Pille farbe={OG.rampe[0]}>{stadtName}</Pille>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <Wortmarke groesse={104} />
+          <div style={{ display: 'flex', fontSize: 44, lineHeight: 1.2, color: OG.text, marginTop: 28, maxWidth: 560 }}>
+            {`Wie gut ist dein Haus in ${stadtName} angebunden?`}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div
+              style={{
+                display: 'flex',
+                width: 300,
+                height: 12,
+                borderRadius: 999,
+                backgroundImage: `linear-gradient(90deg, ${OG.rampe.join(', ')})`,
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', width: 300, marginTop: 10, fontSize: 20, color: OG.leise }}>
+              <span>gut angebunden</span>
+              <span>weit weg</span>
+            </div>
+          </div>
+          <Domain />
+        </div>
+      </Rahmen>
+    ),
+    schriften
+  )
+}
+
+/** Vorschaubild des Velonavi: eine echte Route bei Nacht. */
+export async function velonaviBild() {
+  return new ImageResponse(
+    (
+      <Rahmen bild={await karte('karte-velonavi.svg')} grund={OG.nacht}>
+        <div style={{ display: 'flex' }}>
+          <Pille farbe={OG.stufen[1]}>Velonavi Zürich</Pille>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 999,
-              background: PUNKT,
-              marginLeft: 4,
-              marginBottom: 6,
+              display: 'flex',
+              fontSize: 72,
+              fontWeight: 600,
+              letterSpacing: '-0.03em',
+              lineHeight: 1.04,
+              color: OG.text,
+              maxWidth: 600,
             }}
-          />
+          >
+            Die schnellste Veloroute durch Zürich
+          </div>
+          <div style={{ display: 'flex', marginTop: 30 }}>
+            <Pille farbe={OG.vorzug}>Vorzugsrouten</Pille>
+            <Pille farbe={OG.stufen[3]}>Verkehr</Pille>
+            <Pille farbe={OG.stufen[4]}>Lichtsignale</Pille>
+          </div>
         </div>
-
-        <div
-          style={{
-            display: 'flex',
-            textAlign: 'center',
-            fontSize: 44,
-            color: '#3f3f46',
-            marginTop: 48,
-            maxWidth: 900,
-            lineHeight: 1.3,
-          }}
-        >
-          {zeile}
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <Wortmarke groesse={40} />
+          <Domain />
         </div>
-
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            marginTop: 64,
-            fontSize: 25,
-            color: '#a1a1aa',
-          }}
-        >
-          <div style={{ display: 'flex', width: 44, height: 2, background: '#d4d4d8', marginRight: 16 }} />
-          {domain}
-        </div>
-      </div>
+      </Rahmen>
     ),
-    {
-      ...size,
-      fonts: [
-        { name: 'Geist', data: regular, weight: 400, style: 'normal' },
-        { name: 'Geist', data: semibold, weight: 600, style: 'normal' },
-      ],
-    }
+    schriften
   )
 }

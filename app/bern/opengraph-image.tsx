@@ -1,4 +1,4 @@
-import { altText, stadtZeile, vorschaubild } from '../og/vorschaubild'
+import { altText, stadtBild } from '../og/vorschaubild'
 
 // Ohne das kann `pnpm export` (output: 'export') das Bild nicht vorrendern.
 export const dynamic = 'force-static'
@@ -8,5 +8,5 @@ export const contentType = 'image/png'
 export const alt = altText('Bern')
 
 export default function Image() {
-  return vorschaubild(stadtZeile('Bern'))
+  return stadtBild('Bern', 'karte-bern.svg')
 }
