@@ -385,6 +385,17 @@
         47.3748
       ],
       "grund": "Kurze, direkte Verbindung vom Mühlegasse/Seilergraben-Ende via Hirschengraben hoch auf Auf der Mauer und weiter zur Uni - real mit dem Velo befahrbar. Das Abbiegeverbot der Stadt gilt hier nur fürs Auto, die Geodaten halten das nicht separat fest. Ohne diese Ausnahme umgeht der Router die Kreuzung komplett und macht stattdessen den grossen Umweg über Central. Ortskenntnis des Betreibers."
+    },
+    {
+      "von": "Kalkbreitestrasse",
+      "nach": "Urselweg",
+      "bbox": [
+        8.5198,
+        47.3736,
+        8.5207,
+        47.3741
+      ],
+      "grund": "Von der Kalkbreitestrasse östlich der Seebahnstrasse in den Urselweg abbiegen ist mit dem Velo erlaubt und der beste Weg Richtung Lochergut: Er umgeht die Seebahnstrasse und die Badenerstrasse-Brücke. Das Verbot aus dem Routennetz der Stadt sperrte diese Verbindung, deshalb fand keine Variante den Weg über die Kalkbreite. Ortskenntnis des Betreibers."
     }
   ]
 }
