@@ -314,6 +314,8 @@ type Kante = {
   spuren: number
   /** OSM sagt ausdrücklich, dass die Einbahn auch fürs Velo gilt. */
   einbahnStreng: boolean
+  /** Fahrtrichtung aus den eigenen Korrekturen, kein Automatismus öffnet sie. */
+  richtungFest?: boolean
   /** Einbahn, die für Velos in Gegenrichtung offen ist. */
   gegenverkehr: boolean
   /** Ob die Gegenrichtung einen eigenen Streifen hat. */
@@ -716,6 +718,7 @@ console.log('Eigene Korrekturen')
  * soll am Schluss gelten, egal welcher Automatismus vorher etwas geöffnet hat.
  */
 let gesperrtNachtragen: () => number = () => 0
+const HIMMELSRICHTUNG = { nord: 0, ost: 90, sued: 180, west: 270 } as const
 {
   type Regel = {
     strasse: string
@@ -731,6 +734,7 @@ let gesperrtNachtragen: () => number = () => 0
     nurFahrbahn?: boolean
     netz?: keyof typeof NETZ
     fussgaenger?: boolean
+    richtung?: keyof typeof HIMMELSRICHTUNG
     grund?: string
   }
   const datei = new URL('./velo-korrekturen.json', import.meta.url).pathname
@@ -745,6 +749,17 @@ let gesperrtNachtragen: () => number = () => 0
         if (!drin) continue
       }
       if (r.beideRichtungen) (k.einbahn = null), (k.gegenverkehr = true)
+      // Richtungsgetrennte Velowege beidseits der Fahrbahn: Man fährt auf der
+      // rechten Seite. Offen bleibt die Richtung der Kante, die höchstens 90
+      // Grad von der angegebenen Himmelsrichtung abweicht.
+      if (r.richtung) {
+        const [x0, y0] = [k.xy[0], k.xy[1]]
+        const [x1, y1] = [k.xy[k.xy.length - 2], k.xy[k.xy.length - 1]]
+        const ab = Math.abs(((peilung(x0, y0, x1, y1) - HIMMELSRICHTUNG[r.richtung] + 540) % 360) - 180)
+        k.einbahn = ab <= 90 ? 'FT' : 'TF'
+        k.gegenverkehr = false
+        k.richtungFest = true
+      }
       if (r.veloweg) k.veloweg = true
       if (r.velostreifen) k.streifen = 'BOTH'
       if (r.gesperrt) k.gesperrt = k.velo = false
@@ -892,7 +907,7 @@ console.log('Lücken im Velonetz')
    */
   let quartier = 0
   for (const k of kanten) {
-    if (!k.velo || !k.einbahn || k.einbahnStreng) continue
+    if (!k.velo || !k.einbahn || k.einbahnStreng || k.richtungFest) continue
     const ruhig = k.tempo <= TEMPO.t30 && k.klasse <= KLASSE.neben
     if (!ruhig) continue
     k.einbahn = null
@@ -912,7 +927,7 @@ console.log('Lücken im Velonetz')
   })
   let geoeffnet = 0
   for (const k of kanten) {
-    if (!k.velo || !k.einbahn || !(k.veloweg || k.klasse === KLASSE.veloweg)) continue
+    if (!k.velo || !k.einbahn || k.richtungFest || !(k.veloweg || k.klasse === KLASSE.veloweg)) continue
     const proben = stichproben(k.xy, 10)
     const gegen = proben.filter((pr) => {
       const t = velowegIndex.naechstes(pr.x, pr.y, pr.r, 22, 35)

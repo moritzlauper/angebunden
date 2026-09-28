@@ -77,6 +77,10 @@
           "enum": ["keins", "basis", "haupt", "vorzug"]
         },
         "fussgaenger": { "description": "Fussgängerbereich: Velo nur im Schritttempo.", "type": "boolean" },
+        "richtung": {
+          "description": "Einbahn fürs Velo in diese Himmelsrichtung, für richtungsgetrennte Velowege beidseits der Fahrbahn. Offen bleibt die Richtung der Kante, die höchstens 90 Grad davon abweicht.",
+          "enum": ["nord", "ost", "sued", "west"]
+        },
         "nurFahrbahn": {
           "description": "Nur die Stücke, die man sich mit dem Auto teilt. Trottoirs und abgetrennte Velowege mit demselben Namen bleiben unverändert.",
           "const": true

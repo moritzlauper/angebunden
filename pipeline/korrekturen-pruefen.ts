@@ -54,6 +54,9 @@ const punkt: Pruefer = (v) =>
 const netz: Pruefer = (v) =>
   ['keins', 'basis', 'haupt', 'vorzug'].includes(v as string) ? null : 'muss keins, basis, haupt oder vorzug sein'
 
+const richtung: Pruefer = (v) =>
+  ['nord', 'ost', 'sued', 'west'].includes(v as string) ? null : 'muss nord, ost, sued oder west sein'
+
 const FELDER: Record<string, { pflicht: string[]; felder: Record<string, Pruefer> }> = {
   regeln: {
     pflicht: ['strasse', 'grund'],
@@ -70,6 +73,7 @@ const FELDER: Record<string, { pflicht: string[]; felder: Record<string, Pruefer
       stressMax: stufe,
       netz,
       fussgaenger: boolesch,
+      richtung,
       nurFahrbahn: wahr,
       grund,
     },
@@ -114,7 +118,7 @@ for (const [abschnitt, { pflicht, felder }] of Object.entries(FELDER)) {
       if (meldung) fehler.push(`${wo}: "${f}" ${meldung}`)
     }
     if (abschnitt === 'regeln') {
-      const { stress: s, stressMin: lo, stressMax: hi, gesperrt, offen } = eintrag
+      const { stress: s, stressMin: lo, stressMax: hi, gesperrt, offen, beideRichtungen, richtung: r } = eintrag
       if (istStufe(lo) && istStufe(hi) && (lo as number) > (hi as number)) {
         fehler.push(`${wo}: stressMin ist grösser als stressMax`)
       }
@@ -122,6 +126,7 @@ for (const [abschnitt, { pflicht, felder }] of Object.entries(FELDER)) {
         warnungen.push(`${wo}: stress setzt die Stufe fest, stressMin und stressMax haben daneben keine Wirkung`)
       }
       if (gesperrt && offen) fehler.push(`${wo}: gesperrt und offen widersprechen sich`)
+      if (beideRichtungen && r) fehler.push(`${wo}: beideRichtungen und richtung widersprechen sich`)
     }
   })
 }
