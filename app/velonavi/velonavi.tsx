@@ -67,17 +67,17 @@ function wms(dienst: string, layer: string, transparent = false) {
  *
  * Die Ampel bleibt, weil sie beim Velofahren gelernt ist – nur auf gleiche
  * Sättigung gezogen, damit das Grün nicht die Parks der Stadtkarte schlägt.
- * «Hart» ist nicht mehr rot, sondern Tinte gestrichelt: Kräftiges Rot heisst in
- * der Vergleichskarte «gut angebunden», und dieselbe Farbe darf auf der anderen
- * Seite nicht das Gegenteil sagen. Nebenbei sind «Hart» und «Geschoben» damit
- * auch für Farbenblinde an der Strichelung zu unterscheiden.
+ * «Hart» ist rot, wie man es von der Ampel erwartet. Eine Zeit lang war es
+ * Tinte gestrichelt, damit Rot nicht mit dem Karmin der Vergleichskarte
+ * kollidiert; auf der Karte las sich das aber wie eine Baustelle statt wie
+ * eine Warnung.
  */
 export const STUFEN = [
   { farbe: GRAU, name: 'Geschoben', kurz: 'Schieben', strich: [0.6, 1.2] },
   { farbe: '#2f8a4f', name: 'Angenehm: ruhig und glatt', kurz: 'Angenehm' },
   { farbe: '#d9a531', name: 'Mässig: etwas Verkehr oder ruppig', kurz: 'Mässig' },
   { farbe: '#d7784d', name: 'Unangenehm: Velostreifen, Pflaster', kurz: 'Unangenehm' },
-  { farbe: '#3f3f46', name: 'Hart: Mischverkehr, Gleise, grobes Pflaster', kurz: 'Hart', strich: [1.6, 0.8] },
+  { farbe: '#d03b3b', name: 'Hart: Mischverkehr, Gleise, grobes Pflaster', kurz: 'Hart' },
 ] as const
 
 /** Die Strichelung als `line-dasharray`; durchgezogen heisst bei MapLibre [1, 0]. */
