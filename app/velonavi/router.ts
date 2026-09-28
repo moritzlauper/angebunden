@@ -139,6 +139,38 @@ export function ladeGraph(meta: VeloMeta, puffer: ArrayBuffer) {
   }
   const ampelArme = armeJe.map((a) => Float32Array.from(a))
 
+  // Einzelne Signale: die Namen der Haupt- und Sammelstrassen, die von aussen
+  // an die Kreuzung stossen, und ob eine davon stark befahren ist. Siehe
+  // `WARTEN.einzeln`. Gezählt wird über den Namen: An der Rotachstrasse
+  // liegt von der Birmensdorferstrasse nur der Veloweg im Netz, die Fahrbahn
+  // mit Tram und Autoverkehr nicht.
+  const hauptName = new Set<number>()
+  const starkName = new Set<number>()
+  for (let e = 0; e < E; e++) {
+    const k = (merkmale[e] >> 11) & 7
+    if (k !== KLASSE.haupt && k !== KLASSE.sammel) continue
+    hauptName.add(kanteName[e])
+    const tram = ((merkmale[e] >> 17) & 1) === 1
+    const stress4 = ((merkmale[e] >> 22) & 7) === 4 || ((merkmale[e] >> 25) & 7) === 4
+    if (spuren[e] >= 3 || tram || stress4) starkName.add(kanteName[e])
+  }
+  // Kanten ohne Namen verbinden nichts miteinander.
+  const ohneName = meta.namen.indexOf('')
+  hauptName.delete(ohneName)
+  starkName.delete(ohneName)
+  const einzelHaupt: Set<number>[] = meta.ampeln.map(() => new Set<number>())
+  const einzelStark = new Uint8Array(meta.ampeln.length)
+  for (let e = 0; e < E; e++) {
+    const Jv = knotenAmpel[kanteVon[e]]
+    const Jn = knotenAmpel[kanteNach[e]]
+    if (Jv === Jn || !hauptName.has(kanteName[e])) continue
+    for (const J of [Jv, Jn]) {
+      if (J < 0 || ampelArt[J] === 0) continue
+      einzelHaupt[J].add(kanteName[e])
+      if (starkName.has(kanteName[e])) einzelStark[J] = 1
+    }
+  }
+
   const verbote = new Set<number>()
   for (let i = 0; i < verboteRoh.length; i += 3) verbote.add(verboteRoh[i] * E + verboteRoh[i + 1])
 
@@ -167,7 +199,7 @@ export function ladeGraph(meta: VeloMeta, puffer: ArrayBuffer) {
   return {
     meta, N, E, knotenKoord, knotenAmpel, kanteVon, kanteNach, kantePunkte, punkte, punktHoehe,
     laenge, hoch, runter, merkmale, unfall, unfallAnzahl, huerde, spuren, kanteName, ampelArt, verbote,
-    ausgehend, grad, peilStart, peilEnde, hauptKnoten, ampelArme, raster, ZELLE, punktKante,
+    ausgehend, grad, peilStart, peilEnde, hauptKnoten, ampelArme, einzelHaupt, einzelStark, raster, ZELLE, punktKante,
     kopf, fuss, px, py, MX, MY, LAT0,
   }
 }
@@ -382,8 +414,10 @@ const WARTEN = {
   halt: 5,
   rechts: 1,
   // Einzelne Fussgängerampeln: entlang der Strasse meist grün, beim Queren
-  // rot. Wer abbiegt, quert dabei die Fahrbahn und wartet entsprechend.
-  einzeln: { entlang: 5, queren: 18, abbiegen: 12 },
+  // rot. Wer links abbiegt, quert dabei die Fahrbahn und wartet wie beim
+  // Queren. Über eine stark befahrene Strasse (drei Spuren und mehr, Tram,
+  // Stufe 4) ist der Umlauf lang und die Grünphase für die Querung kurz.
+  einzeln: { entlang: 5, queren: 22, querenStark: 32, rechts: 8 },
 }
 
 /** Gewicht einer Fahrspur je Strassenklasse, für die Verteilung der Grünzeit. */
@@ -596,8 +630,16 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
       else if (mv === 'links') warten = wartenAchse(g, J, rein) + wartenAchse(g, J, g.peilStart[b])
       else warten = WARTEN.rechts
     } else {
-      const quer = !istStrasse(g, a >> 1) || !istStrasse(g, b >> 1)
-      warten = mv === 'geradeaus' ? (quer ? WARTEN.einzeln.queren : WARTEN.einzeln.entlang) : WARTEN.einzeln.abbiegen
+      // Queren heisst: von einem Weg aus über die Strasse, oder über eine
+      // Kante innerhalb der Kreuzung, die nicht zur Hauptstrasse gehört. So
+      // zählt die Rotachstrasse geradeaus über die Birmensdorferstrasse als
+      // Querung, auch wenn beide Seiten Strassen sind und die Fahrbahn der
+      // Birmensdorferstrasse dort gar nicht im Netz liegt.
+      const quer =
+        !istStrasse(g, a >> 1) || !istStrasse(g, b >> 1) || (inJ && !g.einzelHaupt[J].has(g.kanteName[a >> 1]))
+      const queren = g.einzelStark[J] ? WARTEN.einzeln.querenStark : WARTEN.einzeln.queren
+      warten =
+        mv === 'geradeaus' ? (quer ? queren : WARTEN.einzeln.entlang) : mv === 'links' ? queren : WARTEN.einzeln.rechts
     }
     out.zeit += warten
     out.kosten += warten * (p.reineZeit ? 1 : 0.3 + 1.6 * p.ampeln)
