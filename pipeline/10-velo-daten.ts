@@ -7,7 +7,8 @@
  *
  * * Stadt Zürich (WFS): Knoten mit Lichtsignalanlage, signalisierte
  *   Geschwindigkeiten, Velonetzplanung (Vorzugsrouten, Hauptnetz).
- * * Stadt Zürich (CSV): polizeilich registrierte Verkehrsunfälle seit 2011.
+ * * Stadt Zürich (CSV): polizeilich registrierte Verkehrsunfälle seit 2011 und
+ *   die Verkehrszählung an den Lichtsignalanlagen (Fahrzeuge je Stunde).
  * * OpenStreetMap: Strassenklasse, Belag, Brücken und Tunnel, Tramgleise und
  *   Ampeln, die die Stadt nicht als Knoten führt (Fussgängerampeln).
  *
@@ -15,6 +16,8 @@
  * Cache gelesen. Zum Auffrischen den Ordner löschen.
  */
 import { mkdirSync, existsSync, writeFileSync } from 'node:fs'
+import { Readable } from 'node:stream'
+import { readCsv } from './lib/csv.ts'
 
 const RAW = new URL('../data/raw/velo/', import.meta.url).pathname
 mkdirSync(RAW, { recursive: true })
@@ -80,6 +83,63 @@ function overpass(abfrage: string) {
   }
 }
 
+/**
+ * Verkehrszählung der Dienstabteilung Verkehr: Fahrzeuge je Stunde an gut 200
+ * Messstellen, fast alle an den Detektoren einer Lichtsignalanlage. Signalpläne
+ * und Grünzeiten veröffentlicht die Stadt nicht, die Zählung ist das Nächste
+ * dazu: Sie zeigt, wie viel Verkehr an einer Kreuzung über welche Strasse
+ * fliesst, und danach richtet sich die Verteilung der Grünzeit.
+ *
+ * Die Jahresdatei hat rund 400 MB und 1,4 Mio. Zeilen. Sie wird im Durchlauf
+ * gelesen, behalten wird nur das Mittel je Messstelle über die Werktage von
+ * 6 bis 20 Uhr, aus gemessenen Werten (ohne «Fehlend» und «Imputiert»).
+ */
+async function zaehlung() {
+  const heute = new Date()
+  // Im Januar und Februar ist das laufende Jahr noch zu dünn.
+  const jahr = heute.getMonth() < 2 ? heute.getFullYear() - 1 : heute.getFullYear()
+  const res = await fetch(
+    `https://data.stadt-zuerich.ch/dataset/sid_dav_verkehrszaehlung_miv_od2031/download/sid_dav_verkehrszaehlung_miv_OD2031_${jahr}.csv`,
+    { signal: AbortSignal.timeout(1_800_000) }
+  )
+  if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
+  type Stelle = {
+    ms: string; zs: string; name: string; achse: string; richtung: string
+    knoten: number; e: number; n: number; stunden: number; fz: number
+  }
+  const stellen = new Map<string, Stelle>()
+  let tag = ''
+  let werktag = false
+  await readCsv(Readable.fromWeb(res.body as Parameters<typeof Readable.fromWeb>[0]), (r, col) => {
+    if (r[col('AnzFahrzeugeStatus')] !== 'Gemessen') return
+    const zeit = r[col('MessungDatZeit')] // 2026-01-01T07:00:00
+    const stunde = +zeit.slice(11, 13)
+    if (stunde < 6 || stunde >= 20) return
+    if (zeit.slice(0, 10) !== tag) {
+      tag = zeit.slice(0, 10)
+      const wt = new Date(tag + 'T12:00:00Z').getUTCDay()
+      werktag = wt >= 1 && wt <= 5
+    }
+    if (!werktag) return
+    const fz = +r[col('AnzFahrzeuge')]
+    if (!Number.isFinite(fz)) return
+    const ms = r[col('MSID')]
+    let s = stellen.get(ms)
+    if (!s) {
+      s = {
+        ms, zs: r[col('ZSID')], name: r[col('ZSName')], achse: r[col('Achse')], richtung: r[col('Richtung')],
+        knoten: +r[col('Knummer')] || 0, e: +r[col('EKoord')], n: +r[col('NKoord')], stunden: 0, fz: 0,
+      }
+      stellen.set(ms, s)
+    }
+    s.stunden++
+    s.fz += fz
+  })
+  if (stellen.size < 50) throw new Error(`nur ${stellen.size} Messstellen`)
+  for (const s of stellen.values()) s.fz = Math.round(s.fz / s.stunden)
+  return JSON.stringify({ jahr, stellen: [...stellen.values()] })
+}
+
 const b = `${BBOX.s},${BBOX.w},${BBOX.n},${BBOX.e}`
 
 console.log('Stadt Zürich')
@@ -92,6 +152,7 @@ await hole('vorzugsrouten.geojson', wfs('Velonetzplanung', 'view_gs_umsetzungsst
 await hole('unfaelle.csv', () =>
   text('https://data.stadt-zuerich.ch/dataset/sid_dav_strassenverkehrsunfallorte/download/RoadTrafficAccidentLocations.csv')
 )
+await hole('verkehrszaehlung.json', zaehlung)
 
 console.log('OpenStreetMap')
 await hole(

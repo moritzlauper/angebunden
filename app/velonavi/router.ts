@@ -29,6 +29,11 @@ export type VeloMeta = {
   aufbau: Record<string, { offset: number; laenge: number }>
   namen: string[]
   ampeln: [number, number, 0 | 1, string][]
+  /**
+   * Gezählter Verkehr an Ampelkreuzungen: [Ampel, Strassenname, Fahrzeuge je
+   * Stunde]. Fehlt in älteren Dateien und an Kreuzungen ohne Zählstelle.
+   */
+  ampelVerkehr?: [number, number, number][]
   statistik: {
     veloKm: number
     stressKm: number[]
@@ -120,9 +125,12 @@ export function ladeGraph(meta: VeloMeta, puffer: ArrayBuffer) {
   }
 
   // Die Strassen, die an einer Ampelkreuzung ankommen: Peilung vom Knoten weg
-  // und Gewicht aus Strassenklasse und Fahrspuren. Daraus schätzt der Router,
-  // wie die Grünzeit zwischen den Achsen verteilt ist (`wartenAchse`).
-  // Kanten innerhalb der Kreuzung zählen nicht als Arm.
+  // und Gewicht. Daraus schätzt der Router, wie die Grünzeit zwischen den
+  // Achsen verteilt ist (`wartenAchse`). Wo die Stadt den Verkehr zählt, ist
+  // das Gewicht der gezählte Verkehr, sonst folgt es aus Strassenklasse und
+  // Fahrspuren. Kanten innerhalb der Kreuzung zählen nicht als Arm.
+  const verkehr = new Map<number, number>()
+  for (const [J, name, fz] of meta.ampelVerkehr ?? []) verkehr.set(J * 65536 + name, fz)
   const armeJe: number[][] = Array.from({ length: meta.ampeln.length }, () => [])
   for (let v = 0; v < N; v++) {
     const J = knotenAmpel[v]
@@ -134,7 +142,9 @@ export function ladeGraph(meta: VeloMeta, puffer: ArrayBuffer) {
       if (k < KLASSE.wohnstrasse || k > KLASSE.haupt) continue
       const kopfB = b & 1 ? kanteVon[e] : kanteNach[e]
       if (knotenAmpel[kopfB] === J && laenge[e] < 40) continue
-      armeJe[J].push(peilStart[b], ARM_GEWICHT[k] * (spuren[e] || 2), spuren[e] || 2)
+      const fz = verkehr.get(J * 65536 + kanteName[e])
+      const gewicht = fz === undefined ? ARM_GEWICHT[k] * (spuren[e] || 2) : fz / FZ_JE_GEWICHT
+      armeJe[J].push(peilStart[b], gewicht, spuren[e] || 2)
     }
   }
   const ampelArme = armeJe.map((a) => Float32Array.from(a))
@@ -388,12 +398,14 @@ const EINSTIEG_ZEIT = 0.3
  * Erwartete Wartezeit an einem Lichtsignal in Sekunden.
  *
  * Signalpläne veröffentlicht die Stadt nicht, also wird die Grünzeit aus der
- * Kreuzung geschätzt: Jede Achse bekommt Grün im Verhältnis ihres Gewichts
- * aus Strassenklasse und Fahrspuren. Wer auf der Nebenachse eine breite
- * Hauptstrasse quert, hat wenig Grün und wartet lange, auf der Hauptachse
- * kommt man meist durch. An der Kalkbreite-/Seebahnstrasse wartet man auf
- * der Kalkbreitestrasse so rund 30 s, an der Kalkbreite-/Zurlindenstrasse mit
- * zwei gleich breiten Achsen knapp 18 s.
+ * Kreuzung geschätzt: Jede Achse bekommt Grün im Verhältnis ihres Gewichts.
+ * Das Gewicht ist der gezählte Verkehr, wo die Stadt an der Kreuzung oder in
+ * der Nähe auf derselben Strasse eine Zählstelle hat (`ampelVerkehr`), sonst
+ * folgt es aus Strassenklasse und Fahrspuren. Wer auf der Nebenachse eine
+ * stark befahrene Hauptstrasse quert, hat wenig Grün und wartet lange, auf
+ * der Hauptachse kommt man meist durch. An der Kalkbreite-/Seebahnstrasse
+ * wartet man auf der Kalkbreitestrasse so rund 30 s, an der Kalkbreite-/
+ * Zurlindenstrasse mit zwei gleich breiten Achsen knapp 18 s.
  *
  * Breite Strassen verlängern auch den Umlauf, weil das Räumen der Kreuzung
  * länger dauert. Bei zufälliger Ankunft wartet man im Mittel rot² / (2 ·
@@ -425,6 +437,14 @@ const WARTEN = {
 
 /** Gewicht einer Fahrspur je Strassenklasse, für die Verteilung der Grünzeit. */
 const ARM_GEWICHT = [0, 0, 0.5, 1, 2, 3, 0, 0]
+/**
+ * Fahrzeuge je Stunde (Querschnitt, werktags 6 bis 20 Uhr), die einer
+ * Gewichtseinheit entsprechen. Geeicht an den Strassen mit Zählstelle: Dort
+ * ist der gezählte Verkehr im Median so viel wie das Gewicht aus Klasse und
+ * Spuren mal diese Zahl. So bleiben gezählte und geschätzte Strassen an
+ * derselben Kreuzung vergleichbar.
+ */
+const FZ_JE_GEWICHT = 110
 // Querachsen in `wartenAchse`: Peilung und grösstes Gewicht, höchstens vier.
 const querPeil = new Float32Array(4)
 const querGewicht = new Float32Array(4)

@@ -23,11 +23,12 @@ export async function readCsv(
 
   const handleLine = (line: string) => {
     if (!line) return
+    // UTF-8 BOM vor dem Zerlegen entfernen: Steht dahinter ein Anführungszeichen,
+    // gilt es sonst nicht als Feldanfang und bleibt im Spaltennamen hängen.
+    if (!header && line.charCodeAt(0) === 0xfeff) line = line.slice(1)
     parseLine(line, fields)
     if (!header) {
       header = fields.slice()
-      // UTF-8 BOM aus der ersten Spalte entfernen
-      header[0] = header[0].replace(/^﻿/, '')
       colIndex = new Map(header.map((h, i) => [h.trim(), i]))
       return
     }

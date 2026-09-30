@@ -17,6 +17,19 @@ export function toLonLat(x: number, y: number): [number, number] {
   return [x / M_PER_DEG_LON + LON0, y / M_PER_DEG_LAT + LAT0]
 }
 
+/**
+ * Schweizer Landeskoordinaten LV95 nach WGS84, Näherungsformel von swisstopo.
+ * Auf rund einen Meter genau, für das Zuordnen von Messstellen mehr als genug.
+ */
+export function lv95ZuLonLat(e: number, n: number): [number, number] {
+  const y = (e - 2_600_000) / 1e6
+  const x = (n - 1_200_000) / 1e6
+  const lon = 2.6779094 + 4.728982 * y + 0.791484 * y * x + 0.1306 * y * x * x - 0.0436 * y * y * y
+  const lat =
+    16.9023892 + 3.238272 * x - 0.270978 * y * y - 0.002528 * x * x - 0.0447 * y * y * x - 0.014 * x * x * x
+  return [(lon * 100) / 36, (lat * 100) / 36]
+}
+
 export function dist(ax: number, ay: number, bx: number, by: number): number {
   const dx = ax - bx
   const dy = ay - by

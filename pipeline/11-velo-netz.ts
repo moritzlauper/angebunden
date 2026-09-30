@@ -30,7 +30,7 @@
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { Readable } from 'node:stream'
-import { toXY, toLonLat } from './lib/geo.ts'
+import { toXY, toLonLat, lv95ZuLonLat } from './lib/geo.ts'
 import { ladeHoehen, hoehe } from './lib/elevation.ts'
 import { readCsv } from './lib/csv.ts'
 
@@ -1247,8 +1247,11 @@ function knotenImUmkreis(x: number, y: number, r: number) {
 
 type Ampel = { x: number; y: number; art: 0 | 1; name: string; osm: [number, number][] }
 const ampeln: Ampel[] = []
+/** Knotennummer der Stadt -> Index in `ampeln`, für die Verkehrszählung. */
+const ampelVonNr = new Map<number, number>()
 for (const f of json('lichtsignale.geojson').features) {
   const [x, y] = toXY(f.geometry.coordinates[0], f.geometry.coordinates[1])
+  ampelVonNr.set(f.properties.knotennr, ampeln.length)
   ampeln.push({ x, y, art: 0, name: f.properties.knotenbezeichnung ?? '', osm: [] })
 }
 // OSM-Ampeln im Umkreis von 60 m eines städtischen Knotens gehören zu ihm und
@@ -1285,6 +1288,89 @@ const genutzt = new Set(knotenAmpel.filter((a) => a >= 0))
 console.log(
   `  ${ampeln.filter((a) => a.art === 0).length} städtische Signalknoten, ${ampeln.filter((a) => a.art === 1).length} weitere OSM-Ampeln, ${genutzt.size} davon an Knoten des Netzes`
 )
+
+// ------------------------------------------------------------ Verkehrszählung
+
+/**
+ * Wie viel Verkehr über die Strassen einer Ampelkreuzung fliesst, aus der
+ * Verkehrszählung der Stadt. Grünzeiten veröffentlicht die Stadt nicht, aber
+ * sie richten sich nach dem Verkehr: Der Router verteilt das Grün an einer
+ * Kreuzung im Verhältnis dieser Zahlen statt nach Strassenklasse und
+ * Fahrspuren, siehe `wartenAchse` in `app/velonavi/router.ts`.
+ *
+ * Eine Zählstelle ist ein Querschnitt mit meist zwei Messstellen, einer je
+ * Fahrtrichtung. Sie gehört zu einem Signalknoten und nennt die Strasse, auf
+ * der sie zählt. Zugeordnet wird über diesen Namen. Die Koordinaten taugen
+ * dafür nicht, sie liegen oft mitten auf der Kreuzung.
+ *
+ * Zwischen zwei Kreuzungen ändert sich der Verkehr auf einer Strasse wenig.
+ * Eine Kreuzung ohne eigene Zählstelle übernimmt deshalb die nächste auf
+ * derselben Strasse, wenn sie höchstens 500 m entfernt liegt.
+ */
+console.log('Verkehrszählung')
+/** [Ampel, Strassenname, Fahrzeuge je Stunde im Querschnitt] */
+const ampelVerkehr: [number, string, number][] = []
+let zaehlJahr = 0
+{
+  type Messstelle = { zs: string; achse: string; knoten: number; e: number; n: number; stunden: number; fz: number }
+  let stellen: Messstelle[] = []
+  try {
+    const z = json('verkehrszaehlung.json')
+    stellen = z.stellen
+    zaehlJahr = z.jahr
+  } catch {
+    console.log('  verkehrszaehlung.json fehlt (ältere Daten), übersprungen')
+  }
+  // «Emil Klöti-Strasse» und «Emil-Klöti-Strasse», «Zürcherstrasse (Badenerstrasse)»
+  const norm = (s: string) => s.replace(/\(.*?\)/g, '').toLowerCase().replace(/[^a-zäöü]/g, '')
+  type Zaehlstelle = { achse: string; ampel: number; x: number; y: number; fz: number; richtungen: number }
+  const zaehlstellen = new Map<string, Zaehlstelle>()
+  for (const m of stellen) {
+    // Ein Detektor, der nur wenige Wochen lief, sagt nichts über das Jahr.
+    if (m.stunden < 500) continue
+    let z = zaehlstellen.get(m.zs)
+    if (!z) {
+      const [x, y] = toXY(...lv95ZuLonLat(m.e, m.n))
+      z = { achse: norm(m.achse), ampel: ampelVonNr.get(m.knoten) ?? -1, x, y, fz: 0, richtungen: 0 }
+      zaehlstellen.set(m.zs, z)
+    }
+    z.fz += m.fz
+    z.richtungen++
+  }
+  // Nur eine Richtung gezählt: Die andere ist im Tagesmittel etwa gleich stark.
+  for (const z of zaehlstellen.values()) if (z.richtungen === 1) z.fz *= 2
+
+  const strassenJe: Set<string>[] = ampeln.map(() => new Set())
+  for (const k of kanten) {
+    if (k.klasse < KLASSE.wohnstrasse || k.klasse > KLASSE.haupt || !k.name) continue
+    for (const n of [k.von, k.nach]) {
+      const J = knotenAmpel[n]
+      if (J >= 0 && ampeln[J].art === 0) strassenJe[J].add(k.name)
+    }
+  }
+  let eigene = 0
+  const kreuzungen = new Set<number>()
+  strassenJe.forEach((strassen, J) => {
+    for (const name of strassen) {
+      const achse = norm(name)
+      let beste: Zaehlstelle | null = null
+      let besteD = 500
+      for (const z of zaehlstellen.values()) {
+        if (z.achse !== achse) continue
+        const d = z.ampel === J ? 0 : Math.hypot(z.x - ampeln[J].x, z.y - ampeln[J].y)
+        if (d <= besteD) (beste = z), (besteD = d)
+      }
+      if (!beste) continue
+      ampelVerkehr.push([J, name, beste.fz])
+      kreuzungen.add(J)
+      if (besteD === 0) eigene++
+    }
+  })
+  if (stellen.length)
+    console.log(
+      `  ${zaehlstellen.size} Zählstellen (${zaehlJahr}), ${ampelVerkehr.length} Strassen an ${kreuzungen.size} Ampelkreuzungen zugeordnet, ${eigene} davon mit Zählstelle an der Kreuzung selbst`
+    )
+}
 
 // ------------------------------------------------------------ Abbiegeverbote
 
@@ -1536,10 +1622,13 @@ writeFileSync(
       const [lon, lat] = toLonLat(a.x, a.y)
       return [+lon.toFixed(6), +lat.toFixed(6), a.art, a.name]
     }),
+    ampelVerkehr: ampelVerkehr.map(([J, name, fz]) => [J, nameVon(name), fz]),
     statistik: {
       veloKm: Math.round(kanten.filter((k) => k.velo).reduce((s, k) => s + k.laenge, 0) / 1000),
       stressKm: stressMeter.slice(1).map((m) => Math.round(m / 1000)),
       ampelKnoten: genutzt.size,
+      ampelGezaehlt: new Set(ampelVerkehr.map((v) => v[0])).size,
+      zaehlJahr,
       gegenverkehr: kanten.filter((k) => k.gegenverkehr).length,
       velokarteKm: Math.round(kanten.filter((k) => k.velo && k.velokarte > 0).reduce((s, k) => s + k.laenge, 0) / 1000),
       mehrspurigKm: Math.round(kanten.filter((k) => k.velo && k.spuren >= 3).reduce((s, k) => s + k.laenge, 0) / 1000),
