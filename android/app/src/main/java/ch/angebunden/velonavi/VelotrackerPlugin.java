@@ -1,10 +1,14 @@
 package ch.angebunden.velonavi;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
+import android.provider.Settings;
+import androidx.activity.result.ActivityResult;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -12,6 +16,7 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.ActivityCallback;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 import java.io.File;
@@ -107,10 +112,27 @@ public class VelotrackerPlugin extends Plugin {
         if (auto && Build.VERSION.SDK_INT >= 29
                 && hat(Manifest.permission.ACCESS_FINE_LOCATION)
                 && !hat(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
-            requestPermissionForAlias("hintergrund", call, "nachHintergrund");
+            if (Build.VERSION.SDK_INT >= 30) {
+                getActivity().runOnUiThread(() -> new AlertDialog.Builder(getActivity())
+                        .setTitle("Standort im Hintergrund")
+                        .setMessage("Damit Fahrten von selbst aufgezeichnet werden, wähle unter Berechtigungen > Standort «Immer zulassen».")
+                    .setCancelable(false)
+                        .setPositiveButton("Einstellungen öffnen", (dialog, which) -> startActivityForResult(call,
+                                new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.parse("package:" + getContext().getPackageName())), "nachEinstellungen"))
+                        .setNegativeButton("Später", (dialog, which) -> antworten(call, auto))
+                        .show());
+            } else {
+                requestPermissionForAlias("hintergrund", call, "nachHintergrund");
+            }
         } else {
             antworten(call, auto);
         }
+    }
+
+    @ActivityCallback
+    private void nachEinstellungen(PluginCall call, ActivityResult result) {
+        antworten(call, call.getData().optBoolean("_auto", false));
     }
 
     @PermissionCallback
@@ -182,6 +204,37 @@ public class VelotrackerPlugin extends Plugin {
         JSObject o = new JSObject();
         o.put("fahrten", liste);
         call.resolve(o);
+    }
+
+    /**
+     * Legt eine GPX-Datei im Zwischenspeicher ab und öffnet das Teilen-Menü. Ein Herunterladen, wie
+     * der Browser es kennt, gibt es im WebView der App nicht.
+     */
+    @PluginMethod
+    public void gpxTeilen(PluginCall call) {
+        try {
+            String inhalt = call.getString("inhalt");
+            String name = call.getString("name", "velonavi.gpx").replaceAll("[^A-Za-z0-9._-]", "_");
+            if (inhalt == null || inhalt.isEmpty()) {
+                call.reject("Keine Daten");
+                return;
+            }
+            File ordner = new File(getContext().getCacheDir(), "gpx");
+            ordner.mkdirs();
+            File datei = new File(ordner, name);
+            Files.write(datei.toPath(), inhalt.getBytes(StandardCharsets.UTF_8));
+            android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(getContext(), getContext().getPackageName() + ".fileprovider", datei);
+            Intent i = new Intent(Intent.ACTION_SEND)
+                    .setType("application/gpx+xml")
+                    .putExtra(Intent.EXTRA_STREAM, uri)
+                    .putExtra(Intent.EXTRA_SUBJECT, name)
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            Intent wahl = Intent.createChooser(i, "GPX-Datei teilen").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(wahl);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("GPX konnte nicht geteilt werden");
+        }
     }
 
     @PluginMethod

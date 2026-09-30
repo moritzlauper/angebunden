@@ -85,6 +85,10 @@ auf, die Nutzer freiwillig beitragen (`app/velonavi/gemeinschaft.ts`). Einfügen
 öffentlichen Schlüssel, lesen niemand, die Funktion `velonavi_gemeinschaft()` gibt Durchschnitte erst
 ab fünf Messungen heraus. Sie brauchen kein Login.
 
+Die Tabelle `velonavi_einstellungen` hält je Konto die Gewichte für «Komfort», ob Schieben erlaubt
+ist und die Darstellung, damit sie auf jedem Gerät für künftige Routen gelten. Lokal bleiben sie ohnehin
+erhalten, das Konto gleicht nur zwischen Geräten ab; die jüngere Fassung gewinnt.
+
 Gespeichert wird die rohe Spur. Welche Kanten befahren wurden und was daraus gelernt wird,
 rechnet `app/velonavi/fahrten.ts` bei jedem Laden neu, weil sich die Nummern der Kanten mit
 jeder neuen Fassung des Velonetzes ändern.

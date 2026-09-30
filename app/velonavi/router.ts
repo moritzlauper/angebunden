@@ -615,7 +615,7 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
 // ------------------------------------------------------------ Abbiegen
 
 /** Winkel von Peilung a nach b, -180 bis 180, positiv heisst rechts. */
-function drehung(a: number, b: number) {
+export function drehung(a: number, b: number) {
   let d = b - a
   while (d > 180) d -= 360
   while (d <= -180) d += 360

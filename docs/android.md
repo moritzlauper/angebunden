@@ -26,8 +26,11 @@ Die Fassung entsteht bei jeder Änderung am Android-Teil von selbst
   sich fünf Minuten nicht mehr bewegt.
 - Fahrten unter 300 Metern oder zwei Minuten und solche, die für die erkannte Art zu schnell sind
   (Velo über 43 km/h im Mittel), verwirft die App bei der automatischen Aufzeichnung.
-- Beim ersten Start fragt die App einmal nach Standort und Mitteilungen. Den Standort «Immer» und
-  die Bewegungserkennung fragt sie erst, wenn du das automatische Aufzeichnen einschaltest.
+- Beim ersten Start fragt die App nach Standort, Mitteilungen und Bewegungserkennung. Für den
+  Hintergrundstandort führt sie ab Android 11 in die App-Einstellungen: Unter «Standort» muss
+  «Immer zulassen» gewählt werden. Sind alle Freigaben erteilt, schaltet die App das automatische
+  Aufzeichnen einschliesslich Gehen, Joggen, Tram und Auto ein. Wer eine Freigabe ablehnt, kann
+  sie später in den Einstellungen nachholen und den Schalter im Menü einschalten.
 
 Die fertigen Fahrten liegen im privaten Ordner der App und warten dort, bis die Seite sie
 beim nächsten Öffnen abholt. Sie landen in der Datenbank der Seite, dort werten Velonavi die
@@ -37,6 +40,27 @@ weg (Beitragen, im Menü abschaltbar).
 
 Android-Hersteller mit scharfem Energiesparen (Xiaomi, Huawei, Samsung) beenden Hintergrunddienste
 gern. Hilft nichts, die App in den Einstellungen von der Akkuoptimierung ausnehmen.
+
+## Geführt fahren
+
+Bei einer Route den Knopf «Geführt fahren». Das Handy sagt per Vibration, wo du abbiegen sollst:
+einmal lang für rechts, zweimal kurz für links, dreimal kurz für wenden, ein langes Signal am Ziel,
+vier kurze Stösse, wenn du von der Route abkommst (dann rechnet der Velonavi von deiner Position aus
+neu). Der Hinweis kommt etwa sechs Sekunden vor der Kreuzung, bei höherem Tempo früher. Beim ersten
+Start zeigt eine Einführung die Muster zum Ausprobieren. Ist «Aufzeichnen» eingeschaltet, zeichnet
+die Führung die Fahrt mit auf.
+
+Die Führung läuft in der Seite und braucht deshalb einen Bildschirm, der an bleibt; die Seite hält
+ihn an. Bei ausgeschaltetem Bildschirm gibt es noch keine Hinweise. Die Vibration braucht die
+Android-App (`VIBRATE` im Manifest), ein iPhone kann aus dem Browser nicht vibrieren, dort bleibt die
+Anzeige. Die Berechnung der Abbiegehinweise steht in `app/velonavi/fuehrung.ts`.
+
+## GPX
+
+Die Route lässt sich als GPX-Datei für Navi-Geräte und Apps exportieren (Link ganz unten im
+Bedienfeld). Im WebView der App gibt es kein Herunterladen, deshalb öffnet die App das Teilen-Menü von
+Android. Das braucht eine App ab der Fassung mit `gpxTeilen`, in älteren fällt es auf den Browser
+zurück und funktioniert dort nicht.
 
 ## Signieren
 

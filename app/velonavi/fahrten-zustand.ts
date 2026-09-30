@@ -411,13 +411,19 @@ export function useFahrten({
     }
   }, [ortZeigen])
 
-  // Beim ersten Start in der App einmal nach Standort und Mitteilungen fragen, wie jede Navigationsapp.
-  // Wer ablehnt, wird erst wieder gefragt, wenn er etwas auslöst, das sie braucht.
+  // Beim ersten Start in der App alle Freigaben für die automatische Aufzeichnung anfragen.
+  // Wer ablehnt, wird erst wieder gefragt, wenn er die Erkennung selbst einschaltet.
   useEffect(() => {
     if (!nativ || !geladen || lies(SCHLUESSEL.nativGefragt, false)) return
     schreib(SCHLUESSEL.nativGefragt, true)
-    nativ.berechtigen({ auto: false }).catch(() => {})
-  }, [nativ, geladen])
+    nativ.berechtigen({ auto: true }).then(async ({ fehlt }) => {
+      if (fehlt.length) {
+        setMeldung(freigaben(fehlt))
+        return
+      }
+      nativStand(await nativ.auto({ aktiv: true, alle: true }))
+    }).catch(() => setMeldung('Die automatische Erkennung liess sich nicht einschalten.'))
+  }, [nativ, geladen, nativStand])
 
   // Beim Öffnen und bei jeder Rückkehr in die App nachsehen, was im Hintergrund entstanden ist.
   useEffect(() => {

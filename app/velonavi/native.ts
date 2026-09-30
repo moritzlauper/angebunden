@@ -60,6 +60,8 @@ export type Tracker = {
   auto(o: { aktiv: boolean; alle?: boolean }): Promise<NativStatus>
   abholen(): Promise<{ fahrten: NativeFahrt[] }>
   quittieren(o: { ids: string[] }): Promise<void>
+  /** Öffnet das Teilen-Menü von Android mit einer GPX-Datei. Älteren Fassungen der App fehlt die Funktion. */
+  gpxTeilen?(o: { name: string; inhalt: string }): Promise<void>
 }
 
 type CapacitorAussen = { isNativePlatform?: () => boolean; Plugins?: Record<string, unknown> }

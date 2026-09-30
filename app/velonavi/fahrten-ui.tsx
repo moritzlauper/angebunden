@@ -152,6 +152,8 @@ export function Fahrtenmenue({ f, graph, mobil, onSchliessen }: { f: Fahrtenstan
   }, [onSchliessen])
 
   const [alle, setAlle] = useState(false)
+  /** «Alle löschen» fragt im Menü selbst nach: `window.confirm` zeigt das WebView der App nicht zuverlässig. */
+  const [frage, setFrage] = useState(false)
   const datei = useRef<HTMLInputElement>(null)
   const liste = alle ? f.fahrten : f.fahrten.slice(0, 8)
 
@@ -302,16 +304,35 @@ export function Fahrtenmenue({ f, graph, mobil, onSchliessen }: { f: Fahrtenstan
             <button onClick={() => datei.current?.click()} className="underline underline-offset-2" title="Eine Fahrt aus einem Velocomputer oder einer App übernehmen">
               GPX einlesen
             </button>
-            {f.fahrten.length > 0 && (
-              <button
-                onClick={() => window.confirm('Alle Fahrten endgültig löschen?') && f.loeschen('alle')}
-                className="underline underline-offset-2"
-                style={{ color: ui.muted }}
-              >
+            {f.fahrten.length > 0 && !frage && (
+              <button onClick={() => setFrage(true)} className="underline underline-offset-2" style={{ color: ui.muted }}>
                 Alle löschen
               </button>
             )}
           </div>
+          {frage && (
+            <div className="flex flex-col gap-2 rounded-2xl border px-3 py-2.5" style={{ borderColor: ui.fg }} role="alertdialog" aria-label="Alle Fahrten löschen">
+              <p className="text-[12px] leading-snug">
+                Wirklich alle {f.fahrten.length} Fahrten löschen? Das lässt sich nicht rückgängig machen
+                {f.nutzer ? ', und die Kopie im Konto wird mit gelöscht' : ''}.
+              </p>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => {
+                    setFrage(false)
+                    f.loeschen('alle')
+                  }}
+                  className="flex-1 rounded-full border px-3 py-1.5 text-[12px] font-medium"
+                  style={{ background: ui.fg, borderColor: ui.fg, color: ui.bg }}
+                >
+                  Ja, alle löschen
+                </button>
+                <KleinKnopf onClick={() => setFrage(false)} titel="Nichts löschen">
+                  Abbrechen
+                </KleinKnopf>
+              </div>
+            </div>
+          )}
           <input
             ref={datei}
             type="file"
@@ -630,6 +651,7 @@ function Auswertung({
   ziel: Ort | null
   routen: Routen | null
 }) {
+  const [frage, setFrage] = useState(false)
   const velo = (fahrt.modus ?? 'velo') === 'velo'
   const z = velo ? f.zuordnung(fahrt.id) : null
   const dauer = z ? z.netto : fahrt.dauer
@@ -639,6 +661,16 @@ function Auswertung({
   const heute = gleich(start, fahrt.start) && gleich(ziel, fahrt.ziel) ? routen : null
 
   const zeilen: { titel: string; wert: string; hilfe?: string }[] = []
+  // Wann genau aufgezeichnet wurde und ob der Standort zwischendurch ausgesetzt hat. So lässt sich
+  // nachsehen, ob eine Dauer stimmt oder die Aufzeichnung an einer Grenze abgeschnitten wurde.
+  if (fahrt.spur.length > 1) {
+    const uhr = (ms: number) => new Date(ms).toTimeString().slice(0, 8)
+    const ersterMs = Date.parse(fahrt.begonnen)
+    const letzterMs = ersterMs + (fahrt.spur[fahrt.spur.length - 1][2] - fahrt.spur[0][2]) * 1000
+    let luecke = 0
+    for (let i = 1; i < fahrt.spur.length; i++) luecke = Math.max(luecke, fahrt.spur[i][2] - fahrt.spur[i - 1][2])
+    zeilen.push({ titel: 'Aufgezeichnet', wert: `${uhr(ersterMs)} bis ${uhr(letzterMs)}`, hilfe: `${fahrt.spur.length} Punkte, grösste Lücke ${dauerText(luecke)}` })
+  }
   if (z) {
     const halte = z.ampeln.filter((a) => a.gewartet > 0).length
     zeilen.push({
@@ -754,13 +786,21 @@ function Auswertung({
           <span className="inline-block h-[3px] w-4 rounded-full" style={{ background: GEFAHREN }} />
           deine Spur
         </span>
-        <button
-          onClick={() => window.confirm('Diese Fahrt endgültig löschen?') && f.loeschen(fahrt.id)}
-          className="shrink-0 text-[12px] underline underline-offset-2"
-          style={{ color: ui.muted }}
-        >
-          Löschen
-        </button>
+        {frage ? (
+          <span className="flex shrink-0 items-center gap-2 text-[12px]" role="alertdialog" aria-label="Fahrt löschen">
+            Endgültig löschen?
+            <button onClick={() => f.loeschen(fahrt.id)} className="font-medium underline underline-offset-2">
+              Ja
+            </button>
+            <button onClick={() => setFrage(false)} className="underline underline-offset-2" style={{ color: ui.muted }}>
+              Nein
+            </button>
+          </span>
+        ) : (
+          <button onClick={() => setFrage(true)} className="shrink-0 text-[12px] underline underline-offset-2" style={{ color: ui.muted }}>
+            Löschen
+          </button>
+        )}
       </div>
     </div>
   )

@@ -26,6 +26,10 @@ import {
 } from './router'
 import { ui, minuten, km, lies, schreib, Schalter, Hinweis, KleinKnopf } from './teile'
 import { useFahrten, Fahrtbereich, Fahrtenknopf, Fahrtenmenue, AufzeichnenKnopf } from './fahrten-ui'
+import { useFuehrung } from './fuehrung-zustand'
+import { FuehrungKarte, FuehrungKnopf, FuehrungIntro } from './fuehrung-ui'
+import { tracker } from './native'
+import { konto } from './konto'
 
 const STADT = STAEDTE.zuerich
 
@@ -272,6 +276,14 @@ const SCHLUESSEL = {
 }
 const VERLAUF_MAX = 10
 
+/** Was im Konto liegt: die Regler für «Komfort», Schieben und die Darstellung. */
+const EINSTELLUNGEN = 'velonavi.einstellungen'
+type EinstellungenDaten = {
+  gewichte: { sicherheit: number; steigung: number; ampeln: number; belag: number }
+  schieben: boolean
+  themenwahl: Themenwahl
+}
+
 // ---------------------------------------------------------------- Formatierung
 
 const meter = (m: number) => `${nf(m)} m`
@@ -365,6 +377,77 @@ export default function Velonavi() {
       komfort: { schieben, ...gewichte, gelernt },
     }
   }, [schieben, gewichte, fahrten.gelernt])
+
+  // --- Einstellungen: die Gewichte für «Komfort», Schieben und die Darstellung. Sie bleiben auf dem
+  // Gerät erhalten und wandern mit dem Konto auf jedes Gerät, damit sie für künftige Routen gelten.
+  const nutzerId = fahrten.nutzer?.id
+  const [einstellungenGeladen, setEinstellungenGeladen] = useState(false)
+  const letzterStand = useRef('')
+  const pushUhr = useRef(0)
+  const anwenden = useCallback((d: Partial<EinstellungenDaten> | null | undefined) => {
+    if (!d) return
+    const g = d.gewichte
+    if (g && ['sicherheit', 'steigung', 'ampeln', 'belag'].every((k) => typeof (g as Record<string, unknown>)[k] === 'number'))
+      setGewichte({ sicherheit: g.sicherheit, steigung: g.steigung, ampeln: g.ampeln, belag: g.belag })
+    if (typeof d.schieben === 'boolean') setSchieben(d.schieben)
+    if (d.themenwahl === 'auto' || d.themenwahl === 'hell' || d.themenwahl === 'dunkel') {
+      setThemenwahl(d.themenwahl)
+      schreib(SCHLUESSEL.thema, d.themenwahl)
+    }
+  }, [])
+  useEffect(() => {
+    const e = lies<{ daten: Partial<EinstellungenDaten>; t: number } | null>(EINSTELLUNGEN, null)
+    if (e?.daten) {
+      letzterStand.current = JSON.stringify(e.daten)
+      anwenden(e.daten)
+    }
+    setEinstellungenGeladen(true)
+  }, [anwenden])
+  // Speichern, sobald sich etwas ändert; ins Konto verzögert, damit ein Regler nicht jede Stufe schickt.
+  useEffect(() => {
+    if (!einstellungenGeladen) return
+    const daten: EinstellungenDaten = { gewichte, schieben, themenwahl }
+    const json = JSON.stringify(daten)
+    if (json === letzterStand.current) return
+    letzterStand.current = json
+    const t = Date.now()
+    schreib(EINSTELLUNGEN, { daten, t })
+    if (!nutzerId) return
+    window.clearTimeout(pushUhr.current)
+    pushUhr.current = window.setTimeout(async () => {
+      try {
+        const sb = await konto()
+        await sb.from('velonavi_einstellungen').upsert({ user_id: nutzerId, daten, geaendert: new Date(t).toISOString() })
+      } catch {
+        /* Die lokale Fassung bleibt, beim nächsten Start wird es erneut versucht. */
+      }
+    }, 1200)
+  }, [einstellungenGeladen, gewichte, schieben, themenwahl, nutzerId])
+  // Nach der Anmeldung: Die jüngere Fassung gewinnt, die des Kontos oder die dieses Geräts.
+  useEffect(() => {
+    if (!nutzerId || !einstellungenGeladen) return
+    let weg = false
+    ;(async () => {
+      try {
+        const sb = await konto()
+        const { data } = await sb.from('velonavi_einstellungen').select('daten, geaendert').maybeSingle()
+        if (weg) return
+        const lokal = lies<{ daten: EinstellungenDaten; t: number } | null>(EINSTELLUNGEN, null)
+        if (data && (!lokal || Date.parse(data.geaendert) > lokal.t)) {
+          letzterStand.current = JSON.stringify(data.daten)
+          schreib(EINSTELLUNGEN, { daten: data.daten, t: Date.parse(data.geaendert) })
+          anwenden(data.daten)
+        } else if (lokal) {
+          await sb.from('velonavi_einstellungen').upsert({ user_id: nutzerId, daten: lokal.daten, geaendert: new Date(lokal.t).toISOString() })
+        }
+      } catch {
+        /* Ohne Verbindung gelten die Einstellungen dieses Geräts. */
+      }
+    })()
+    return () => {
+      weg = true
+    }
+  }, [nutzerId, einstellungenGeladen, anwenden])
 
   // --- Thema: gemerkte Wahl, sonst nach Tageszeit
   useEffect(() => {
@@ -593,6 +676,33 @@ export default function Velonavi() {
   // Die gewählte Variante, bei Zusammenlegung die, auf die sie zeigt.
   const aktiv: Variante | null = routen ? (routen.gleichWie[wahl] ?? (routen.routen[wahl] ? wahl : 'komfort')) : null
   const r = routen && aktiv ? routen.routen[aktiv] : null
+
+  // Geführtes Fahren: folgt der Position auf der Route und meldet Abbiegen per Vibration. Läuft eine
+  // Aufzeichnung nicht schon, startet sie mit, wenn sie eingeschaltet ist, und endet mit der Führung.
+  const fuehrung = useFuehrung({
+    graph: graphBereit ? graphRef.current : null,
+    route: r,
+    neuRechnen: (p) => {
+      setStart({ lon: p[0], lat: p[1], titel: 'Mein Standort' })
+      setStartText('Mein Standort')
+    },
+    beiStart: () => {
+      if (!fahrten.aufzeichnen || fahrten.laufend) return
+      const rr = routen?.routen
+      fahrten.starten(
+        rr && aktiv
+          ? {
+              wahl: aktiv,
+              schnell: rr.schnell ? { zeit: rr.schnell.zeit, distanz: rr.schnell.distanz } : undefined,
+              komfort: rr.komfort ? { zeit: rr.komfort.zeit, distanz: rr.komfort.distanz } : undefined,
+            }
+          : null
+      )
+    },
+    beiEnde: () => {
+      if (fahrten.laufend) fahrten.beenden()
+    },
+  })
   const andere = useMemo(
     () =>
       routen
@@ -1015,7 +1125,8 @@ export default function Velonavi() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fahrten.ansicht, kartenBereit])
 
-  const ich = fahrten.ich
+  // Während der Führung gilt die Position der Führung, sonst der blaue Standortpunkt.
+  const ich = fuehrung.pos ?? fahrten.ich
   useEffect(() => {
     const map = mapRef.current
     if (!kartenBereit || !map) return
@@ -1024,6 +1135,13 @@ export default function Velonavi() {
       features: ich ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: ich } }] : [],
     })
   }, [kartenBereit, ich])
+
+  // Die Karte folgt der Position, solange geführt wird.
+  useEffect(() => {
+    const map = mapRef.current
+    if (!kartenBereit || !map || !fuehrung.aktiv || !fuehrung.pos) return
+    map.easeTo({ center: fuehrung.pos, zoom: Math.max(map.getZoom(), 16.5), duration: 700 })
+  }, [kartenBereit, fuehrung.aktiv, fuehrung.pos])
 
   const standortJetzt = fahrten.laufend?.ort ?? null
   useEffect(() => {
@@ -1214,10 +1332,34 @@ export default function Velonavi() {
     )
   }
 
-  const gpx = () => {
+  /**
+   * Die Route als GPX-Datei für Navi-Geräte und Apps. Im WebView der Android-App gibt es kein Herunterladen,
+   * dort öffnet die App das Teilen-Menü. Im Browser: Teilen-Menü mit Datei, wo der Browser es kann,
+   * sonst der gewöhnliche Download.
+   */
+  const gpx = async () => {
     if (!r) return
     const name = `${start?.titel ?? 'Start'} nach ${ziel?.titel ?? 'Ziel'}`
-    const blob = new Blob([alsGpx(r, name)], { type: 'application/gpx+xml' })
+    const inhalt = alsGpx(r, name)
+    const nativ = tracker()
+    if (nativ?.gpxTeilen) {
+      try {
+        await nativ.gpxTeilen({ name: 'velonavi.gpx', inhalt })
+      } catch {
+        setFehler('Die GPX-Datei liess sich nicht teilen.')
+      }
+      return
+    }
+    try {
+      const datei = new File([inhalt], 'velonavi.gpx', { type: 'application/gpx+xml' })
+      if (navigator.canShare?.({ files: [datei] })) {
+        await navigator.share({ files: [datei], title: name })
+        return
+      }
+    } catch {
+      /* abgebrochen oder nicht möglich: dann der gewöhnliche Weg */
+    }
+    const blob = new Blob([inhalt], { type: 'application/gpx+xml' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
     a.download = 'velonavi.gpx'
@@ -1426,6 +1568,7 @@ export default function Velonavi() {
   const inhalt = (
     <div className="flex flex-col gap-4" style={{ color: ui.fg }}>
       {fehler && <Hinweis>{fehler}</Hinweis>}
+      {!mobil && <FuehrungKarte f={fuehrung} />}
       {ergebnis && 'fehler' in ergebnis && <Hinweis>{ergebnis.fehler}</Hinweis>}
       <Fahrtbereich
         f={fahrten}
@@ -1449,7 +1592,7 @@ export default function Velonavi() {
           setWahl={setWahl}
           hover={hover}
           setHover={setHover}
-          gpx={gpx}
+          fuehrung={<FuehrungKnopf f={fuehrung} routeDa />}
           teilen={teilen}
           kopiert={kopiert}
           aktion={<AufzeichnenKnopf f={fahrten} routen={routen.routen} wahl={aktiv} />}
@@ -1478,6 +1621,14 @@ export default function Velonavi() {
         >
           Bessere Route melden
         </a>
+        {r && (
+          <>
+            {' · '}
+            <button onClick={gpx} className="underline underline-offset-2" title="Die Route als Datei für Navi-Geräte und Apps wie Komoot oder Garmin">
+              Route als GPX-Datei exportieren
+            </button>
+          </>
+        )}
         {' · '}
         <Link href="/erreichbarkeitskarte" className="underline underline-offset-2">
           Erreichbarkeitskarte
@@ -1544,6 +1695,7 @@ export default function Velonavi() {
         </div>
       )}
 
+      <FuehrungIntro f={fuehrung} mobil={mobil} />
       {menueOffen && <Fahrtenmenue f={fahrten} graph={graphBereit ? graphRef.current : null} mobil={mobil} onSchliessen={menueZu} />}
 
       {mobil ? (
@@ -1554,12 +1706,20 @@ export default function Velonavi() {
           >
             {/* Der Wechsel zur Erreichbarkeitskarte: ein schlichtes Segment über den Suchfeldern,
                 nur am Anfang und nie mit Konto. Die Felder rücken mit, wenn es wegfällt. */}
-            {anfang && !kontoDa && (
-              <div className="pointer-events-auto self-center">
-                <Seitenwahl ui={ui} aktiv="velonavi" />
+            {fuehrung.aktiv ? (
+              <div className="pointer-events-auto">
+                <FuehrungKarte f={fuehrung} />
               </div>
+            ) : (
+              <>
+                {anfang && !kontoDa && (
+                  <div className="pointer-events-auto self-center">
+                    <Seitenwahl ui={ui} aktiv="velonavi" />
+                  </div>
+                )}
+                <div className="pointer-events-auto">{felder}</div>
+              </>
             )}
-            <div className="pointer-events-auto">{felder}</div>
           </div>
           <Blatt ui={ui} offen={blattOffen} onSchliessen={() => setBlattOffen(false)} onHoehe={setDeckung}>
             {inhalt}
@@ -1635,7 +1795,7 @@ function routeAlsLinien(r: Route) {
 }
 
 function Ergebnis({
-  r, routen, gleichWie, aktiv, setWahl, hover, setHover, gpx, teilen, kopiert, aktion, detailsOffen, setDetailsOffen,
+  r, routen, gleichWie, aktiv, setWahl, hover, setHover, fuehrung, teilen, kopiert, aktion, detailsOffen, setDetailsOffen,
 }: {
   r: Route
   routen: Record<Variante, Route | null>
@@ -1644,10 +1804,11 @@ function Ergebnis({
   setWahl: (v: Variante) => void
   hover: number | null
   setHover: (i: number | null) => void
-  gpx: () => void
+  /** Der Knopf für das geführte Fahren. */
+  fuehrung?: React.ReactNode
   teilen: () => void
   kopiert: boolean
-  /** Knöpfe, die neben GPX und Teilen stehen. */
+  /** Knöpfe, die neben Teilen stehen. */
   aktion?: React.ReactNode
   detailsOffen: boolean
   setDetailsOffen: (v: boolean) => void
@@ -1688,14 +1849,13 @@ function Ergebnis({
         </div>
         <div className="flex flex-wrap justify-end gap-1.5">
           {aktion}
-          <KleinKnopf onClick={gpx} titel="Als GPX-Datei für Navigationsgerät oder App">
-            GPX
-          </KleinKnopf>
           <KleinKnopf onClick={teilen} titel="Link auf diese Route">
             {kopiert ? 'Kopiert' : 'Teilen'}
           </KleinKnopf>
         </div>
       </div>
+
+      {fuehrung}
 
       <StressBalken r={r} />
 
