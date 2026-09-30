@@ -12,7 +12,7 @@ export type Stadt = {
   schluessel: StadtSchluessel
   /** So heisst die Stadt im Text: «… in Basel», «Erreichbarkeitskarte Bern». */
   name: string
-  /** Route der Stadt. Zürich liegt auf «/», die anderen auf «/basel», «/bern». */
+  /** Route der Karte. Zürich liegt auf «/erreichbarkeitskarte» («/» gehört dem Velonavi), die anderen auf «/basel», «/bern». */
   pfad: string
   /** Präfix der Datendateien, z. B. «/data/basel». */
   daten: string
@@ -25,7 +25,7 @@ export const STAEDTE: Record<StadtSchluessel, Stadt> = {
   zuerich: {
     schluessel: 'zuerich',
     name: 'Zürich',
-    pfad: '/',
+    pfad: '/erreichbarkeitskarte',
     daten: '/data/zuerich',
     center: [8.5405, 47.3775],
     zoom: 13.4,

@@ -19,7 +19,7 @@ export function SeoInhalt({ statistik }: { statistik: VeloMeta['statistik'] }) {
     '@context': 'https://schema.org',
     '@type': 'WebApplication',
     name: `${SITE_NAME} · Velonavi Zürich`,
-    url: `${SITE_URL}/velonavi`,
+    url: `${SITE_URL}/`,
     applicationCategory: 'TravelApplication',
     operatingSystem: 'Web',
     browserRequirements: 'Requires JavaScript',

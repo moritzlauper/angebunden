@@ -86,14 +86,14 @@ export default async function Methode() {
     <div className="min-h-dvh bg-[#f7f7f5] text-[#18181b] dark:bg-[#0b0b0c] dark:text-[#f4f4f5]">
       <main className="mx-auto max-w-[44rem] px-5 py-12 sm:px-8 sm:py-16 text-[15px] leading-relaxed">
         <div className="flex items-center justify-between gap-4">
-          <Link href="/" aria-label="angebunden · zur Karte" className="hover:opacity-70">
+          <Link href="/" aria-label="angebunden · zum Velonavi" className="hover:opacity-70">
             <Wortmarke size={16} />
           </Link>
           <Link
             href="/"
             className="text-[13px] text-zinc-500 underline underline-offset-2 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            Zurück zur Karte
+            Zurück zum Velonavi
           </Link>
         </div>
 
@@ -331,7 +331,7 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
 
         <H2 id="velonavi">Velonavi</H2>
         <p className="mt-4">
-          Der <Link href="/velonavi" className="underline underline-offset-2">Velonavi</Link> rechnet
+          Der <Link href="/" className="underline underline-offset-2">Velonavi</Link> rechnet
           auf dem Fuss- und Velowegnetz der Stadt Zürich. Das sind rund 38&apos;700 Wegstücke mit
           Angaben dazu, ob Velos fahren dürfen, in welche Richtung eine Einbahn gilt und auf welcher
           Seite ein Velostreifen liegt. Dazu kommen 1&apos;015 Abbiegeverbote. Jedes Wegstück bekommt

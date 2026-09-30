@@ -29,6 +29,9 @@ const SCHLUESSEL =
 
 export const KONTO_MOEGLICH = !!ADRESSE && !!SCHLUESSEL
 
+/** Für die Gemeinschaft (`gemeinschaft-netz.ts`), die ohne Anmeldung und ohne die Bibliothek auskommt. */
+export const PROJEKT = { adresse: ADRESSE, schluessel: SCHLUESSEL }
+
 /** Unter diesem Namen liegt die Sitzung im localStorage. Cookies gibt es keine. */
 const SPEICHER = 'velonavi.konto'
 
@@ -64,8 +67,8 @@ export function kontoAngefangen() {
   }
 }
 
-/** Wohin Supabase nach der Anmeldung zurückschickt. Muss dort als Redirect-URL eingetragen sein. */
-export const rueckkehr = () => `${window.location.origin}/velonavi`
+/** Wohin Supabase nach der Anmeldung zurückschickt: die Startseite. Muss dort als Redirect-URL eingetragen sein. */
+export const rueckkehr = () => window.location.origin
 
 /** Anbieter, für die es einen Knopf gibt, sofern sie im Supabase-Projekt eingeschaltet sind. */
 const ANBIETER = [

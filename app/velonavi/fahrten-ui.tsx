@@ -1,448 +1,18 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { User } from '@supabase/supabase-js'
-import {
-  anmeldeFehler, anmeldewege, codeOhnePruefwert, konto, kontoAngefangen, rueckkehr, KONTO_MOEGLICH, TABELLE, type Anbieter,
-} from './konto'
-import {
-  deckung, lerne, spurAusGpx, spurDistanz, verdichten, zuordnen, DISTANZ_SCHRITT,
-  type Fahrt, type Lernstand, type Ort, type Spurpunkt, type Vorschlag, type Zuordnung,
-} from './fahrten.ts'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { GEFAHREN, GRAU } from '../farben'
+import { anmeldewege, type Anbieter } from './konto'
+import { deckung, type Fahrt, type Ort } from './fahrten.ts'
+import { aehnliche, teilstrecken, type Teilstrecke } from './vergleich.ts'
 import type { Graph, Route } from './router'
-import { ui, km, lies, minuten, schreib, Hinweis, KleinKnopf, Schalter } from './teile'
+import type { Fahrtenstand } from './fahrten-zustand'
+import { ui, km, minuten, Hinweis, KleinKnopf, Schalter } from './teile'
 
-/**
- * Was der Kontobereich im Browser ablegt. Die Fahrten selbst liegen im Konto;
- * hier stehen nur die beiden Schalter und eine Aufzeichnung, die noch läuft
- * oder sich nicht speichern liess.
- */
-const SCHLUESSEL = {
-  aufzeichnen: 'velonavi.aufzeichnen',
-  lernen: 'velonavi.lernen',
-  laufend: 'velonavi.laufend',
-}
+export { useFahrten } from './fahrten-zustand'
+export type { Fahrtenstand } from './fahrten-zustand'
 
-/** Ungenauere Standorte (Mobilfunkzelle statt GPS) kommen nicht in die Spur. */
-const GENAU_MAX = 60
-/** So nah am Ziel endet die Aufzeichnung von selbst. */
-const ANKUNFT = 30
-/** Liegt der Anfang oder das Ende der Spur so nah am geplanten Ort, trägt die Fahrt dessen Namen. */
-const ORT_NAH = 80
-/** Nach einem Neuladen läuft eine Aufzeichnung weiter, wenn ihr letzter Punkt jünger ist, in Millisekunden. */
-const WEITER_BIS = 10 * 60_000
-/** Mehr Fahrten lädt und lernt der Velonavi nicht, die neusten zuerst. */
-const FAHRTEN_MAX = 200
-const FREMDER_BROWSER =
-  'Die Anmeldung hat nicht geklappt. Den Link aus der E-Mail im selben Browser öffnen, in dem du ihn angefordert hast.'
-
-const MY = 111133
-const mx = (lat: number) => 111320 * Math.cos((lat * Math.PI) / 180)
-const abstand = (lon0: number, lat0: number, lon1: number, lat1: number) =>
-  Math.hypot((lon1 - lon0) * mx(lat0), (lat1 - lat0) * MY)
-
-type Zeile = {
-  id: string
-  begonnen: string
-  dauer_s: number
-  distanz_m: number
-  start: Ort
-  ziel: Ort
-  spur: Spurpunkt[]
-  vorschlag: Vorschlag | null
-  quelle: Fahrt['quelle']
-}
-const ausZeile = (z: Zeile): Fahrt => ({
-  id: z.id, begonnen: z.begonnen, dauer: z.dauer_s, distanz: z.distanz_m,
-  start: z.start, ziel: z.ziel, spur: z.spur, vorschlag: z.vorschlag, quelle: z.quelle,
-})
-
-type Offen = { beginn: number; spur: Spurpunkt[]; vorschlag: Vorschlag | null; quelle?: Fahrt['quelle'] }
-
-/** Stand der laufenden Aufzeichnung, für die Anzeige. */
-export type Aufzeichnung = {
-  /** Beginn in Millisekunden seit 1970. */
-  seit: number
-  distanz: number
-  ort: [number, number] | null
-}
-
-/**
- * Zustand und Handlungen rund ums Konto: Anmeldung, Aufzeichnung, gespeicherte
- * Fahrten und was daraus gelernt wurde.
- *
- * Der Haken sitzt im Velonavi selbst und nicht im Kontobereich. Dieser wird je
- * nach Fensterbreite im Blatt oder in der Seitenleiste gezeichnet und beim
- * Wechsel neu aufgebaut; eine laufende Aufzeichnung darf das nicht beenden.
- */
-export function useFahrten({
-  graph, start, ziel, benenne, zeigeStrecke,
-}: {
-  graph: Graph | null
-  start: Ort | null
-  ziel: Ort | null
-  /** Der nächste bekannte Ort zu einer Koordinate. */
-  benenne: (lon: number, lat: number) => Ort
-  /** Start und Ziel einer Fahrt in den Routenplaner übernehmen. */
-  zeigeStrecke: (f: Fahrt) => void
-}) {
-  // Was die Rückrufe des Standortdienstes brauchen, steht in Refs: Sie leben
-  // länger als ein Anstrich und sähen sonst veraltete Werte.
-  const startRef = useRef(start)
-  startRef.current = start
-  const zielRef = useRef(ziel)
-  zielRef.current = ziel
-  const benenneRef = useRef(benenne)
-  benenneRef.current = benenne
-  const zeigeStreckeRef = useRef(zeigeStrecke)
-  zeigeStreckeRef.current = zeigeStrecke
-
-  const [angebunden, setAngebunden] = useState(false)
-  const [nutzer, setNutzer] = useState<User | null>(null)
-  const [fahrten, setFahrten] = useState<Fahrt[]>([])
-  const [aufzeichnen, setAufzeichnenRoh] = useState(false)
-  const [lernen, setLernenRoh] = useState(true)
-  const [laufend, setLaufend] = useState<Aufzeichnung | null>(null)
-  const [gezeigt, setGezeigt] = useState<string | null>(null)
-  const [meldung, setMeldung] = useState<string | null>(null)
-  const nutzerId = nutzer?.id
-
-  // --- Anmeldung
-  useEffect(() => {
-    setAufzeichnenRoh(lies(SCHLUESSEL.aufzeichnen, false))
-    setLernenRoh(lies(SCHLUESSEL.lernen, true))
-    if (!KONTO_MOEGLICH) return
-    const fehler = anmeldeFehler()
-    if (fehler) setMeldung(fehler)
-    else if (codeOhnePruefwert()) setMeldung(FREMDER_BROWSER)
-    if (kontoAngefangen()) setAngebunden(true)
-  }, [])
-
-  useEffect(() => {
-    if (!angebunden) return
-    let weg = false
-    let abbestellen: (() => void) | undefined
-    konto()
-      .then(async (sb) => {
-        if (weg) return
-        const { data } = sb.auth.onAuthStateChange((_ereignis, sitzung) => setNutzer(sitzung?.user ?? null))
-        abbestellen = () => data.subscription.unsubscribe()
-        // Scheitert das Einlösen des Codes, ist er abgelaufen oder schon benutzt.
-        const { error } = await sb.auth.initialize()
-        if (error && !weg) setMeldung(`Die Anmeldung hat nicht geklappt: ${error.message}`)
-      })
-      .catch(() => !weg && setMeldung('Die Anmeldung liess sich nicht laden.'))
-    return () => {
-      weg = true
-      abbestellen?.()
-    }
-  }, [angebunden])
-
-  const mit = useCallback(async (anbieter: Anbieter['id']) => {
-    const sb = await konto()
-    const { error } = await sb.auth.signInWithOAuth({ provider: anbieter, options: { redirectTo: rueckkehr() } })
-    if (error) setMeldung(`Die Anmeldung hat nicht geklappt: ${error.message}`)
-  }, [])
-
-  const perMail = useCallback(async (mail: string) => {
-    const sb = await konto()
-    const { error } = await sb.auth.signInWithOtp({ email: mail, options: { emailRedirectTo: rueckkehr() } })
-    if (error) setMeldung(`Der Anmeldelink liess sich nicht verschicken: ${error.message}`)
-    return !error
-  }, [])
-
-  // --- Gespeicherte Fahrten
-  useEffect(() => {
-    if (!nutzerId) {
-      setFahrten([])
-      setGezeigt(null)
-      return
-    }
-    let weg = false
-    konto()
-      .then((sb) => sb.from(TABELLE).select('*').order('begonnen', { ascending: false }).limit(FAHRTEN_MAX))
-      .then(({ data, error }) => {
-        if (weg) return
-        if (error) setMeldung(`Die Fahrten liessen sich nicht laden: ${error.message}`)
-        else setFahrten((data as Zeile[]).map(ausZeile))
-      })
-    return () => {
-      weg = true
-    }
-  }, [nutzerId])
-
-  const sichern = useCallback(async (offen: Offen): Promise<Fahrt | null> => {
-    /** Der geplante Ort, wenn die Spur dort beginnt oder endet, sonst die nächste Adresse. */
-    const ortFuer = (geplant: Ort | null, [lon, lat]: Spurpunkt): Ort =>
-      geplant && geplant.titel !== 'Mein Standort' && abstand(geplant.lon, geplant.lat, lon, lat) < ORT_NAH
-        ? { lon: geplant.lon, lat: geplant.lat, titel: geplant.titel }
-        : benenneRef.current(lon, lat)
-    const spur = verdichten(offen.spur)
-    const distanz = spur.length ? spurDistanz(spur) : 0
-    if (spur.length < 10 || distanz < 150) {
-      schreib(SCHLUESSEL.laufend, null)
-      setMeldung('Die Aufzeichnung war zu kurz und wurde nicht gespeichert.')
-      return null
-    }
-    const erster = spur[0]
-    const letzter = spur[spur.length - 1]
-    // Der Vorschlag vom Losfahren lässt sich nur mit einer Fahrt vergleichen,
-    // die am geplanten Start begann und am geplanten Ziel ankam.
-    const nah = (geplant: Ort | null, [lon, lat]: Spurpunkt) => !!geplant && abstand(geplant.lon, geplant.lat, lon, lat) < ORT_NAH
-    const wieGeplant = nah(startRef.current, erster) && nah(zielRef.current, letzter)
-    try {
-      const sb = await konto()
-      const { data, error } = await sb
-        .from(TABELLE)
-        .insert({
-          begonnen: new Date(offen.beginn + erster[2] * 1000).toISOString(),
-          dauer_s: letzter[2] - erster[2],
-          distanz_m: distanz,
-          start: ortFuer(startRef.current, erster),
-          ziel: ortFuer(zielRef.current, letzter),
-          spur,
-          vorschlag: wieGeplant ? offen.vorschlag : null,
-          quelle: offen.quelle ?? 'aufzeichnung',
-        })
-        .select()
-        .single()
-      if (error) throw error
-      schreib(SCHLUESSEL.laufend, null)
-      const f = ausZeile(data as Zeile)
-      setFahrten((alt) => [f, ...alt].sort((a, b) => (a.begonnen < b.begonnen ? 1 : -1)))
-      return f
-    } catch {
-      // Die Spur bleibt im Browser liegen und wird beim nächsten Öffnen noch einmal gesichert.
-      schreib(SCHLUESSEL.laufend, offen)
-      setMeldung('Die Fahrt liess sich nicht speichern. Sie bleibt in diesem Browser, bis es klappt.')
-      return null
-    }
-  }, [])
-
-  const zeigen = useCallback((f: Fahrt | null) => {
-    setGezeigt(f?.id ?? null)
-    if (f) zeigeStreckeRef.current(f)
-  }, [])
-
-  // --- Aufzeichnung
-  const offenRef = useRef<Offen>({ beginn: 0, spur: [], vorschlag: null })
-  const distanzRef = useRef({ summe: 0, lon: 0, lat: 0 })
-  const watchRef = useRef<number | null>(null)
-  const sperreRef = useRef<WakeLockSentinel | null>(null)
-  const beendenRef = useRef<() => void>(() => {})
-
-  /** Hält den Bildschirm an: Im Hintergrund liefert der Browser keinen Standort. */
-  const wachhalten = useCallback(() => {
-    navigator.wakeLock
-      ?.request('screen')
-      .then((s) => (sperreRef.current = s))
-      .catch(() => {})
-  }, [])
-
-  const anhalten = useCallback(() => {
-    if (watchRef.current !== null) navigator.geolocation.clearWatch(watchRef.current)
-    watchRef.current = null
-    sperreRef.current?.release().catch(() => {})
-    sperreRef.current = null
-    setLaufend(null)
-  }, [])
-
-  const horchen = useCallback(() => {
-    if (!navigator.geolocation) {
-      setMeldung('Dieser Browser gibt keinen Standort her.')
-      return false
-    }
-    const offen = offenRef.current
-    const d = distanzRef.current
-    d.summe = spurDistanz(offen.spur)
-    const letzter = offen.spur[offen.spur.length - 1]
-    if (letzter) (d.lon = letzter[0]), (d.lat = letzter[1])
-    setLaufend({ seit: offen.beginn, distanz: d.summe, ort: letzter ? [letzter[0], letzter[1]] : null })
-    watchRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        const { longitude: lon, latitude: lat, accuracy } = pos.coords
-        if (accuracy > GENAU_MAX) return
-        const t = (Date.now() - offen.beginn) / 1000
-        const vorher = offen.spur[offen.spur.length - 1]
-        if (vorher && t - vorher[2] < 0.9) return
-        offen.spur.push([lon, lat, t, accuracy])
-        // Gezählt wird wie in `spurDistanz`.
-        if (offen.spur.length === 1) (d.lon = lon), (d.lat = lat)
-        const schritt = abstand(d.lon, d.lat, lon, lat)
-        if (schritt >= DISTANZ_SCHRITT) (d.summe += schritt), (d.lon = lon), (d.lat = lat)
-        if (offen.spur.length % 15 === 0) schreib(SCHLUESSEL.laufend, offen)
-        setLaufend({ seit: offen.beginn, distanz: d.summe, ort: [lon, lat] })
-        const z = zielRef.current
-        if (z && t > 60 && d.summe > 200 && abstand(z.lon, z.lat, lon, lat) < ANKUNFT) beendenRef.current()
-      },
-      (e) => {
-        if (e.code !== e.PERMISSION_DENIED) return
-        anhalten()
-        setMeldung('Ohne Freigabe des Standorts lässt sich keine Fahrt aufzeichnen.')
-      },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 30_000 }
-    )
-    wachhalten()
-    return true
-  }, [anhalten, wachhalten])
-
-  const starten = useCallback(
-    (vorschlag: Vorschlag | null) => {
-      offenRef.current = { beginn: Date.now(), spur: [], vorschlag }
-      setGezeigt(null)
-      setMeldung(null)
-      horchen()
-    },
-    [horchen]
-  )
-
-  const beenden = useCallback(async () => {
-    if (watchRef.current === null) return
-    anhalten()
-    const f = await sichern(offenRef.current)
-    if (f) zeigen(f)
-  }, [anhalten, sichern, zeigen])
-  beendenRef.current = beenden
-
-  const verwerfen = useCallback(() => {
-    anhalten()
-    schreib(SCHLUESSEL.laufend, null)
-  }, [anhalten])
-
-  // Die Bildschirmsperre fällt weg, sobald die Seite in den Hintergrund geht.
-  const laeuft = !!laufend
-  useEffect(() => {
-    if (!laeuft) return
-    const sichtbar = () => document.visibilityState === 'visible' && wachhalten()
-    document.addEventListener('visibilitychange', sichtbar)
-    return () => document.removeEventListener('visibilitychange', sichtbar)
-  }, [laeuft, wachhalten])
-
-  // Beim Verlassen der Seite aufhören zu horchen. Die Spur liegt im Browser.
-  useEffect(
-    () => () => {
-      if (watchRef.current !== null) navigator.geolocation.clearWatch(watchRef.current)
-      sperreRef.current?.release().catch(() => {})
-    },
-    []
-  )
-
-  // Was vom letzten Mal liegen blieb: Wurde die Seite mitten in der Fahrt neu
-  // geladen, geht die Aufzeichnung weiter. Ist sie älter, wird sie gesichert.
-  const aufgenommen = useRef(false)
-  useEffect(() => {
-    if (!nutzerId || aufgenommen.current) return
-    aufgenommen.current = true
-    const offen = lies<Offen | null>(SCHLUESSEL.laufend, null)
-    const letzter = offen?.spur?.[offen.spur.length - 1]
-    if (!offen || !letzter) return
-    const frisch = Date.now() - (offen.beginn + letzter[2] * 1000) < WEITER_BIS
-    if (frisch && offen.quelle !== 'gpx' && lies(SCHLUESSEL.aufzeichnen, false)) {
-      offenRef.current = offen
-      horchen()
-    } else sichern(offen)
-  }, [nutzerId, horchen, sichern])
-
-  const importieren = useCallback(
-    async (datei: File) => {
-      const gpx = spurAusGpx(await datei.text())
-      if (!gpx) {
-        setMeldung('In der Datei steht keine Spur mit Zeitstempeln. Ohne Zeiten gibt es nichts auszuwerten.')
-        return
-      }
-      const f = await sichern({ beginn: gpx.beginn, spur: gpx.spur, vorschlag: null, quelle: 'gpx' })
-      if (f) zeigen(f)
-    },
-    [sichern, zeigen]
-  )
-
-  const loeschen = useCallback(async (welche: 'alle' | string) => {
-    const sb = await konto()
-    // Ohne Bedingung löscht Supabase nichts; die Datenbank lässt ohnehin nur die eigenen Zeilen zu.
-    const { error } = welche === 'alle' ? await sb.from(TABELLE).delete().not('id', 'is', null) : await sb.from(TABELLE).delete().eq('id', welche)
-    if (error) {
-      setMeldung(`Löschen hat nicht geklappt: ${error.message}`)
-      return
-    }
-    setFahrten((alt) => (welche === 'alle' ? [] : alt.filter((f) => f.id !== welche)))
-    setGezeigt((g) => (welche === 'alle' || g === welche ? null : g))
-  }, [])
-
-  const abmelden = useCallback(async () => {
-    anhalten()
-    const sb = await konto()
-    await sb.auth.signOut()
-  }, [anhalten])
-
-  // --- Zuordnen und Lernen
-  // Jede Fahrt wird einmal je Sitzung dem Netz zugeordnet, in kleinen
-  // Portionen, damit die Oberfläche zwischendurch zum Zug kommt. Eine Fahrt
-  // braucht rund 20 Millisekunden.
-  const zuRef = useRef(new Map<string, Zuordnung | null>())
-  const [stand, setStand] = useState<Lernstand | null>(null)
-  /** Zählt hoch, wenn neue Zuordnungen da sind: Die Auswertung liest sie beim nächsten Anstrich. */
-  const [, setZugeordnet] = useState(0)
-  useEffect(() => {
-    if (!graph) return
-    let weg = false
-    let uhr = 0
-    const offen = fahrten.filter((f) => !zuRef.current.has(f.id))
-    const schritt = () => {
-      if (weg) return
-      const t0 = performance.now()
-      while (offen.length && performance.now() - t0 < 12) {
-        const f = offen.shift()!
-        zuRef.current.set(f.id, zuordnen(graph, f.spur))
-      }
-      if (offen.length) {
-        uhr = window.setTimeout(schritt, 0)
-        return
-      }
-      const alle = fahrten.map((f) => zuRef.current.get(f.id)).filter((z): z is Zuordnung => !!z)
-      setStand(alle.length ? lerne(graph, alle) : null)
-      setZugeordnet((n) => n + 1)
-    }
-    uhr = window.setTimeout(schritt, 0)
-    return () => {
-      weg = true
-      window.clearTimeout(uhr)
-    }
-  }, [graph, fahrten])
-
-  const gezeigteFahrt = useMemo(() => fahrten.find((f) => f.id === gezeigt) ?? null, [fahrten, gezeigt])
-
-  /** Die Spur für die Karte: die laufende Aufzeichnung, sonst die angesehene Fahrt. */
-  const linie = useMemo(
-    () => (laufend ? offenRef.current.spur : (gezeigteFahrt?.spur ?? [])).map(([lon, lat]): [number, number] => [lon, lat]),
-    [laufend, gezeigteFahrt]
-  )
-
-  return {
-    moeglich: KONTO_MOEGLICH,
-    nutzer, anbinden: () => setAngebunden(true), mit, perMail, abmelden,
-    fahrten, gezeigteFahrt, zeigen, loeschen, importieren,
-    zuordnung: (id: string) => zuRef.current.get(id) ?? null,
-    aufzeichnen,
-    setAufzeichnen: (v: boolean) => {
-      setAufzeichnenRoh(v)
-      schreib(SCHLUESSEL.aufzeichnen, v)
-    },
-    laufend, starten, beenden, verwerfen, linie,
-    lernen,
-    setLernen: (v: boolean) => {
-      setLernenRoh(v)
-      schreib(SCHLUESSEL.lernen, v)
-    },
-    stand,
-    /** Was der Router bekommt: das Gelernte, solange der Schalter an ist. */
-    gelernt: lernen ? stand : null,
-    meldung, setMeldung,
-  }
-}
-
-export type Fahrtenstand = ReturnType<typeof useFahrten>
-
-// ---------------------------------------------------------------- Darstellung
+// ---------------------------------------------------------------- Formatierung
 
 function dauerText(s: number) {
   const sek = Math.round(s)
@@ -458,110 +28,378 @@ function datumText(iso: string) {
 
 const prozent = (anteil: number) => `${Math.round(100 * anteil)}%`
 
+/** «1 Min. 20 s schneller» oder «… langsamer», ab fünf Sekunden Unterschied. */
+function unterschied(gefahren: number, vergleich: number, wort: [string, string]) {
+  const d = Math.round(vergleich - gefahren)
+  if (Math.abs(d) < 5) return 'gleich schnell'
+  return `${dauerText(Math.abs(d))} ${d > 0 ? wort[0] : wort[1]}`
+}
+
 type Routen = { schnell: Route | null; komfort: Route | null }
 
-/**
- * Konto, Aufzeichnung und vergangene Fahrten im Bedienfeld des Velonavi.
- * `routen` sind die Vorschläge, die der Routenplaner gerade zeigt.
- */
-export function Kontobereich({
-  f, graph, start, ziel, routen,
-}: {
-  f: Fahrtenstand
-  graph: Graph | null
-  start: Ort | null
-  ziel: Ort | null
-  routen: Routen | null
-}) {
-  if (!f.moeglich) return null
+// ---------------------------------------------------------------- Knopf und Menü
+
+function Symbol() {
   return (
-    <section className="flex flex-col gap-2.5 border-t pt-3" style={{ borderColor: ui.border }}>
-      {f.meldung && (
-        <div className="flex items-start gap-2">
-          <div className="flex-1">
-            <Hinweis>{f.meldung}</Hinweis>
-          </div>
-          <button onClick={() => f.setMeldung(null)} aria-label="Hinweis schliessen" className="px-1 text-[16px] leading-none" style={{ color: ui.muted }}>
-            ×
-          </button>
-        </div>
-      )}
-      {f.nutzer ? (
-        <Angemeldet f={f} graph={graph} start={start} ziel={ziel} routen={routen} />
-      ) : (
-        <Anmeldung f={f} />
-      )}
-    </section>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden>
+      <circle cx="12" cy="8.5" r="3.8" />
+      <path d="M4.5 20.5c1.2-3.6 4-5.4 7.5-5.4s6.3 1.8 7.5 5.4" />
+    </svg>
   )
 }
 
 /**
- * Losfahren und Anhalten stehen zuoberst im Bedienfeld: Unterwegs soll man
- * danach nicht unter Höhenprofil und Einstellungen suchen müssen.
+ * Der Knopf, der das Fahrtenmenü öffnet. In der Seitenleiste ist er ein
+ * rundes Symbol neben dem Titel, auf dem Handy eine Pille wie «Tauschen»
+ * daneben. Läuft eine Aufzeichnung, trägt er einen violetten Punkt.
  */
-export function Fahrtknopf({ f, routen, wahl }: { f: Fahrtenstand; routen: Routen | null; wahl: string | null }) {
-  if (!f.nutzer) return null
-  if (f.laufend) return <Laufend f={f} />
-  if (!f.aufzeichnen) return null
-  const losfahren = () =>
-    f.starten(
-      routen && wahl
-        ? {
-            wahl,
-            schnell: routen.schnell ? { zeit: routen.schnell.zeit, distanz: routen.schnell.distanz } : undefined,
-            komfort: routen.komfort ? { zeit: routen.komfort.zeit, distanz: routen.komfort.distanz } : undefined,
-          }
-        : null
+export function Fahrtenknopf({ f, offen, onClick, pille }: { f: Fahrtenstand; offen: boolean; onClick: () => void; pille?: boolean }) {
+  const punkt = f.laufend && (
+    <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full" style={{ background: GEFAHREN, boxShadow: `0 0 0 2px ${ui.bg}` }} />
+  )
+  if (pille)
+    return (
+      <button
+        onClick={onClick}
+        aria-haspopup="dialog"
+        aria-expanded={offen}
+        className="relative flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] backdrop-blur-md"
+        style={{ background: ui.panel, borderColor: ui.border, color: ui.fg, boxShadow: ui.schatten }}
+      >
+        <Symbol />
+        Konto
+        {punkt}
+      </button>
     )
   return (
     <button
-      onClick={losfahren}
-      className="rounded-full border px-3.5 py-2 text-[13px] font-medium"
-      style={{ background: ui.fg, borderColor: ui.fg, color: ui.bg }}
+      onClick={onClick}
+      aria-label="Konto und Fahrten"
+      title="Konto und Fahrten"
+      aria-haspopup="dialog"
+      aria-expanded={offen}
+      className="relative grid h-7 w-7 shrink-0 place-items-center rounded-full border"
+      style={{ borderColor: offen ? ui.fg : ui.border, color: ui.fg }}
     >
-      Fahrt aufzeichnen
+      <Symbol />
+      {punkt}
     </button>
   )
 }
 
+function Abschnitt({ titel, zusatz, offen: anfang = false, children }: { titel: string; zusatz?: string; offen?: boolean; children: ReactNode }) {
+  const [offen, setOffen] = useState(anfang)
+  return (
+    <section className="flex flex-col gap-2 border-t pt-3" style={{ borderColor: ui.border }}>
+      <button onClick={() => setOffen(!offen)} aria-expanded={offen} className="flex w-full items-center justify-between gap-2 text-left text-[13px] font-medium">
+        <span>
+          {titel}
+          {zusatz && (
+            <span className="ml-1.5 text-[12px] font-normal" style={{ color: ui.muted }}>
+              {zusatz}
+            </span>
+          )}
+        </span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ color: ui.muted, transform: offen ? 'rotate(180deg)' : undefined }} aria-hidden>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {offen && children}
+    </section>
+  )
+}
+
+function Meldung({ f }: { f: Fahrtenstand }) {
+  if (!f.meldung) return null
+  return (
+    <div className="flex items-start gap-2">
+      <div className="flex-1">
+        <Hinweis>{f.meldung}</Hinweis>
+      </div>
+      <button onClick={() => f.setMeldung(null)} aria-label="Hinweis schliessen" className="px-1 text-[16px] leading-none" style={{ color: ui.muted }}>
+        ×
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Das Fahrtenmenü. Es schwebt als eigenes Feld über der Karte, neben der
+ * Seitenleiste oder auf dem Handy über den Suchfeldern. Ein Klick daneben
+ * oder Escape schliesst es. Wer eine Fahrt oder einen Vergleich wählt, sieht
+ * das Ergebnis im Bedienfeld und auf der Karte, das Menü macht dafür Platz.
+ */
+export function Fahrtenmenue({ f, graph, mobil, onSchliessen }: { f: Fahrtenstand; graph: Graph | null; mobil: boolean; onSchliessen: () => void }) {
+  useEffect(() => {
+    const taste = (e: KeyboardEvent) => e.key === 'Escape' && onSchliessen()
+    window.addEventListener('keydown', taste)
+    return () => window.removeEventListener('keydown', taste)
+  }, [onSchliessen])
+
+  const [alle, setAlle] = useState(false)
+  const datei = useRef<HTMLInputElement>(null)
+  const liste = alle ? f.fahrten : f.fahrten.slice(0, 8)
+
+  // Die Teilstrecken rechnen sich in wenigen Millisekunden, aber erst, wenn Fahrten zugeordnet sind.
+  const teil = useMemo(() => (graph && f.laeufe.length > 1 ? teilstrecken(graph, f.laeufe.slice(0, 60)) : []), [graph, f.laeufe])
+
+  return (
+    <>
+      <div className="absolute inset-0 z-40" style={{ background: mobil ? 'rgba(0, 0, 0, 0.25)' : undefined }} onClick={onSchliessen} />
+      <div
+        role="dialog"
+        data-menue="fahrten"
+        aria-label="Konto und Fahrten"
+        className={
+          'absolute z-50 flex flex-col gap-3 overflow-y-auto overscroll-contain rounded-2xl border p-4 backdrop-blur-md ' +
+          (mobil ? 'inset-x-3' : 'left-[25.5rem] top-3 w-[22rem]')
+        }
+        style={{
+          background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten, color: ui.fg,
+          top: mobil ? 'max(0.75rem, env(safe-area-inset-top))' : undefined,
+          maxHeight: 'calc(100% - 1.5rem)',
+        }}
+      >
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-[15px] font-semibold">Konto und Fahrten</h2>
+          <button onClick={onSchliessen} aria-label="Menü schliessen" className="-mr-1 px-1 text-[18px] leading-none" style={{ color: ui.muted }}>
+            ×
+          </button>
+        </div>
+        <Meldung f={f} />
+
+        <div className="flex flex-col gap-2.5">
+          <Schalter
+            an={f.aufzeichnen}
+            setAn={f.setAufzeichnen}
+            titel="Knopf «Aufzeichnen» zeigen"
+            hilfe={
+              f.nativ
+                ? 'Bei jeder Route. Die App zeichnet auch bei ausgeschaltetem Bildschirm auf'
+                : 'Bei jeder Route. Im Browser zeichnet die Seite nur auf, solange sie offen und der Bildschirm an ist'
+            }
+          />
+          {f.nativ ? (
+            <Schalter
+              an={f.autoAn}
+              setAn={f.setAuto}
+              titel="Von selbst aufzeichnen"
+              hilfe="Erkennt Velofahrten und zeichnet sie im Hintergrund auf. Braucht Standort «Immer» und Bewegungserkennung"
+            />
+          ) : (
+            <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
+              Von selbst im Hintergrund aufzeichnen geht nur mit der Android-App.
+            </p>
+          )}
+          <Schalter
+            an={f.lernen}
+            setAn={f.setLernen}
+            titel="Aus Fahrten lernen"
+            hilfe={
+              f.stand && (f.stand.fahrten || f.stand.vonAnderen.abschnitte)
+                ? `${f.stand.fahrten} eigene ${f.stand.fahrten === 1 ? 'Fahrt' : 'Fahrten'}, ${f.stand.abschnitte} Abschnitte, ${f.stand.ampeln} Ampeln. ${f.stand.fahrten ? tempoText(f.stand.tempo) : ''}`
+                : 'Passt Fahrzeiten und Wartezeiten an Ampeln an das an, was gefahren wurde'
+            }
+          />
+          {f.lernen && f.kontoMoeglich && (
+            <div className="flex flex-col gap-2.5 border-l-2 pl-3" style={{ borderColor: ui.border }}>
+              <Schalter
+                an={f.vonAnderen}
+                setAn={f.setVonAnderen}
+                titel="Von den Fahrten anderer lernen"
+                hilfe={
+                  f.stand && f.stand.vonAnderen.abschnitte + f.stand.vonAnderen.ampeln
+                    ? `${f.stand.vonAnderen.abschnitte} Abschnitte und ${f.stand.vonAnderen.ampeln} Ampeln zusätzlich aus Messungen anderer`
+                    : 'Nutzt die Durchschnitte aller, die ihre Messwerte beitragen. Es wird nur etwas gezeigt, was mindestens fünf gemessen haben'
+                }
+              />
+              <Schalter
+                an={f.beitragen}
+                setAn={f.setBeitragen}
+                titel="Meine Messwerte anonym beitragen"
+                hilfe="Es gehen einzelne Werte je Abschnitt und Ampel weg, ohne Zeit, Reihenfolge und Kennung und ohne die ersten und letzten 150 Meter. Nie eine Spur"
+              />
+            </div>
+          )}
+          <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
+            Die Fahrten bleiben auf diesem Gerät{f.sicherung && f.nutzer ? ', eine gekürzte Kopie liegt im Konto' : ''}.
+          </p>
+        </div>
+
+        <Abschnitt titel="Fahrten" zusatz={String(f.fahrten.length)} offen>
+          {f.fahrten.length === 0 && (
+            <p className="text-[12px]" style={{ color: ui.muted }}>
+              {f.geladen ? 'Noch keine.' : 'Wird geladen …'}
+            </p>
+          )}
+          <ul className="-mx-2 flex flex-col">
+            {liste.map((x) => (
+              <li key={x.id}>
+                <button
+                  onClick={() => {
+                    f.zeigen(x)
+                    onSchliessen()
+                  }}
+                  aria-current={f.gezeigteFahrt?.id === x.id}
+                  className="zeile flex w-full items-baseline justify-between gap-3 rounded-xl px-2 py-1.5 text-left text-[12px]"
+                  style={{ '--weich': ui.weich, background: f.gezeigteFahrt?.id === x.id ? ui.weich : undefined } as React.CSSProperties}
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate">
+                      {x.start.titel} → {x.ziel.titel}
+                    </span>
+                    <span className="block text-[11px]" style={{ color: ui.muted }}>
+                      {datumText(x.begonnen)}
+                      {x.quelle === 'auto' && ' · von selbst'}
+                      {x.quelle === 'gpx' && ' · GPX'}
+                    </span>
+                  </span>
+                  <span className="shrink-0 tabular-nums" style={{ color: ui.muted }}>
+                    {minuten(x.dauer)} · {km(x.distanz)}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {f.fahrten.length > 8 && (
+            <button onClick={() => setAlle(!alle)} className="self-start text-[12px] underline underline-offset-2">
+              {alle ? 'Weniger anzeigen' : `Alle ${f.fahrten.length} anzeigen`}
+            </button>
+          )}
+          <div className="flex items-center justify-between gap-3 text-[12px]">
+            <button onClick={() => datei.current?.click()} className="underline underline-offset-2" title="Eine Fahrt aus einem Velocomputer oder einer App übernehmen">
+              GPX einlesen
+            </button>
+            {f.fahrten.length > 0 && (
+              <button
+                onClick={() => window.confirm('Alle Fahrten endgültig löschen?') && f.loeschen('alle')}
+                className="underline underline-offset-2"
+                style={{ color: ui.muted }}
+              >
+                Alle löschen
+              </button>
+            )}
+          </div>
+          <input
+            ref={datei}
+            type="file"
+            accept=".gpx,application/gpx+xml"
+            className="hidden"
+            onChange={(e) => {
+              const d = e.target.files?.[0]
+              e.target.value = ''
+              if (!d) return
+              f.importieren(d)
+              onSchliessen()
+            }}
+          />
+        </Abschnitt>
+
+        <Abschnitt titel="Vergleich" zusatz={teil.length ? String(teil.length) : undefined}>
+          {teil.length === 0 ? (
+            <p className="text-[12px] leading-snug" style={{ color: ui.muted }}>
+              Sobald du ein Stück Strecke auf verschiedenen Wegen gefahren bist, steht hier, welcher schneller war. Start und Ziel müssen dafür nicht dieselben sein.
+            </p>
+          ) : (
+            <ul className="-mx-2 flex flex-col">
+              {teil.map((t) => (
+                <li key={`${t.von}>${t.nach}`}>
+                  <button
+                    onClick={() => {
+                      f.zeigenTeil(t)
+                      onSchliessen()
+                    }}
+                    className="zeile flex w-full flex-col rounded-xl px-2 py-1.5 text-left text-[12px]"
+                    style={{ '--weich': ui.weich } as React.CSSProperties}
+                  >
+                    <span className="truncate">{teilTitel(t)}</span>
+                    <span className="text-[11px]" style={{ color: ui.muted }}>
+                      {dauerText(t.vorsprung)} schneller · {km(t.meter)} · {t.fahrten} Fahrten
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Abschnitt>
+
+        {f.kontoMoeglich && (
+          <Abschnitt titel="Sicherung im Konto" zusatz={f.nutzer && f.sicherung ? 'an' : undefined}>
+            {f.nutzer ? <Konto f={f} /> : <Anmeldung f={f} />}
+          </Abschnitt>
+        )}
+      </div>
+    </>
+  )
+}
+
+/** «Weinbergstrasse statt Bahnhofquai», sonst ein allgemeiner Titel. */
+function teilTitel(t: Teilstrecke) {
+  const schnell = t.wege[0].strasse
+  const langsam = t.wege[t.wege.length - 1].strasse
+  return schnell && langsam && schnell !== langsam ? `${schnell} statt ${langsam}` : 'Anderer Weg'
+}
+
+/** Das eigene Tempo im Vergleich zu den 23 km/h, mit denen das Modell in der Ebene rechnet. */
+function tempoText(tempo: number) {
+  const p = Math.round(100 * Math.abs(1 - tempo))
+  if (p < 2) return 'Dein Tempo entspricht dem Modell.'
+  return `Du brauchst ${p}% ${tempo < 1 ? 'weniger' : 'mehr'} Fahrzeit als das Modell.`
+}
+
+// ---------------------------------------------------------------- Sicherung
+
+function Konto({ f }: { f: Fahrtenstand }) {
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-center justify-between gap-3 text-[12px]">
+        <span className="truncate" style={{ color: ui.muted }}>
+          {f.nutzer?.email ?? 'Angemeldet'}
+        </span>
+        <button onClick={f.abmelden} className="shrink-0 underline underline-offset-2">
+          Abmelden
+        </button>
+      </div>
+      <Schalter
+        an={f.sicherung}
+        setAn={f.setSicherung}
+        titel="Fahrten im Konto sichern"
+        hilfe="Damit sie auf einem neuen Gerät wieder da sind. Es geht eine gekürzte Kopie: ohne die ersten und letzten 150 Meter, ohne Adressen, mit dem Beginn auf die Stunde gerundet"
+      />
+      <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
+        Gelöschte Fahrten verschwinden auch aus dem Konto.
+      </p>
+    </div>
+  )
+}
+
 function Anmeldung({ f }: { f: Fahrtenstand }) {
-  const [offen, setOffen] = useState(false)
   const [wege, setWege] = useState<{ anbieter: Anbieter[]; mail: boolean } | 'fehler' | null>(null)
   const [mail, setMail] = useState('')
   const [geschickt, setGeschickt] = useState(false)
   const [wartet, setWartet] = useState(false)
 
-  const oeffnen = () => {
-    setOffen(true)
-    f.anbinden()
-    anmeldewege().then(setWege, () => setWege('fehler'))
-  }
-
-  if (!offen)
-    return (
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[12px] leading-snug">
-          Fahrten aufzeichnen
-          <span className="block text-[11px]" style={{ color: ui.muted }}>
-            Mit Konto: Fahrten auswerten, und der Velonavi lernt aus ihnen.
-          </span>
-        </p>
-        <KleinKnopf onClick={oeffnen} titel="Im Velonavi anmelden">
-          Anmelden
-        </KleinKnopf>
-      </div>
+  // Erst mit dem Öffnen des Abschnitts wird Supabase geladen und gefragt, welche Anmeldewege es gibt.
+  const { anbinden } = f
+  useEffect(() => {
+    let weg = false
+    anbinden()
+    anmeldewege().then(
+      (w) => !weg && setWege(w),
+      () => !weg && setWege('fehler')
     )
+    return () => {
+      weg = true
+    }
+  }, [anbinden])
 
   const feld = 'w-full rounded-full border px-3.5 py-2 text-[13px] outline-none'
   const knopf = 'w-full rounded-full border px-3.5 py-2 text-[13px] font-medium disabled:opacity-50'
   return (
     <div className="flex flex-col gap-2.5">
-      <div className="flex items-baseline justify-between">
-        <h3 className="text-[13px] font-semibold">Anmelden</h3>
-        <button onClick={() => setOffen(false)} className="text-[12px] underline underline-offset-2" style={{ color: ui.muted }}>
-          Abbrechen
-        </button>
-      </div>
+      <p className="text-[12px] leading-snug" style={{ color: ui.muted }}>
+        Ohne Konto bleibt alles auf diesem Gerät. Mit Konto liegt zusätzlich eine gekürzte Kopie bei Supabase in Zürich, sie ist nur für dich lesbar.
+      </p>
       {wege === null && (
         <p className="text-[12px]" style={{ color: ui.muted }}>
           Anmeldung wird geladen …
@@ -610,139 +448,67 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
             ))}
         </>
       )}
-      <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
-        Das Konto gibt es nur im Velonavi. Gespeichert werden die E-Mail-Adresse und, wenn du es einschaltest, die
-        GPS-Spuren deiner Fahrten. Sie liegen bei Supabase und sind nur für dich lesbar. Ohne Anmeldung bleibt alles
-        im Browser.
-      </p>
     </div>
   )
 }
 
-function Angemeldet({
-  f, graph, start, ziel, routen,
+// ---------------------------------------------------------------- Im Bedienfeld
+
+/**
+ * Was zuoberst im Bedienfeld steht: Meldungen, laufende Aufzeichnung, die
+ * Auswertung der Fahrt und der Vergleich, die gerade auf der Karte liegen.
+ * `routen` sind die Vorschläge, die der Routenplaner gerade zeigt.
+ */
+export function Fahrtbereich({
+  f, graph, start, ziel, routen, wahl,
 }: {
   f: Fahrtenstand
   graph: Graph | null
   start: Ort | null
   ziel: Ort | null
   routen: Routen | null
+  wahl: string | null
 }) {
-  const [alle, setAlle] = useState(false)
-  const datei = useRef<HTMLInputElement>(null)
-  const liste = alle ? f.fahrten : f.fahrten.slice(0, 5)
-
   return (
     <>
-      <div className="flex items-center justify-between gap-3 text-[12px]">
-        <span className="truncate" style={{ color: ui.muted }}>
-          {f.nutzer?.email ?? 'Angemeldet'}
-        </span>
-        <button onClick={f.abmelden} className="shrink-0 underline underline-offset-2">
-          Abmelden
-        </button>
-      </div>
-
-      <Schalter
-        an={f.aufzeichnen}
-        setAn={f.setAufzeichnen}
-        titel="Fahrten aufzeichnen"
-        hilfe="Zeigt oben den Knopf zum Losfahren. Gespeichert werden Standort und Zeit, solange die Seite offen und der Bildschirm an ist"
-      />
-
-      <Schalter
-        an={f.lernen}
-        setAn={f.setLernen}
-        titel="Aus meinen Fahrten lernen"
-        hilfe={
-          f.stand
-            ? `${f.stand.fahrten} ${f.stand.fahrten === 1 ? 'Fahrt' : 'Fahrten'}, ${f.stand.abschnitte} Abschnitte, ${f.stand.ampeln} Ampeln. ${tempoText(f.stand.tempo)}`
-            : 'Passt Fahrzeiten und Wartezeiten an Ampeln an das an, was du gefahren bist'
-        }
-      />
-
-      {f.gezeigteFahrt && (
-        <Auswertung
-          f={f}
-          fahrt={f.gezeigteFahrt}
-          graph={graph}
-          start={start}
-          ziel={ziel}
-          routen={routen}
-        />
-      )}
-
-      <div className="flex flex-col gap-1">
-        <div className="flex items-baseline justify-between">
-          <h3 className="text-[12px] font-medium">Vergangene Fahrten</h3>
-          <button onClick={() => datei.current?.click()} className="text-[12px] underline underline-offset-2" style={{ color: ui.muted }} title="Eine Fahrt aus einem Velocomputer oder einer App übernehmen">
-            GPX einlesen
-          </button>
-          <input
-            ref={datei}
-            type="file"
-            accept=".gpx,application/gpx+xml"
-            className="hidden"
-            onChange={(e) => {
-              const d = e.target.files?.[0]
-              if (d) f.importieren(d)
-              e.target.value = ''
-            }}
-          />
-        </div>
-        {f.fahrten.length === 0 && (
-          <p className="text-[12px]" style={{ color: ui.muted }}>
-            Noch keine.
-          </p>
-        )}
-        <ul className="-mx-2 flex flex-col">
-          {liste.map((x) => (
-            <li key={x.id}>
-              <button
-                onClick={() => f.zeigen(f.gezeigteFahrt?.id === x.id ? null : x)}
-                aria-pressed={f.gezeigteFahrt?.id === x.id}
-                className="zeile flex w-full items-baseline justify-between gap-3 rounded-xl px-2 py-1.5 text-left text-[12px]"
-                style={{ '--weich': ui.weich, background: f.gezeigteFahrt?.id === x.id ? ui.weich : undefined } as React.CSSProperties}
-              >
-                <span className="min-w-0">
-                  <span className="block truncate">
-                    {x.start.titel} → {x.ziel.titel}
-                  </span>
-                  <span className="block text-[11px]" style={{ color: ui.muted }}>
-                    {datumText(x.begonnen)}
-                  </span>
-                </span>
-                <span className="shrink-0 tabular-nums" style={{ color: ui.muted }}>
-                  {minuten(x.dauer)} · {km(x.distanz)}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-        {f.fahrten.length > 5 && (
-          <button onClick={() => setAlle(!alle)} className="self-start text-[12px] underline underline-offset-2">
-            {alle ? 'Weniger anzeigen' : `Alle ${f.fahrten.length} anzeigen`}
-          </button>
-        )}
-        {f.fahrten.length > 0 && (
-          <button
-            onClick={() => window.confirm('Alle aufgezeichneten Fahrten endgültig löschen?') && f.loeschen('alle')}
-            className="self-start text-[11px] underline underline-offset-2"
-            style={{ color: ui.muted }}
-          >
-            Alle Fahrten löschen
-          </button>
-        )}
-      </div>
+      <Meldung f={f} />
+      {f.laufend && <Laufend f={f} />}
+      {/* Steht keine Route da, hängt der Knopf nicht an ihr: Man kann auch ohne Plan losfahren. */}
+      {!routen && !f.laufend && <AufzeichnenKnopf f={f} routen={routen} wahl={wahl} gross />}
+      {f.gezeigteFahrt && <Auswertung f={f} fahrt={f.gezeigteFahrt} graph={graph} start={start} ziel={ziel} routen={routen} />}
+      {f.teilGezeigt && <Teilvergleich f={f} t={f.teilGezeigt} />}
     </>
   )
 }
 
-/** Das eigene Tempo im Vergleich zu den 23 km/h, mit denen das Modell in der Ebene rechnet. */
-function tempoText(tempo: number) {
-  const p = Math.round(100 * Math.abs(1 - tempo))
-  if (p < 2) return 'Dein Tempo entspricht dem Modell.'
-  return `Du brauchst ${p}% ${tempo < 1 ? 'weniger' : 'mehr'} Fahrzeit als das Modell.`
+/** Der Knopf zum Losfahren, klein neben GPX und Teilen, gross ohne Route. */
+export function AufzeichnenKnopf({ f, routen, wahl, gross }: { f: Fahrtenstand; routen: Routen | null; wahl: string | null; gross?: boolean }) {
+  if (!f.aufzeichnen || f.laufend) return null
+  const losfahren = () =>
+    f.starten(
+      routen && wahl
+        ? {
+            wahl,
+            schnell: routen.schnell ? { zeit: routen.schnell.zeit, distanz: routen.schnell.distanz } : undefined,
+            komfort: routen.komfort ? { zeit: routen.komfort.zeit, distanz: routen.komfort.distanz } : undefined,
+          }
+        : null
+    )
+  if (!gross)
+    return (
+      <KleinKnopf onClick={losfahren} titel="Die Fahrt aufzeichnen, auswerten und mit anderen vergleichen">
+        Aufzeichnen
+      </KleinKnopf>
+    )
+  return (
+    <button
+      onClick={losfahren}
+      className="rounded-full border px-3.5 py-2 text-[13px] font-medium"
+      style={{ background: ui.fg, borderColor: ui.fg, color: ui.bg }}
+    >
+      Fahrt aufzeichnen
+    </button>
+  )
 }
 
 function Laufend({ f }: { f: Fahrtenstand }) {
@@ -774,13 +540,15 @@ function Laufend({ f }: { f: Fahrtenstand }) {
         </KleinKnopf>
       </div>
       <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
-        Am Ziel endet die Aufzeichnung von selbst. Der Bildschirm bleibt an, die Seite muss im Vordergrund sein.
+        {f.nativ
+          ? 'Die App zeichnet weiter, auch wenn der Bildschirm aus ist. Am Ziel endet die Fahrt, wenn du dich einige Minuten nicht mehr bewegst.'
+          : 'Am Ziel endet die Aufzeichnung von selbst. Der Bildschirm bleibt an, die Seite muss im Vordergrund sein.'}
       </p>
     </div>
   )
 }
 
-/** Eine Fahrt im Rückblick: was gemessen wurde, und wie sie zu den Vorschlägen steht. */
+/** Eine Fahrt im Rückblick: was gemessen wurde, wie sie zu den Vorschlägen steht und welche Fahrten ähnlich waren. */
 function Auswertung({
   f, fahrt, graph, start, ziel, routen,
 }: {
@@ -809,12 +577,7 @@ function Auswertung({
     if (z.pausen > 0) zeilen.push({ titel: 'Pausen', wert: dauerText(z.pausen), hilfe: 'zählen nicht zur Fahrzeit' })
   }
   const damals = fahrt.vorschlag?.schnell
-  if (damals)
-    zeilen.push({
-      titel: '«Schnell» beim Losfahren',
-      wert: dauerText(damals.zeit),
-      hilfe: unterschied(dauer, damals.zeit),
-    })
+  if (damals) zeilen.push({ titel: '«Schnell» beim Losfahren', wert: dauerText(damals.zeit), hilfe: `du warst ${unterschied(dauer, damals.zeit, ['schneller', 'langsamer'])}` })
   if (z) zeilen.push({ titel: 'Modell für deine Strecke', wert: dauerText(z.modell), hilfe: 'ohne Gelerntes, bei 23 km/h in der Ebene' })
   if (heute && graph && z)
     for (const [titel, r] of [['«Schnell» heute', heute.schnell], ['«Komfort» heute', heute.komfort]] as const)
@@ -829,6 +592,7 @@ function Auswertung({
           </div>
           <div className="text-[11px]" style={{ color: ui.muted }}>
             {datumText(fahrt.begonnen)}
+            {fahrt.quelle === 'auto' && ' · von selbst aufgezeichnet'}
             {fahrt.quelle === 'gpx' && ' · aus GPX'}
           </div>
         </div>
@@ -867,16 +631,12 @@ function Auswertung({
           </div>
         ))}
       </dl>
+      <Aehnliche f={f} fahrt={fahrt} graph={graph} />
       <div className="flex items-center justify-between gap-2">
-        {heute ? (
-          <span className="text-[11px]" style={{ color: ui.muted }}>
-            Violett auf der Karte: deine Spur.
-          </span>
-        ) : (
-          <button onClick={() => f.zeigen(fahrt)} className="text-[12px] underline underline-offset-2">
-            Mit heutigem Vorschlag vergleichen
-          </button>
-        )}
+        <span className="flex items-center gap-1.5 text-[11px]" style={{ color: ui.muted }}>
+          <span className="inline-block h-[3px] w-4 rounded-full" style={{ background: GEFAHREN }} />
+          deine Spur
+        </span>
         <button
           onClick={() => window.confirm('Diese Fahrt endgültig löschen?') && f.loeschen(fahrt.id)}
           className="shrink-0 text-[12px] underline underline-offset-2"
@@ -889,9 +649,93 @@ function Auswertung({
   )
 }
 
-/** «1 Min. 20 s schneller gefahren» oder «… langsamer», ab fünf Sekunden Unterschied. */
-function unterschied(gefahren: number, vorschlag: number) {
-  const d = Math.round(vorschlag - gefahren)
-  if (Math.abs(d) < 5) return 'du warst gleich schnell'
-  return `du warst ${dauerText(Math.abs(d))} ${d > 0 ? 'schneller' : 'langsamer'}`
+/**
+ * Fahrten, die ungefähr dieselbe Strecke waren, nach Fahrzeit geordnet. Es
+ * zählt nicht die genaue Adresse: Ähnlich ist, was in der Nähe beginnt und
+ * endet oder zu grossen Teilen auf denselben Wegen lag.
+ */
+function Aehnliche({ f, fahrt, graph }: { f: Fahrtenstand; fahrt: Fahrt; graph: Graph | null }) {
+  const [mit, setMit] = useState<string | null>(null)
+  const lauf = f.laeufe.find((l) => l.fahrt.id === fahrt.id)
+  const treffer = useMemo(() => (graph && lauf ? aehnliche(graph, lauf, f.laeufe) : []), [graph, lauf, f.laeufe])
+  if (!lauf || !treffer.length) return null
+
+  const zeilen = [
+    { id: fahrt.id, fahrt, netto: lauf.zuordnung.netto, distanz: lauf.zuordnung.distanz, gemeinsam: 1 },
+    ...treffer.map((t) => ({ id: t.fahrt.id, fahrt: t.fahrt, netto: t.zuordnung.netto, distanz: t.zuordnung.distanz, gemeinsam: t.gemeinsam })),
+  ].sort((a, b) => a.netto - b.netto)
+
+  return (
+    <div className="flex flex-col gap-1 border-t pt-2" style={{ borderColor: ui.border }}>
+      <h4 className="text-[12px] font-medium">Ähnliche Fahrten</h4>
+      <ul className="-mx-2 flex flex-col">
+        {zeilen.map((z, i) => {
+          const diese = z.id === fahrt.id
+          return (
+            <li key={z.id}>
+              <button
+                disabled={diese}
+                onClick={() => {
+                  const neu = mit === z.id ? null : z.id
+                  setMit(neu)
+                  f.zeigenMit(fahrt, neu ? z.fahrt : null)
+                }}
+                className="zeile flex w-full items-baseline justify-between gap-3 rounded-xl px-2 py-1 text-left text-[12px]"
+                style={{ '--weich': ui.weich, background: mit === z.id ? ui.weich : undefined } as React.CSSProperties}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate">
+                    {diese ? 'Diese Fahrt' : datumText(z.fahrt.begonnen)}
+                    {i === 0 && <span style={{ color: ui.muted }}> · schnellste</span>}
+                  </span>
+                  <span className="block text-[11px]" style={{ color: ui.muted }}>
+                    {diese ? datumText(fahrt.begonnen) : `folgt zu ${prozent(z.gemeinsam)} derselben Strecke · ${unterschied(lauf.zuordnung.netto, z.netto, ['langsamer', 'schneller'])}`}
+                  </span>
+                </span>
+                <span className="shrink-0 tabular-nums" style={{ color: ui.muted }}>
+                  {dauerText(z.netto)} · {km(z.distanz)}
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </div>
+  )
+}
+
+/** Die Wege einer Teilstrecke im Vergleich, der schnellste zuerst. */
+function Teilvergleich({ f, t }: { f: Fahrtenstand; t: Teilstrecke }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl border px-3 py-2.5" style={{ borderColor: ui.border }}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 text-[12px]">
+          <div className="truncate font-medium">{teilTitel(t)}</div>
+          <div className="text-[11px]" style={{ color: ui.muted }}>
+            {dauerText(t.vorsprung)} schneller, auf {t.fahrten} Fahrten
+          </div>
+        </div>
+        <button onClick={() => f.zeigenTeil(null)} aria-label="Vergleich schliessen" className="px-1 text-[16px] leading-none" style={{ color: ui.muted }}>
+          ×
+        </button>
+      </div>
+      <ul className="flex flex-col gap-1.5 text-[12px]">
+        {t.wege.map((w, i) => (
+          <li key={i} className="flex items-baseline justify-between gap-3">
+            <span className="flex min-w-0 items-baseline gap-1.5">
+              <span className="inline-block h-[3px] w-4 shrink-0 self-center rounded-full" style={{ background: i === 0 ? GEFAHREN : GRAU }} />
+              <span className="truncate">
+                {w.strasse ? `über ${w.strasse}` : 'anderer Weg'}
+                <span style={{ color: ui.muted }}> · {km(w.meter)} · {w.zeiten.length}×</span>
+              </span>
+            </span>
+            <span className="shrink-0 tabular-nums">
+              {dauerText(w.median)}
+              {w.zeiten.length > 1 && <span style={{ color: ui.muted }}> Ø</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
 }

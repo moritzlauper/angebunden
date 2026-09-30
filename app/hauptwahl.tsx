@@ -13,7 +13,7 @@ type Ui = { fg: string; muted: string; panel: string; border: string; aktiv: str
  * schon steht. Der fällt deshalb weg, und `unten` steht allein.
  */
 export function Hauptwahl({
-  ui, aktiv, vergleichHref = '/', velonavi = true, velonaviOnClick, velonaviAktiv = false, unten,
+  ui, aktiv, vergleichHref = '/erreichbarkeitskarte', velonavi = true, velonaviOnClick, velonaviAktiv = false, unten,
 }: {
   ui: Ui
   aktiv: 'vergleich' | 'velonavi'
@@ -52,7 +52,7 @@ export function Hauptwahl({
             {velonaviAktiv ? 'Stadtkarte' : 'Velonavi'}
           </button>
         ) : (
-          <Link href="/velonavi" className={knopf} style={stil(aktiv === 'velonavi')}>
+          <Link href="/" className={knopf} style={stil(aktiv === 'velonavi')}>
             <VeloSymbol />
             Velonavi
           </Link>

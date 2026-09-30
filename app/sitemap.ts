@@ -29,7 +29,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         url: `${SITE_URL}${stadt.pfad}`,
         lastModified: new Date(meta.builtAt),
         changeFrequency: 'monthly' as const,
-        priority: stadt.pfad === '/' ? 1 : 0.8,
+        priority: stadt.schluessel === 'zuerich' ? 0.9 : 0.8,
       }
     })
   )
@@ -37,10 +37,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     ...staedte,
     {
-      url: `${SITE_URL}/velonavi`,
+      url: `${SITE_URL}/`,
       lastModified: await veloErstellt(),
       changeFrequency: 'monthly',
-      priority: 0.9,
+      priority: 1,
     },
     {
       url: `${SITE_URL}/methode`,

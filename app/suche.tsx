@@ -275,6 +275,8 @@ export function Suchleiste({
         >
           {links ?? <Lupe farbe={ui.muted} />}
           <input
+          // Erweiterungen für Passwörter und Formulare setzen Attribute auf Suchfelder. React soll das nicht als Fehler beim Hydrieren melden.
+          suppressHydrationWarning
             ref={feldRef}
             value={wert}
             onChange={(e) => {

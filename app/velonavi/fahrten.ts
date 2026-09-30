@@ -17,6 +17,7 @@ import {
   veloErlaubt,
   type Einrastung, type Gelernt, type Graph, type Profil, type Route, type Stueck,
 } from './router.ts'
+import { ampelNummer, kantenIndex, type Gemeinschaft } from './gemeinschaft.ts'
 
 /** Ein Punkt der Spur: Länge, Breite, Sekunden seit dem Start, Genauigkeit in Metern. */
 export type Spurpunkt = [lon: number, lat: number, t: number, genau?: number]
@@ -40,7 +41,8 @@ export type Fahrt = {
   ziel: Ort
   spur: Spurpunkt[]
   vorschlag: Vorschlag | null
-  quelle: 'aufzeichnung' | 'gpx'
+  /** `auto`: von der Android-App von selbst erkannt und aufgezeichnet. */
+  quelle: 'aufzeichnung' | 'gpx' | 'auto'
 }
 
 // ------------------------------------------------------------ Spur aufbereiten
@@ -206,9 +208,17 @@ export type Zuordnung = {
   /** Anteil der Spurpunkte, die auf der zugeordneten Strecke liegen. */
   treffer: number
   /** Je ganz befahrener Kante: gemessene Fahrzeit und die des Modells. */
-  kanten: { a: number; fahr: number; modell: number }[]
+  /** `s0` und `s1`: Bogenlänge am Anfang und am Ende der Kante, ab Beginn der Fahrt. */
+  kanten: { a: number; fahr: number; modell: number; s0: number; s1: number }[]
   /** Je Ampel: gemessene Wartezeit und die des Modells. */
-  ampeln: { schluessel: number; gewartet: number; modell: number }[]
+  /** `s`: wo in der Fahrt die Ampel lag, in Metern ab Beginn. */
+  ampeln: { schluessel: number; gewartet: number; modell: number; s: number }[]
+  /**
+   * Die Knoten des Netzes, die die Fahrt passiert hat, mit Bogenlänge und
+   * Fahrzeit ohne Pausen ab Beginn. `i` ist das erste Stück nach dem Knoten.
+   * Damit lassen sich Fahrten Stück für Stück vergleichen (`vergleich.ts`).
+   */
+  knoten: { v: number; s: number; t: number; i: number }[]
 }
 
 /** Hängt ein Stück an und legt es mit dem vorigen zusammen, wenn es dieselbe Kante fortsetzt. */
@@ -502,6 +512,8 @@ export function zuordnen(g: Graph, spur: Spurpunkt[]): Zuordnung | null {
   const ampeln: Zuordnung['ampeln'] = []
   let gewartet = 0
   let pausen = 0
+  /** Wo und wie lange pausiert wurde, für die Fahrzeit ohne Pausen bei den Knoten. */
+  const pauseListe: { s: number; dauer: number }[] = []
   for (let i = 0; i < n; i++) {
     if (ueAmpel[i] < 0) continue
     let j = i
@@ -518,7 +530,7 @@ export function zuordnen(g: Graph, spur: Spurpunkt[]): Zuordnung | null {
     }
     if (summe > AMPEL_MAX) {
       pausen += summe
-      for (const h of hier) gesperrt[stueckBei(h.s)] = 1
+      for (const h of hier) (gesperrt[stueckBei(h.s)] = 1), pauseListe.push({ s: h.s, dauer: h.dauer })
       continue
     }
     // Die Standzeit gehört zur Ampel. Der Kante, auf der gestanden wurde,
@@ -526,13 +538,14 @@ export function zuordnen(g: Graph, spur: Spurpunkt[]): Zuordnung | null {
     hier.forEach((h, nr) => (abzug[stueckBei(h.s)] += h.dauer + (nr === 0 ? HALT_ZUSCHLAG : 0)))
     if (inLuecke(s0, s1) || Number.isNaN(zeitBei(s0)) || Number.isNaN(zeitBei(Math.min(s1, laenge)))) continue
     gewartet += summe
-    ampeln.push({ schluessel: ueSchluessel[i], gewartet: summe > 0 ? summe + HALT_ZUSCHLAG : 0, modell: ueWarten[i] })
+    ampeln.push({ schluessel: ueSchluessel[i], gewartet: summe > 0 ? summe + HALT_ZUSCHLAG : 0, modell: ueWarten[i], s: grenze[i + 1] })
   }
   // Was übrig bleibt: Ein kurzer Halt (Vortritt gewähren) gehört zur Fahrzeit
   // der Kante, ein langer ist eine Pause und sagt nichts über die Strecke.
   for (const h of halte) {
     if (h.vergeben || h.dauer <= PAUSE_AB) continue
     pausen += h.dauer
+    pauseListe.push({ s: h.s, dauer: h.dauer })
     gesperrt[stueckBei(h.s)] = 1
   }
 
@@ -549,12 +562,27 @@ export function zuordnen(g: Graph, spur: Spurpunkt[]): Zuordnung | null {
     // Abbremsen und Schulterblick beim Abbiegen rechnet der Router als festen
     // Zuschlag am Knoten, gemessen stecken sie in der Kante davor. Sie kommen
     // hier weg, sonst zählten sie nach dem Lernen doppelt.
-    kanten.push({ a: st.a, fahr: Math.max(fahr - ueFahren[i], L / 15), modell: zeit0[st.a] })
+    kanten.push({ a: st.a, fahr: Math.max(fahr - ueFahren[i], L / 15), modell: zeit0[st.a], s0: grenze[i], s1: grenze[i + 1] })
+  }
+
+  // Die passierten Knoten. Stehen am Beginn oder am Ende eines Stücks nur ein
+  // Teil der Kante, gehört der Knoten dazu, nicht aber der Teil.
+  const knoten: Zuordnung['knoten'] = []
+  const knotenAn = (v: number, s: number, i: number) => {
+    const t = zeitBei(s) - pauseListe.reduce((a, p) => (p.s < s ? a + p.dauer : a), 0)
+    if (Number.isNaN(t) || inLuecke(s, s)) return
+    const l = knoten[knoten.length - 1]
+    if (!l || l.v !== v) knoten.push({ v, s, t, i })
+  }
+  for (let i = 0; i < n; i++) {
+    const st = stuecke[i]
+    if (st.von < 0.001) knotenAn(g.fuss(st.a), grenze[i], i)
+    if (st.bis > 0.999) knotenAn(g.kopf(st.a), grenze[i + 1], i + 1)
   }
 
   return {
     stuecke, distanz: laenge, netto: Math.max(0, P[P.length - 1].t - P[0].t - pausen), pausen, gewartet, modell,
-    treffer: zeit.length / P.length, kanten, ampeln,
+    treffer: zeit.length / P.length, kanten, ampeln, knoten,
   }
 }
 
@@ -597,7 +625,20 @@ export type Lernstand = Gelernt & {
   fahrten: number
   abschnitte: number
   ampeln: number
+  /** Wie viele Abschnitte und Ampeln zusätzlich aus den Fahrten anderer stammen. */
+  vonAnderen: { abschnitte: number; ampeln: number }
 }
+
+/**
+ * Gewicht der Fahrten anderer je Abschnitt, in Sekunden Modellzeit. Es
+ * wächst mit der Zahl der Messungen: Fünf Messungen zählen halb so viel wie
+ * unendlich viele, und gegenüber den eigenen Messungen wie ein Abschnitt
+ * von acht Sekunden.
+ */
+const GEM_VORWISSEN = 8
+const GEM_HALB = 5
+/** Gewicht der Wartezeit anderer je Ampel, in Durchfahrten. */
+const GEM_AMPEL = 3
 
 /**
  * Macht aus den Messungen aller Fahrten die Korrekturen für den Router.
@@ -607,8 +648,14 @@ export type Lernstand = Gelernt & {
  * fährt als das Modell, «langsam» und jede unbefahrene «schnell», und der
  * Router wiche genau den Strassen aus, die man kennt. Erst was vom eigenen
  * Tempo abweicht, sagt etwas über die Kante.
+ *
+ * `gemeinschaft` sind die Messungen anderer, siehe `gemeinschaft.ts`. Sie
+ * gelten als Vorwissen: Wo man selbst nichts gefahren ist, bestimmen sie den
+ * Abschnitt und die Ampel, wo man selbst gefahren ist, ziehen sie die eigene
+ * Messung ein Stück Richtung Durchschnitt. Ihre Werte sind auf das jeweils
+ * eigene Tempo der Beitragenden bezogen, das eigene Tempo kommt obendrauf.
  */
-export function lerne(g: Graph, zuordnungen: Zuordnung[]): Lernstand | null {
+export function lerne(g: Graph, zuordnungen: Zuordnung[], gemeinschaft?: Gemeinschaft | null): Lernstand | null {
   const brauchbar = zuordnungen.filter((z) => z.treffer >= TREFFER_MIN)
   let fahr = 0
   let modell = 0
@@ -617,7 +664,7 @@ export function lerne(g: Graph, zuordnungen: Zuordnung[]): Lernstand | null {
       fahr += k.fahr
       modell += k.modell
     }
-  if (modell <= 0) return null
+  if (modell <= 0 && !gemeinschaft) return null
   const tempo = Math.max(0.6, Math.min(1.7, (fahr + TEMPO_VORWISSEN) / (modell + TEMPO_VORWISSEN)))
 
   const jeKante = new Map<number, { fahr: number; modell: number }>()
@@ -636,16 +683,43 @@ export function lerne(g: Graph, zuordnungen: Zuordnung[]): Lernstand | null {
   }
 
   const faktor = new Float32Array(2 * g.E).fill(1)
+  // Die anderen: je Abschnitt ein Faktor und sein Gewicht.
+  const gemKante = new Map<number, { f: number; w: number }>()
+  const gemWarten = new Map<number, number>()
+  if (gemeinschaft) {
+    const index = kantenIndex(g)
+    for (const [k, [r, n]] of Object.entries(gemeinschaft.kanten ?? {})) {
+      const a = index.get(k)
+      if (a === undefined) continue
+      gemKante.set(a, { f: Math.max(0.6, Math.min(2, r)), w: n / (n + GEM_HALB) })
+    }
+    for (const [k, [mittel, n]] of Object.entries(gemeinschaft.ampeln ?? {})) {
+      const sk = ampelNummer(g, k)
+      if (sk !== undefined && n > 0) gemWarten.set(sk, mittel)
+    }
+    for (const [a, x] of gemKante) faktor[a] = 1 + (x.f - 1) * x.w
+  }
   for (const [a, s] of jeKante) {
-    const f = (s.fahr / tempo + VORWISSEN) / (s.modell + VORWISSEN)
+    const x = gemKante.get(a)
+    // Ohne andere ist das Vorwissen eine Sekunde bei Faktor 1, mit ihnen mehr, bei ihrem Faktor.
+    const w = x ? VORWISSEN + GEM_VORWISSEN * x.w : VORWISSEN
+    const vor = x ? x.f : 1
+    const f = (s.fahr / tempo + w * vor) / (s.modell + w)
     // Zusammen mit dem Tempo nie unter die Hälfte der Modellzeit.
     faktor[a] = Math.max(0.6, 0.5 / tempo, Math.min(2, f))
   }
   const warten = new Map<number, number>()
-  for (const [schluessel, s] of jeAmpel)
-    warten.set(schluessel, (VORWISSEN_AMPEL * s.modell + s.gewartet) / (VORWISSEN_AMPEL + s.n))
+  for (const [schluessel, s] of jeAmpel) {
+    const andere = gemWarten.get(schluessel)
+    warten.set(schluessel, andere === undefined ? (VORWISSEN_AMPEL * s.modell + s.gewartet) / (VORWISSEN_AMPEL + s.n) : (GEM_AMPEL * andere + s.gewartet) / (GEM_AMPEL + s.n))
+  }
+  for (const [schluessel, mittel] of gemWarten) if (!warten.has(schluessel)) warten.set(schluessel, mittel)
 
-  return { tempo, faktor, warten, fahrten: brauchbar.length, abschnitte: jeKante.size, ampeln: jeAmpel.size }
+  return {
+    tempo, faktor, warten,
+    fahrten: brauchbar.length, abschnitte: jeKante.size, ampeln: jeAmpel.size,
+    vonAnderen: { abschnitte: [...gemKante.keys()].filter((a) => !jeKante.has(a)).length, ampeln: [...gemWarten.keys()].filter((k) => !jeAmpel.has(k)).length },
+  }
 }
 
 /** Anteil der gefahrenen Meter, die auf Kanten von `r` liegen. */

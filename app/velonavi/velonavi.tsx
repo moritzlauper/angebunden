@@ -15,6 +15,7 @@ import {
 import { Blatt, useMedienabfrage } from '../blatt'
 import { Suchleiste, bauIndex, suchen, Sternsymbol, type Eintrag } from '../suche'
 import { Wortmarke } from '../marke'
+import { Seitenwahl } from '../seitenwahl'
 import { STAEDTE } from '../staedte'
 import { nf } from '../site'
 import { ZIEL, TINTE, GRAU, GEFAHREN } from '../farben'
@@ -24,7 +25,7 @@ import {
   type Graph, type Profil, type Route, type VeloMeta,
 } from './router'
 import { ui, minuten, km, lies, schreib, Schalter, Hinweis, KleinKnopf } from './teile'
-import { useFahrten, Kontobereich, Fahrtknopf } from './fahrten-ui'
+import { useFahrten, Fahrtbereich, Fahrtenknopf, Fahrtenmenue, AufzeichnenKnopf } from './fahrten-ui'
 
 const STADT = STAEDTE.zuerich
 
@@ -317,6 +318,9 @@ export default function Velonavi() {
   const [hover, setHover] = useState<number | null>(null)
   const [kopiert, setKopiert] = useState(false)
   const [blattOffen, setBlattOffen] = useState(true)
+  const [menueOffen, setMenueOffen] = useState(false)
+  const menueZu = useCallback(() => setMenueOffen(false), [])
+  const [detailsOffen, setDetailsOffen] = useState(false)
   const [deckung, setDeckung] = useState(0)
 
   // Suche: zwei Felder mit eigenem Text, ein gemeinsamer Index.
@@ -807,7 +811,10 @@ export default function Velonavi() {
         type: 'line',
         source: 'fahrt',
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': GEFAHREN, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.5, 16, 3] },
+        paint: {
+          'line-color': ['match', ['get', 'rolle'], 'daneben', GRAU, GEFAHREN],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.5, 16, 3],
+        },
       })
       map.addLayer({
         id: 'standort',
@@ -936,7 +943,7 @@ export default function Velonavi() {
       [[w, s], [o, n]],
       {
         padding: mobil
-          ? { top: 190, bottom: Math.max(deckung, 120) + 20, left: 30, right: 30 }
+          ? { top: 235, bottom: Math.max(deckung, 120) + 20, left: 30, right: 30 }
           : { top: 70, bottom: 60, left: 440, right: 60 },
         duration: 900,
         maxZoom: 16,
@@ -961,12 +968,31 @@ export default function Velonavi() {
     if (!kartenBereit || !map) return
     ;(map.getSource('fahrt') as GeoJSONSource).setData({
       type: 'FeatureCollection',
-      features:
-        fahrten.linie.length > 1
-          ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: fahrten.linie } }]
-          : [],
+      // Die Hauptfahrt liegt zuoberst: grau zuerst, dann violett.
+      features: [...fahrten.linien]
+        .sort((a, b) => (a.rolle === b.rolle ? 0 : a.rolle === 'daneben' ? -1 : 1))
+        .filter((l) => l.koord.length > 1)
+        .map((l) => ({ type: 'Feature' as const, properties: { rolle: l.rolle }, geometry: { type: 'LineString' as const, coordinates: l.koord } })),
     })
-  }, [kartenBereit, fahrten.linie])
+  }, [kartenBereit, fahrten.linien])
+
+  // Wer eine Fahrt oder einen Vergleich wählt, sieht ihn ganz im Bild.
+  const linienRef = useRef(fahrten.linien)
+  linienRef.current = fahrten.linien
+  useEffect(() => {
+    const map = mapRef.current
+    if (!kartenBereit || !map || !fahrten.ansicht) return
+    let w = Infinity, s = Infinity, o = -Infinity, n = -Infinity
+    for (const l of linienRef.current) for (const [lon, lat] of l.koord) (w = Math.min(w, lon)), (o = Math.max(o, lon)), (s = Math.min(s, lat)), (n = Math.max(n, lat))
+    if (!Number.isFinite(w)) return
+    map.fitBounds([[w, s], [o, n]], {
+      padding: mobil ? { top: 235, bottom: Math.max(deckung, 120) + 20, left: 30, right: 30 } : { top: 70, bottom: 60, left: 440, right: 60 },
+      duration: 700,
+      maxZoom: 17,
+    })
+    // Die Fahrt setzt Start und Ziel selbst; ohne Route soll `fitBounds` von dort nicht nochmals eingreifen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fahrten.ansicht, kartenBereit])
 
   const standortJetzt = fahrten.laufend?.ort ?? null
   useEffect(() => {
@@ -1308,7 +1334,9 @@ export default function Velonavi() {
           }
         />
       </div>
-      <div className="relative z-20 -mt-1 flex justify-end">
+      <div className="relative z-20 -mt-1 flex justify-end gap-2">
+        {/* In der Seitenleiste steht der Knopf neben dem Titel. */}
+        {mobil && <Fahrtenknopf f={fahrten} offen={menueOffen} onClick={() => setMenueOffen(!menueOffen)} pille />}
         <button
           onClick={tausche}
           aria-label="Start und Ziel tauschen"
@@ -1366,7 +1394,14 @@ export default function Velonavi() {
     <div className="flex flex-col gap-4" style={{ color: ui.fg }}>
       {fehler && <Hinweis>{fehler}</Hinweis>}
       {ergebnis && 'fehler' in ergebnis && <Hinweis>{ergebnis.fehler}</Hinweis>}
-      <Fahrtknopf f={fahrten} routen={routen?.routen ?? null} wahl={aktiv} />
+      <Fahrtbereich
+        f={fahrten}
+        graph={graphBereit ? graphRef.current : null}
+        start={start}
+        ziel={ziel}
+        routen={routen?.routen ?? null}
+        wahl={aktiv}
+      />
       {routen?.notSchieben && (
         <p className="rounded-2xl px-3 py-2 text-[12px] leading-snug" style={{ background: ui.weich, color: ui.muted }}>
           Fahrend gibt es keinen Weg. Diese Route enthält ein kurzes Stück, auf dem du das Velo schiebst.
@@ -1384,6 +1419,9 @@ export default function Velonavi() {
           gpx={gpx}
           teilen={teilen}
           kopiert={kopiert}
+          aktion={<AufzeichnenKnopf f={fahrten} routen={routen.routen} wahl={aktiv} />}
+          detailsOffen={detailsOffen}
+          setDetailsOffen={setDetailsOffen}
         />
       ) : (
         !fehler && !(ergebnis && 'fehler' in ergebnis) && (
@@ -1391,13 +1429,6 @@ export default function Velonavi() {
         )
       )}
       {einstellungen}
-      <Kontobereich
-        f={fahrten}
-        graph={graphBereit ? graphRef.current : null}
-        start={start}
-        ziel={ziel}
-        routen={routen?.routen ?? null}
-      />
       <Legende />
       <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
         Grundlage ist das Fuss- und Velowegnetz der Stadt Zürich, ergänzt um Ampeln, Tempo,
@@ -1415,8 +1446,8 @@ export default function Velonavi() {
           Bessere Route melden
         </a>
         {' · '}
-        <Link href="/" className="underline underline-offset-2">
-          Zur Vergleichskarte
+        <Link href="/erreichbarkeitskarte" className="underline underline-offset-2">
+          Erreichbarkeitskarte
         </Link>
       </p>
     </div>
@@ -1480,12 +1511,18 @@ export default function Velonavi() {
         </div>
       )}
 
+      {menueOffen && <Fahrtenmenue f={fahrten} graph={graphBereit ? graphRef.current : null} mobil={mobil} onSchliessen={menueZu} />}
+
       {mobil ? (
         <>
           <div
             className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-2 px-3"
             style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
           >
+            {/* Der Wechsel zur Erreichbarkeitskarte: ein schlichtes Segment über den Suchfeldern. */}
+            <div className="pointer-events-auto self-center">
+              <Seitenwahl ui={ui} aktiv="velonavi" />
+            </div>
             <div className="pointer-events-auto">{felder}</div>
           </div>
           <Blatt ui={ui} offen={blattOffen} onSchliessen={() => setBlattOffen(false)} onHoehe={setDeckung}>
@@ -1515,12 +1552,20 @@ export default function Velonavi() {
                     <Wortmarke size={15} />
                   </Link>
                   <span style={{ color: ui.muted }}>Velonavi Zürich</span>
+                  {/* Klein und leise: Die ÖV-Karte ist der zweite Teil von angebunden, aber nicht der erste Handgriff. */}
+                  <Link
+                    href="/erreichbarkeitskarte"
+                    title="Erreichbarkeitskarte: wie gut jedes Haus an den ÖV angebunden ist"
+                    className="text-[11px] font-normal underline-offset-2 hover:underline"
+                    style={{ color: ui.muted, opacity: 0.75 }}
+                  >
+                    Erreichbarkeit
+                  </Link>
                 </h2>
-                {routen && (
-                  <span className="text-[11px] tabular-nums" style={{ color: ui.muted }}>
-                    2 Routen in {Math.round(routen.ms)} ms
-                  </span>
-                )}
+                {/* Die Rechenzeit steht nur noch als Tooltip: Im Kopf war sie Unruhe, und «2 Routen» stimmte nicht, wenn beide Varianten zusammenfielen. */}
+                <span className="flex items-center gap-2 self-center" title={routen ? `Gerechnet in ${Math.round(routen.ms)} ms` : undefined}>
+                  <Fahrtenknopf f={fahrten} offen={menueOffen} onClick={() => setMenueOffen(!menueOffen)} />
+                </span>
               </div>
               {felder}
             </div>
@@ -1554,7 +1599,7 @@ function routeAlsLinien(r: Route) {
 }
 
 function Ergebnis({
-  r, routen, gleichWie, aktiv, setWahl, hover, setHover, gpx, teilen, kopiert,
+  r, routen, gleichWie, aktiv, setWahl, hover, setHover, gpx, teilen, kopiert, aktion, detailsOffen, setDetailsOffen,
 }: {
   r: Route
   routen: Record<Variante, Route | null>
@@ -1566,6 +1611,10 @@ function Ergebnis({
   gpx: () => void
   teilen: () => void
   kopiert: boolean
+  /** Knöpfe, die neben GPX und Teilen stehen. */
+  aktion?: React.ReactNode
+  detailsOffen: boolean
+  setDetailsOffen: (v: boolean) => void
 }) {
   const fakten: { titel: string; wert: string; hilfe?: string }[] = []
   const warten = Math.round(r.ampeln.wartezeit / 60)
@@ -1601,7 +1650,8 @@ function Ergebnis({
             {km(r.distanz)} · ↑ {meter(r.hoch)} · ↓ {meter(r.runter)}
           </div>
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {aktion}
           <KleinKnopf onClick={gpx} titel="Als GPX-Datei für Navigationsgerät oder App">
             GPX
           </KleinKnopf>
@@ -1613,26 +1663,40 @@ function Ergebnis({
 
       <StressBalken r={r} />
 
-      {/* Ohne Profilpunkte wären min und max unendlich und jede Koordinate NaN. */}
-      {r.profil.length > 0 && <Hoehenprofil r={r} hover={hover} setHover={setHover} />}
+      {/* Höhenprofil, Kennzahlen und Strassenfolge sind Nachschlagewerk: einen Tipp entfernt, nicht im Weg. */}
+      <button
+        onClick={() => setDetailsOffen(!detailsOffen)}
+        aria-expanded={detailsOffen}
+        className="flex items-center gap-1.5 self-start text-[12px] font-medium underline underline-offset-2"
+        style={{ color: ui.fg }}
+      >
+        {detailsOffen ? 'Details ausblenden' : 'Details: Höhenprofil, Ampeln, Strassenfolge'}
+      </button>
 
-      <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[12px]">
-        {fakten.map((f) => (
-          <div key={f.titel} className="contents">
-            <dt style={{ color: ui.muted }}>{f.titel}</dt>
-            <dd className="text-right tabular-nums">
-              {f.wert}
-              {f.hilfe && (
-                <span className="block text-[11px]" style={{ color: ui.muted }}>
-                  {f.hilfe}
-                </span>
-              )}
-            </dd>
-          </div>
-        ))}
-      </dl>
+      {detailsOffen && (
+        <>
+          {/* Ohne Profilpunkte wären min und max unendlich und jede Koordinate NaN. */}
+          {r.profil.length > 0 && <Hoehenprofil r={r} hover={hover} setHover={setHover} />}
 
-      <Wegbeschreibung r={r} />
+          <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[12px]">
+            {fakten.map((f) => (
+              <div key={f.titel} className="contents">
+                <dt style={{ color: ui.muted }}>{f.titel}</dt>
+                <dd className="text-right tabular-nums">
+                  {f.wert}
+                  {f.hilfe && (
+                    <span className="block text-[11px]" style={{ color: ui.muted }}>
+                      {f.hilfe}
+                    </span>
+                  )}
+                </dd>
+              </div>
+            ))}
+          </dl>
+
+          <Wegbeschreibung r={r} />
+        </>
+      )}
     </section>
   )
 }
@@ -1982,8 +2046,18 @@ function Themenschalter({ wahl, setWahl }: { wahl: Themenwahl; setWahl: (v: Them
 }
 
 function Legende() {
+  const [offen, setOffen] = useState(false)
+  if (!offen)
+    return (
+      <button onClick={() => setOffen(true)} aria-expanded={false} className="self-start text-[11px] underline underline-offset-2" style={{ color: ui.muted }}>
+        Legende anzeigen
+      </button>
+    )
   return (
     <section className="flex flex-col gap-1.5 text-[11px]" style={{ color: ui.muted }}>
+      <button onClick={() => setOffen(false)} aria-expanded className="self-start underline underline-offset-2">
+        Legende ausblenden
+      </button>
       <div className="grid grid-cols-2 gap-x-3 gap-y-1">
         {[1, 2, 3, 4, 0].map((i) => (
           <span key={i} className="flex items-center gap-1.5">
