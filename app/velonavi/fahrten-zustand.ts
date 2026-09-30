@@ -60,6 +60,8 @@ const FAHRTEN_MAX = 200
 const PAKET = 10
 /** Frühestens nach so vielen Millisekunden gleicht die Seite bei der Rückkehr in die App erneut ab. */
 const ABGLEICH_PAUSE = 60_000
+/** So oft gleicht die offene Seite mit dem Konto ab. */
+const ABGLEICH_TAKT = 5 * 60_000
 const KEIN_NETZ = 'Gerade keine Verbindung zum Konto. Die Fahrten gehen hinein, sobald das Netz zurück ist.'
 const FREMDER_BROWSER =
   'Die Anmeldung hat nicht geklappt. Den Link aus der E-Mail im selben Browser öffnen, in dem du ihn angefordert hast.'
@@ -762,10 +764,25 @@ export function useFahrten({
   const setModus = useCallback(async (id: string, modus: Modus) => {
     const alt = fahrtenRef.current.find((f) => f.id === id)
     if (!alt || (alt.modus ?? 'velo') === modus) return
-    const neu = { ...alt, modus, geteilt: false }
+    const neu: Gespeichert = { ...alt, modus, geteilt: false }
+    // Ins Konto gehören nur Velofahrten: Wird eine zu Tram oder Gehen, geht sie dort weg, und umgekehrt hinein.
+    const warVelo = (alt.modus ?? 'velo') === 'velo'
+    if (warVelo && alt.gesichert) neu.gesichert = false
     setFahrten((liste) => liste.map((f) => (f.id === id ? neu : f)))
     await speichern(neu).catch(() => setMeldung('Die Änderung liess sich nicht speichern.'))
-  }, [])
+    if (!nutzerIdRef.current) return
+    if (modus === 'velo') {
+      if (sichernImKonto.current) await hochladen([neu], true)
+    } else if (warVelo) {
+      try {
+        const sb = await konto()
+        const { error } = await sb.from(TABELLE).delete().eq('id', id)
+        if (error) throw error
+      } catch {
+        // Bleibt sie im Konto, holt der nächste Abgleich sie nicht als Velofahrt zurück: Sie liegt ja noch hier.
+      }
+    }
+  }, [hochladen])
 
   const abmelden = useCallback(async () => {
     const sb = await konto()
@@ -834,9 +851,16 @@ export function useFahrten({
       zuletzt = Date.now()
       abgleichen(true)
     }
+    // Und regelmässig, solange die Seite offen ist: Fahrten von anderen Geräten erscheinen von selbst.
+    const uhr = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      zuletzt = Date.now()
+      abgleichen(true)
+    }, ABGLEICH_TAKT)
     document.addEventListener('visibilitychange', nochmal)
     window.addEventListener('online', online)
     return () => {
+      window.clearInterval(uhr)
       document.removeEventListener('visibilitychange', nochmal)
       window.removeEventListener('online', online)
     }

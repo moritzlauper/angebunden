@@ -9,7 +9,7 @@
 -- Schlüssel. Wer was sieht, regelt deshalb allein Row Level Security: jede
 -- Person nur ihre eigenen Zeilen.
 
-create table public.velonavi_fahrten (
+create table if not exists public.velonavi_fahrten (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users (id) on delete cascade,
   -- Zeitpunkt des ersten Punkts der Spur.
@@ -27,21 +27,25 @@ create table public.velonavi_fahrten (
   erstellt timestamptz not null default now()
 );
 
-create index velonavi_fahrten_nutzer on public.velonavi_fahrten (user_id, begonnen desc);
+create index if not exists velonavi_fahrten_nutzer on public.velonavi_fahrten (user_id, begonnen desc);
 
 alter table public.velonavi_fahrten enable row level security;
 
 revoke all on public.velonavi_fahrten from anon;
 grant select, insert, update, delete on public.velonavi_fahrten to authenticated;
 
+drop policy if exists "Eigene Fahrten lesen" on public.velonavi_fahrten;
 create policy "Eigene Fahrten lesen" on public.velonavi_fahrten
   for select to authenticated using ((select auth.uid()) = user_id);
 
+drop policy if exists "Eigene Fahrten anlegen" on public.velonavi_fahrten;
 create policy "Eigene Fahrten anlegen" on public.velonavi_fahrten
   for insert to authenticated with check ((select auth.uid()) = user_id);
 
+drop policy if exists "Eigene Fahrten ändern" on public.velonavi_fahrten;
 create policy "Eigene Fahrten ändern" on public.velonavi_fahrten
   for update to authenticated using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
+drop policy if exists "Eigene Fahrten löschen" on public.velonavi_fahrten;
 create policy "Eigene Fahrten löschen" on public.velonavi_fahrten
   for delete to authenticated using ((select auth.uid()) = user_id);

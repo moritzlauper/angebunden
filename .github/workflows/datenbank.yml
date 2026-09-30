@@ -1,0 +1,49 @@
+name: Datenbank
+
+# Spielt neue Dateien aus supabase/migrations/ in die Datenbank des Supabase-Projekts ein
+# (scripts/datenbank.mjs). Dasselbe geschieht bei jedem Build für die Produktion auf Vercel,
+# sofern dort die Supabase-Integration die Adresse liefert. Dieser Lauf ist der Weg ohne Vercel
+# und der Knopf zum Nachholen unter «Actions».
+#
+# Braucht das Secret SUPABASE_DB_URL: im Supabase-Dashboard unter «Connect» die Adresse
+# «Session pooler» (GitHub erreicht die direkte Adresse nur über IPv6 nicht), mit Passwort.
+# Ohne Secret endet der Lauf mit einer Warnung.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'scripts/datenbank.mjs'
+      - '.github/workflows/datenbank.yml'
+
+concurrency:
+  group: datenbank
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  migrationen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Abhängigkeiten
+        run: pnpm install --frozen-lockfile
+      - name: Migrationen einspielen
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::Secret SUPABASE_DB_URL fehlt, die Migrationen sind nicht eingespielt (siehe docs/betreiben.md)."
+            exit 0
+          fi
+          pnpm datenbank

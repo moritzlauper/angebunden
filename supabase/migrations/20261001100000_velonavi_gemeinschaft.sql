@@ -6,22 +6,22 @@
 -- Was die Seite zurückbekommt, liefert allein die Funktion unten, und die
 -- gibt einen Wert erst her, wenn mindestens fünf Messungen dazu vorliegen.
 
-create table public.velonavi_messungen_kanten (
+create table if not exists public.velonavi_messungen_kanten (
   -- Koordinaten beider Knoten, auf einen Meter gerundet: «859234_4737612>859301_4737655»
   k text not null check (length(k) between 8 and 60 and k ~ '^-?[0-9]+_-?[0-9]+>-?[0-9]+_-?[0-9]+$'),
   -- Fahrzeit im Verhältnis zur erwarteten
   v real not null check (v between 0.3 and 4)
 );
 
-create table public.velonavi_messungen_ampeln (
+create table if not exists public.velonavi_messungen_ampeln (
   -- Koordinaten der Ampel, Achtel der Anfahrtsrichtung, Manöver: «853921_4737410_3_0»
   k text not null check (length(k) between 8 and 60 and k ~ '^-?[0-9]+_-?[0-9]+_[0-7]_[0-3]$'),
   -- gewartete Sekunden, null bei Grün
   w real not null check (w between 0 and 240)
 );
 
-create index on public.velonavi_messungen_kanten (k);
-create index on public.velonavi_messungen_ampeln (k);
+create index if not exists velonavi_messungen_kanten_k_idx on public.velonavi_messungen_kanten (k);
+create index if not exists velonavi_messungen_ampeln_k_idx on public.velonavi_messungen_ampeln (k);
 
 alter table public.velonavi_messungen_kanten enable row level security;
 alter table public.velonavi_messungen_ampeln enable row level security;
@@ -31,14 +31,16 @@ revoke all on public.velonavi_messungen_ampeln from anon, authenticated;
 grant insert on public.velonavi_messungen_kanten to anon, authenticated;
 grant insert on public.velonavi_messungen_ampeln to anon, authenticated;
 
+drop policy if exists "Messwerte beitragen" on public.velonavi_messungen_kanten;
 create policy "Messwerte beitragen" on public.velonavi_messungen_kanten
   for insert to anon, authenticated with check (true);
+drop policy if exists "Messwerte beitragen" on public.velonavi_messungen_ampeln;
 create policy "Messwerte beitragen" on public.velonavi_messungen_ampeln
   for insert to anon, authenticated with check (true);
 
 -- Der Durchschnitt aller Messungen: je Abschnitt der Median des Verhältnisses,
 -- je Ampel die mittlere Wartezeit, jeweils mit der Zahl der Messungen.
-create function public.velonavi_gemeinschaft(mindestens int default 5)
+create or replace function public.velonavi_gemeinschaft(mindestens int default 5)
 returns jsonb
 language sql
 stable

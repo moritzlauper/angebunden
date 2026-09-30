@@ -57,8 +57,16 @@ erscheint im Velonavi kein Kontobereich.
    Region Zürich (`eu-central-2`) am nächsten. Der Text unter «Was gespeichert wird» in
    `app/methode/page.tsx` nennt Zürich als Speicherort und ist bei einer anderen Region
    anzupassen.
-2. Die Tabelle anlegen: die Dateien in `supabase/migrations/` der Reihe nach im SQL-Editor
-   des Dashboards ausführen, oder je mit `psql "$POSTGRES_URL_NON_POOLING" -f <datei>`. Sie
+2. Die Tabellen legt der Build an: `scripts/datenbank.mjs` spielt bei jedem Build für die
+   Produktion auf Vercel die Dateien aus `supabase/migrations/` ein, die noch fehlen, und
+   vermerkt sie in `supabase_migrations.schema_migrations` (wie `supabase db push`). Die Adresse
+   der Datenbank liefert die Supabase-Integration von Vercel (`POSTGRES_URL_NON_POOLING`, auch mit
+   Präfix wie `STORAGE_`), oder man setzt `SUPABASE_DB_URL` selbst. Ohne Vercel übernimmt das der
+   Workflow `.github/workflows/datenbank.yml` mit dem Secret `SUPABASE_DB_URL`; im Dashboard
+   unter «Connect» die Adresse «Session pooler» nehmen, die direkte erreicht GitHub nur über
+   IPv6 nicht. Von Hand: `SUPABASE_DB_URL=… pnpm datenbank`. Die Migrationen sind wiederholbar
+   geschrieben (`if not exists`, `drop policy if exists`), eine früher von Hand im SQL-Editor
+   eingerichtete Datenbank nimmt sie ohne Fehler. Neue Migrationen bitte ebenso schreiben. Sie
    schalten Row Level Security ein, jedes Konto sieht nur die eigenen Fahrten.
 3. `NEXT_PUBLIC_SUPABASE_URL` und `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` setzen, lokal in
    `.env.local` und beim Hoster, danach neu bauen. Beide Werte sind öffentlich. Der geheime
