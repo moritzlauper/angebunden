@@ -268,6 +268,33 @@ export type Profil = {
   reineZeit?: boolean
   /** Nur mit `reineZeit`: Gewicht für den festen Preis fürs Einbiegen. */
   einstieg?: number
+  /** Was aus aufgezeichneten Fahrten gelernt wurde. Fehlt es, gilt das Modell. */
+  gelernt?: Gelernt
+}
+
+/**
+ * Korrekturen aus eigenen Fahrten, gerechnet in `fahrten.ts`. Sie verändern
+ * die Fahrzeit und damit auch die Kosten, in beiden Varianten.
+ */
+export type Gelernt = {
+  /** Eigenes Tempo im Verhältnis zum Modell: Faktor auf jede Fahrzeit. */
+  tempo: number
+  /** Je gerichteter Kante ein weiterer Faktor auf die Fahrzeit, 1 ohne Messung. */
+  faktor: Float32Array
+  /** Gemessene Wartezeit in Sekunden, Schlüssel aus `ampelSchluessel`. */
+  warten: Map<number, number>
+}
+
+const MANOEVER_NR = { geradeaus: 0, links: 1, rechts: 2, wende: 3 } as const
+
+/**
+ * Unter diesem Schlüssel merkt sich `Gelernt` die Wartezeit an einer Ampel:
+ * Kreuzung, Anfahrtsrichtung in Achteln der Windrose und Manöver. Dieselbe
+ * Ampel kostet von der Nebenstrasse her anders als auf der Hauptachse.
+ */
+export function ampelSchluessel(J: number, peil: number, mv: keyof typeof MANOEVER_NR) {
+  const achtel = Math.round((((peil % 360) + 360) % 360) / 45) % 8
+  return (J * 8 + achtel) * 4 + MANOEVER_NR[mv]
 }
 
 export const VOREINSTELLUNGEN = {
@@ -504,6 +531,7 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
   const kosten = new Float32Array(2 * g.E).fill(Infinity)
   const v0 = V0
   const sProM = S_PRO_M
+  const lern = p.gelernt
   for (let a = 0; a < 2 * g.E; a++) {
     const e = a >> 1
     const L = g.laenge[e]
@@ -519,7 +547,7 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
       if (fuss) v = Math.min(v, 3.3)
       const eben = L / v
       const gewinn = Math.max(0, Math.min(ab * 3, eben - L / VMAX))
-      const t = eben + auf * sProM - gewinn
+      const t = (eben + auf * sProM - gewinn) * (lern ? lern.tempo * lern.faktor[a] : 1)
       const steil = auf / Math.max(L, 1)
       const stress = stressVon(g, a)
       // Jede zusätzliche Fahrspur über zwei hinaus: mehr Verkehr, schnellere
@@ -570,6 +598,10 @@ export function kantenKosten(g: Graph, p: Profil): Kosten {
         huerde * (p.zeitOptimal ? 1 : 1.6) +
         auf * sProM * p.steigung * (1.2 + 12 * Math.max(0, steil - 0.05)) +
         g.unfall[e] * 3 * p.sicherheit
+      // Ein gelernter Faktor unter 1 darf die Kosten nicht unter die
+      // Untergrenze drücken, mit der die Suche den Restweg schätzt. Sonst
+      // fände sie nicht mehr sicher den günstigsten Weg.
+      if (lern) kosten[a] = Math.max(kosten[a], (L / VMAX) * MIN_FAKTOR)
     } else if (p.schieben && schiebenErlaubt(g, a)) {
       const treppe = klasse === KLASSE.treppe
       const t = L / (treppe ? 0.5 : V_SCHIEBEN) + auf * (treppe ? 4 : 1.5)
@@ -598,7 +630,21 @@ function manoever(d: number): Manoever {
   return d > 0 ? 'rechts' : 'links'
 }
 
-type Uebergang = { kosten: number; zeit: number; ampel: number; manoever: Manoever | null; eintritt: number }
+export type Uebergang = {
+  kosten: number
+  zeit: number
+  ampel: number
+  manoever: Manoever | null
+  eintritt: number
+  /** Der Anteil von `zeit`, der Warten an der Ampel ist. */
+  warten: number
+  /** `ampelSchluessel` der Ampel, an der gewartet wird, sonst -1. */
+  schluessel: number
+}
+
+export const leererUebergang = (): Uebergang => ({
+  kosten: 0, zeit: 0, ampel: -1, manoever: null, eintritt: NaN, warten: 0, schluessel: -1,
+})
 
 /**
  * Kosten beim Übergang von gerichteter Kante a auf b am Knoten v.
@@ -606,12 +652,14 @@ type Uebergang = { kosten: number; zeit: number; ampel: number; manoever: Manoev
  * schon innerhalb einer Ampelkreuzung liegt; sonst NaN. Eine Kreuzung besteht
  * oft aus mehreren Knoten, das Manöver ergibt sich erst beim Verlassen.
  */
-function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintritt: number, out: Uebergang) {
+export function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintritt: number, out: Uebergang) {
   out.kosten = 0
   out.zeit = 0
   out.ampel = -1
   out.manoever = null
   out.eintritt = NaN
+  out.warten = 0
+  out.schluessel = -1
   // Vom Velonetz der Stadt herunter: hält die Route auf dem Korridor.
   if (!p.reineZeit && netzVon(g, a >> 1) > 0 && netzVon(g, b >> 1) === 0) out.kosten += NETZ_VERLASSEN
 
@@ -667,6 +715,10 @@ function uebergang(g: Graph, p: Profil, a: number, b: number, v: number, eintrit
       warten =
         mv === 'geradeaus' ? (quer ? queren : WARTEN.einzeln.entlang) : mv === 'links' ? queren : WARTEN.einzeln.rechts
     }
+    // Wo eigene Fahrten die Wartezeit gemessen haben, gilt die Messung.
+    out.schluessel = ampelSchluessel(J, rein, mv)
+    warten = p.gelernt?.warten.get(out.schluessel) ?? warten
+    out.warten = warten
     out.zeit += warten
     out.kosten += warten * (p.reineZeit ? p.ampeln : 0.3 + 1.6 * p.ampeln)
     out.ampel = J
@@ -870,6 +922,22 @@ export function route(
   ziel: Einrastung | Einrastung[],
   k?: Kosten
 ): Route | null {
+  const s = sucheStuecke(g, p, start, ziel, k)
+  return s && auswerten(g, p, s.stuecke, s.kosten)
+}
+
+/**
+ * Die Suche ohne Auswertung: nur die Kette der befahrenen Kanten. `fahrten.ts`
+ * ordnet damit eine aufgezeichnete Spur dem Netz zu und braucht dafür weder
+ * Höhenprofil noch Kennzahlen.
+ */
+export function sucheStuecke(
+  g: Graph,
+  p: Profil,
+  start: Einrastung | Einrastung[],
+  ziel: Einrastung | Einrastung[],
+  k?: Kosten
+): { stuecke: Stueck[]; kosten: number } | null {
   const starts = Array.isArray(start) ? start : [start]
   const ziele = Array.isArray(ziel) ? ziel : [ziel]
   if (!starts.length || !ziele.length) return null
@@ -931,7 +999,7 @@ export function route(
       }
     }
 
-  const ue: Uebergang = { kosten: 0, zeit: 0, ampel: -1, manoever: null, eintritt: NaN }
+  const ue = leererUebergang()
   while (heap.n > 0) {
     if (heap.minKey >= bestesZiel) break
     const a = heap.pop()
@@ -996,13 +1064,13 @@ export function route(
     const zv = g.kopf(letzte) === g.kanteVon[ze]
     stuecke.push({ a: zv ? 2 * ze : 2 * ze + 1, von: 0, bis: zv ? zielK.t : 1 - zielK.t, ampel: -1, manoever: null })
   }
-  return auswerten(g, p, stuecke, bestesZiel)
+  return { stuecke, kosten: bestesZiel }
 }
 
 // ------------------------------------------------------------ Auswertung
 
 /** Koordinaten und Höhen einer gerichteten Kante zwischen zwei Längenanteilen. */
-function ausschnitt(g: Graph, a: number, von: number, bis: number) {
+export function ausschnitt(g: Graph, a: number, von: number, bis: number) {
   const e = a >> 1
   const p0 = g.kantePunkte[e]
   const p1 = g.kantePunkte[e + 1]
@@ -1046,7 +1114,7 @@ function auswerten(g: Graph, p: Profil, stuecke: Stueck[], kostenSumme: number):
     meterNachStufe: [0, 0, 0, 0, 0], vorzugM: 0, tramM: 0, kopfsteinM: 0, kiesM: 0, treppen: 0, unfaelle: 0, huerden: 0,
     ampeln: { geradeaus: 0, abbiegen: 0, wartezeit: 0, orte: [] }, profil: [], strassen: [],
   }
-  const ue: Uebergang = { kosten: 0, zeit: 0, ampel: -1, manoever: null, eintritt: NaN }
+  const ue = leererUebergang()
   let eintritt = NaN
   const gesehen = new Set<number>()
   stuecke.forEach((s, i) => {

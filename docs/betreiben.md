@@ -1,9 +1,9 @@
 # Selbst betreiben und einbinden
 
-angebunden ist eine statische Website. Es gibt keinen Server, keine Datenbank und keine
-Konten. Die Pipeline rechnet alles vorher aus und legt es als Dateien unter `public/data/`
-ab, das Velorouting läuft im Browser. Wer die Seite selbst betreiben will, braucht deshalb
-nur einen Webserver, der Dateien ausliefert.
+angebunden ist eine statische Website. Die Pipeline rechnet alles vorher aus und legt es als
+Dateien unter `public/data/` ab, das Velorouting läuft im Browser. Wer die Seite selbst
+betreiben will, braucht deshalb nur einen Webserver, der Dateien ausliefert. Eine Datenbank
+braucht einzig das Konto im Velonavi. Es ist freiwillig und weiter unten beschrieben.
 
 ## Eigenes Deployment
 
@@ -39,10 +39,47 @@ Die Seite lädt zur Laufzeit von diesen Adressen:
 | --- | --- | --- |
 | `www.ogd.stadt-zuerich.ch/wms/geoportal/` | Hintergrundkarte (WMS der Stadt Zürich) | `app/karte.tsx`, `app/velonavi/velonavi.tsx` |
 | `gc.zgo.at`, `*.goatcounter.com` | Besucherzählung, nur wenn eingerichtet | `app/besucher-zaehler.tsx` |
+| `*.supabase.co` | Konto im Velonavi, nur wenn eingerichtet | `app/velonavi/konto.ts` |
 
 Schriften, MapLibre und alle Daten liefert die Seite selbst aus. Der Service Worker
 `public/velonavi-sw.js` hält die Kartenbilder der Stadt im Browser, weil der WMS keine
 Cache-Header mitschickt.
+
+## Konto im Velonavi
+
+Mit einem Konto zeichnet der Velonavi Fahrten auf, wertet sie aus und passt Fahrzeiten und
+Ampelwartezeiten an die Messungen an. Anmeldung und Ablage übernimmt ein
+[Supabase](https://supabase.com)-Projekt. Der Browser spricht direkt mit Supabase, die Seite
+bleibt statisch und `pnpm export` funktioniert wie zuvor. Ohne die beiden Variablen unten
+erscheint im Velonavi kein Kontobereich.
+
+1. Bei Supabase ein Projekt anlegen. Für Nutzerinnen und Nutzer in der Schweiz liegt die
+   Region Zürich (`eu-central-2`) am nächsten.
+2. Die Tabelle anlegen: `supabase/migrations/20260930170000_velonavi_fahrten.sql` im SQL-Editor
+   des Dashboards ausführen, oder mit
+   `psql "$POSTGRES_URL_NON_POOLING" -f supabase/migrations/20260930170000_velonavi_fahrten.sql`.
+   Die Datei schaltet Row Level Security ein, jedes Konto sieht nur die eigenen Fahrten.
+3. `NEXT_PUBLIC_SUPABASE_URL` und `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` setzen, lokal in
+   `.env.local` und beim Hoster, danach neu bauen. Beide Werte sind öffentlich. Der geheime
+   Schlüssel (`service_role`, `sb_secret_…`) gehört nicht in die Seite.
+4. Im Dashboard unter Authentication, URL Configuration die eigene Adresse eintragen: als
+   Site URL `https://deine-domain/velonavi`, als Redirect URLs dieselbe Adresse und für die
+   Entwicklung `http://localhost:3000/velonavi`.
+5. Für die Anmeldung mit Google unter Authentication, Providers Google einschalten. Client-ID
+   und Secret stammen aus einem OAuth-Client in der Google Cloud Console, dessen Redirect-URI
+   `https://<projekt>.supabase.co/auth/v1/callback` lautet. Der Knopf erscheint im Velonavi
+   von selbst, sobald der Anbieter eingeschaltet ist. Dasselbe gilt für Apple, GitHub und
+   Microsoft.
+6. Für die Anmeldung per E-Mail einen eigenen SMTP-Server eintragen. Der eingebaute Versand
+   von Supabase schickt nur wenige Mails pro Stunde und nur an Adressen des Projektteams.
+
+Aufgezeichnet wird mit dem Standortdienst des Browsers. Er liefert nur, solange die Seite im
+Vordergrund und der Bildschirm an ist. Wer das Handy in der Tasche hat, zeichnet mit einer
+anderen App auf und liest die GPX-Datei im Velonavi ein.
+
+Gespeichert wird die rohe Spur. Welche Kanten befahren wurden und was daraus gelernt wird,
+rechnet `app/velonavi/fahrten.ts` bei jedem Laden neu, weil sich die Nummern der Kanten mit
+jeder neuen Fassung des Velonetzes ändern.
 
 ## Einbetten
 

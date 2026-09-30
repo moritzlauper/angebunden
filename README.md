@@ -245,6 +245,12 @@ es für die städtischen Anlagen nicht als offene Daten. Die Lichtsignal-Schnitt
 auf opentransportdata.swiss liefert den Grünanteil nur für 37 Knoten an Kantonsstrassen
 ausserhalb der Stadt (Stand Mai 2026).
 
+Wer sich im Velonavi anmeldet, kann Fahrten aufzeichnen oder als GPX einlesen.
+`app/velonavi/fahrten.ts` ordnet die Spur den Kanten zu, misst Fahrzeit und Standzeit vor
+Ampeln und leitet daraus das eigene Tempo, einen Faktor je Kante und eine Wartezeit je Ampel
+ab. Der Router rechnet danach mit diesen Werten. Das Konto braucht ein Supabase-Projekt und
+ist freiwillig, die Einrichtung steht in [`docs/betreiben.md`](docs/betreiben.md#konto-im-velonavi).
+
 Was in keiner Quelle stimmt, steht mit Begründung in `pipeline/velo-korrekturen.json`. Wie
 man dort etwas ergänzt, beschreibt [`docs/daten-anpassen.md`](docs/daten-anpassen.md). Die
 GitHub-Action `velodaten.yml` baut das Netz am 3. jedes Monats aus frischen Daten neu.
@@ -283,7 +289,8 @@ app/
   meta.ts, site.ts, seo.ts   geteilte Metadaten und SEO
   besucher-zaehler.tsx   GoatCounter-Einbindung
   og/                    Vorschaubilder je Stadt, beim Bauen gerendert
-  velonavi/              Route /velonavi, Oberfläche und Router
+  velonavi/              Route /velonavi, Oberfläche, Router, Konto und Fahrten
+supabase/                Tabelle für die aufgezeichneten Fahrten im Velonavi
 docs/                    Daten anpassen, selbst betreiben und einbinden
 scripts/                 MapLibre-Worker und Schriftglyphen ins public-Verzeichnis
 analytics/               Besuche pro Tag, siehe analytics/README.md
@@ -317,7 +324,8 @@ und die Fusswegparameter stehen in `pipeline/config.ts`. Alles Stadtspezifische 
 
 ## Ins Netz stellen
 
-Die Seite hat keinen Serveranteil. Alle Daten liegen als Dateien in `public/`, die vier
+Die Seite hat keinen Serveranteil. Alle Daten liegen als Dateien in `public/`, das Konto im
+Velonavi spricht aus dem Browser direkt mit Supabase. Die vier
 Routen (`/`, `/basel`, `/bern`, `/methode`) werden beim Bauen vorgerendert. `pnpm export`
 schreibt einen Ordner `out/` mit reinen statischen Dateien, den jeder Gratis-Hoster
 ausliefert. Mit allen drei Städten und dem Velonavi sind das rund 100 MB, das meiste davon

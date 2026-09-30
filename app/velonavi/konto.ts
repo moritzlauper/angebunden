@@ -1,0 +1,118 @@
+/**
+ * Das Konto im Velonavi: Anmeldung und Ablage der Fahrten bei Supabase.
+ *
+ * Die Seite hat keinen Serveranteil, der Browser spricht direkt mit Supabase.
+ * Dafür reichen die Adresse des Projekts und der öffentliche Schlüssel; wer
+ * welche Zeile lesen darf, regelt die Datenbank selbst (Row Level Security,
+ * siehe `supabase/migrations`). Fehlen die beiden Angaben, gibt es im
+ * Velonavi kein Konto und die Seite verhält sich wie zuvor.
+ *
+ * Die Bibliothek wird erst geladen, wenn jemand sich anmelden will oder schon
+ * angemeldet ist. Wer nur eine Route sucht, lädt sie nicht.
+ */
+
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+const ADRESSE = process.env.NEXT_PUBLIC_SUPABASE_URL
+const SCHLUESSEL = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+
+export const KONTO_MOEGLICH = !!ADRESSE && !!SCHLUESSEL
+
+/** Unter diesem Namen liegt die Sitzung im localStorage. Cookies gibt es keine. */
+const SPEICHER = 'velonavi.konto'
+
+export const TABELLE = 'velonavi_fahrten'
+
+let client: Promise<SupabaseClient> | null = null
+
+/**
+ * Angemeldet wird mit PKCE: Supabase schickt den Browser mit `?code=…` zurück
+ * statt mit dem Zugangsschlüssel im Fragment. Das Fragment gehört im Velonavi
+ * der Route (`#von=…&nach=…`), die beiden kämen sich sonst in die Quere.
+ */
+export function konto(): Promise<SupabaseClient> {
+  client ??= import('@supabase/supabase-js').then(({ createClient }) =>
+    createClient(ADRESSE!, SCHLUESSEL!, {
+      auth: { flowType: 'pkce', storageKey: SPEICHER, persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    })
+  )
+  return client
+}
+
+/** Ob schon eine Sitzung besteht oder gerade eine Anmeldung zurückkommt. */
+export function kontoAngefangen() {
+  if (!KONTO_MOEGLICH) return false
+  try {
+    return (
+      new URLSearchParams(window.location.search).has('code') ||
+      window.localStorage.getItem(SPEICHER) !== null ||
+      window.localStorage.getItem(`${SPEICHER}-code-verifier`) !== null
+    )
+  } catch {
+    return false
+  }
+}
+
+/** Wohin Supabase nach der Anmeldung zurückschickt. Muss dort als Redirect-URL eingetragen sein. */
+export const rueckkehr = () => `${window.location.origin}/velonavi`
+
+/** Anbieter, für die es einen Knopf gibt, sofern sie im Supabase-Projekt eingeschaltet sind. */
+const ANBIETER = [
+  { id: 'google', name: 'Google' },
+  { id: 'apple', name: 'Apple' },
+  { id: 'github', name: 'GitHub' },
+  { id: 'azure', name: 'Microsoft' },
+] as const
+export type Anbieter = (typeof ANBIETER)[number]
+
+/**
+ * Fragt das Projekt, welche Anmeldewege eingeschaltet sind. So erscheint der
+ * Google-Knopf erst, wenn Google im Supabase-Dashboard eingerichtet ist, und
+ * führt nie auf eine Fehlerseite.
+ */
+export async function anmeldewege(): Promise<{ anbieter: Anbieter[]; mail: boolean }> {
+  const r = await fetch(`${ADRESSE}/auth/v1/settings`, { headers: { apikey: SCHLUESSEL! } })
+  if (!r.ok) throw new Error(`Supabase antwortet mit ${r.status}`)
+  const { external } = (await r.json()) as { external?: Record<string, boolean> }
+  return { anbieter: ANBIETER.filter((a) => external?.[a.id]), mail: external?.email !== false }
+}
+
+/**
+ * Kommt die Anmeldung mit einem Fehler zurück, steht er in der Adresse. Liest
+ * ihn aus und räumt die Adresse auf.
+ */
+export function anmeldeFehler(): string | null {
+  const suche = new URLSearchParams(window.location.search)
+  const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  const code = suche.get('error_code') ?? fragment.get('error_code')
+  const text = suche.get('error_description') ?? fragment.get('error_description')
+  if (!code && !text) return null
+  for (const k of ['error', 'error_code', 'error_description']) suche.delete(k)
+  const rest = suche.toString()
+  // Steht der Fehler im Fragment, fällt es weg; eine Route im Fragment bleibt.
+  const fragmentBleibt = fragment.has('error_code') || fragment.has('error_description') ? '' : window.location.hash
+  window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : '') + fragmentBleibt)
+  return code === 'otp_expired'
+    ? 'Der Anmeldelink ist abgelaufen oder wurde schon benutzt.'
+    : `Die Anmeldung hat nicht geklappt: ${text ?? code}`
+}
+
+/**
+ * Der Anmeldelink gilt nur in dem Browser, der ihn angefordert hat: Dort liegt
+ * der Prüfwert, ohne den sich der Code nicht einlösen lässt. Wer den Link auf
+ * einem anderen Gerät öffnet, bliebe sonst ohne jede Rückmeldung abgemeldet.
+ * Nimmt den nutzlosen Code aus der Adresse und meldet, dass es so war.
+ */
+export function codeOhnePruefwert() {
+  const suche = new URLSearchParams(window.location.search)
+  if (!suche.has('code')) return false
+  try {
+    if (window.localStorage.getItem(`${SPEICHER}-code-verifier`) !== null) return false
+  } catch {
+    /* ohne Speicher gibt es auch keinen Prüfwert */
+  }
+  suche.delete('code')
+  const rest = suche.toString()
+  window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash)
+  return true
+}

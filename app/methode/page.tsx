@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { ladeMeta } from '../meta'
 import { Wortmarke } from '../marke'
+import { KONTO_MOEGLICH } from '../velonavi/konto'
 
 export const metadata: Metadata = {
   title: 'Wie das gerechnet ist',
@@ -386,6 +387,24 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           durch die Stadt fährt «Schnell» 32% der Strecke auf Stufe 3 oder 4, «Komfort» 12%.
           Vorzugsrouten bekommen 15% Rabatt, das Hauptnetz 5%.
         </p>
+        {KONTO_MOEGLICH && (
+          <p className="mt-4">
+            Wer sich im Velonavi anmeldet und Fahrten aufzeichnet, bekommt Fahrzeiten, die sich nach
+            den eigenen Messungen richten. Der Velonavi legt jede aufgezeichnete Spur auf das
+            Velonetz und misst, wie lange jeder Abschnitt gedauert hat und wie lange du vor jeder
+            Ampel gestanden bist. Daraus entstehen drei Korrekturen: Dein Tempo im Verhältnis zu den
+            23 km/h des Modells, ein Faktor für jeden befahrenen Abschnitt und eine Wartezeit für
+            jede Ampel, getrennt nach Anfahrtsrichtung und Manöver. Ob eine Ampel grün ist,
+            entscheidet der Zufall, deshalb verschiebt eine einzelne Fahrt ihre Wartezeit nur um die
+            Hälfte. Fährst du eine eigene Strecke schneller, als «Schnell» für seinen Vorschlag
+            rechnet, werden ihre Abschnitte schneller und der nächste Vorschlag rückt an deine
+            Strecke heran. Aus einer einzelnen Fahrt lässt sich nicht trennen, ob du schnell fährst
+            oder ob die Strecke schnell ist. Zu Beginn schreibt der Velonavi die Abweichung deshalb
+            der Strecke zu. Nach rund zwei Stunden aufgezeichneter Fahrzeit bestimmt die Messung
+            dein Tempo zu vier Fünfteln. Das Gelernte gilt nur für dein Konto und lässt sich im
+            Velonavi abschalten.
+          </p>
+        )}
         <p className="mt-4">
           Die Grundkarte des Velonavi ist die Basiskarte der Stadt Zürich. Sie kommt direkt vom
           Kartendienst der Stadt, dein Browser fragt dort also die Kartenausschnitte ab. Start und
@@ -394,10 +413,22 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
 
         <H2>Was gespeichert wird</H2>
         <p className="mt-4">
-          Kein Konto, keine Cookies. Die Adresssuche rechnet im Browser, und welches Haus du dir
-          ansiehst, bleibt dort. Es steht im Link hinter dem <code>#</code> und wird nie an einen
-          Server geschickt.
+          {KONTO_MOEGLICH ? 'Ohne Anmeldung gibt es kein Konto, und Cookies setzt die Seite nie.' : 'Kein Konto, keine Cookies.'}{' '}
+          Die Adresssuche rechnet im Browser, und welches Haus du dir ansiehst, bleibt dort. Es steht
+          im Link hinter dem <code>#</code> und wird nie an einen Server geschickt.
         </p>
+        {KONTO_MOEGLICH && (
+          <p className="mt-4">
+            Im Velonavi kannst du dich anmelden, mit Google oder mit einem Link per E-Mail. Gespeichert
+            wird dann deine E-Mail-Adresse. Schaltest du «Fahrten aufzeichnen» ein und startest eine
+            Fahrt, kommen die GPS-Spur mit ihren Zeitstempeln sowie Start und Ziel dazu. Diese Daten
+            liegen bei{' '}
+            <Aus href="https://supabase.com">Supabase</Aus> in einer Datenbank, in der jedes Konto nur
+            die eigenen Fahrten lesen kann. Die Anmeldung steht im Speicher des Browsers und nicht in
+            einem Cookie. Einzelne Fahrten oder alle zusammen löschst du im Velonavi selbst. Das
+            Konto lösche ich auf ein E-Mail an die Adresse unter <Aus href="#kontakt">Kontakt</Aus>.
+          </p>
+        )}
         <p className="mt-4">
           Eine Zahl wird doch gezählt: wie viele Leute pro Tag da sind. Das übernimmt{' '}
           <a

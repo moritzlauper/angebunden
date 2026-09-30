@@ -17,12 +17,14 @@ import { Suchleiste, bauIndex, suchen, Sternsymbol, type Eintrag } from '../such
 import { Wortmarke } from '../marke'
 import { STAEDTE } from '../staedte'
 import { nf } from '../site'
-import { ZIEL, TINTE, GRAU } from '../farben'
+import { ZIEL, TINTE, GRAU, GEFAHREN } from '../farben'
 import {
   ladeGraph, einrastenAlle, route, kantenKosten, alsGpx, verbinde, VOREINSTELLUNGEN, reinZeitlich,
   veloErlaubt, stressVon, netzVon, NETZ, VMAX,
   type Graph, type Profil, type Route, type VeloMeta,
 } from './router'
+import { ui, minuten, km, lies, schreib, Schalter, Hinweis, KleinKnopf } from './teile'
+import { useFahrten, Kontobereich, Fahrtknopf } from './fahrten-ui'
 
 const STADT = STAEDTE.zuerich
 
@@ -103,34 +105,6 @@ function stufenBelag(i: number) {
 
 /** Vorzugsrouten der Stadt: eine Empfehlung, kein Datenwert – deshalb grau. */
 const VORZUG = GRAU
-
-/**
- * Die Oberfläche liest ihre Farben als CSS-Variablen (definiert in
- * `globals.css`), nicht als feste Werte. So wechselt das Thema, indem am
- * <html> ein Attribut umgesetzt wird - ohne die Farben durch jede Komponente
- * durchzureichen und ohne dass ein einziges `style` hier davon weiss. Es sind
- * dieselben Variablen wie in der Vergleichskarte.
- *
- * Einen Akzent gibt es nicht mehr: Was man drückt, zieht oder wählt, ist
- * Tinte (`fg`). Karmin bleibt der Marke vorbehalten, das Ziel ist blau.
- */
-const ui = {
-  bg: 'var(--ab-papier)',
-  fg: 'var(--ab-tinte)',
-  panel: 'var(--ab-blatt)',
-  border: 'var(--ab-linie)',
-  muted: 'var(--ab-leise)',
-  weich: 'var(--ab-weich)',
-  aktiv: 'var(--ab-aktiv)',
-  ring: 'var(--ab-ring)',
-  /** Schiene der Schalter. */
-  spur: 'var(--ab-spur)',
-  /** Die Scheibe des Reglers. */
-  knopf: 'var(--ab-knopf)',
-  /** Nur für das Ziel. */
-  ziel: 'var(--ab-ziel)',
-  schatten: 'var(--ab-schatten)',
-}
 
 type Thema = 'hell' | 'dunkel'
 type Themenwahl = Thema | 'auto'
@@ -268,7 +242,9 @@ function schreibeUrl(start: Punkt | null, ziel: Punkt | null, zwischen: Punkt[],
   if (ziel) p.set('nach', `${ziel.lon.toFixed(5)},${ziel.lat.toFixed(5)}`), p.set('nn', ziel.titel)
   if (wahl !== 'komfort') p.set('wahl', wahl)
   const s = p.toString()
-  window.history.replaceState(null, '', window.location.pathname + (s ? `#${s}` : ''))
+  // Der Suchteil bleibt stehen: Nach einer Anmeldung steht dort kurz der Code,
+  // den `konto.ts` einlöst und danach selbst entfernt.
+  window.history.replaceState(null, '', window.location.pathname + window.location.search + (s ? `#${s}` : ''))
 }
 
 const koordText = (lon: number, lat: number) => `Punkt ${lat.toFixed(4)}, ${lon.toFixed(4)}`
@@ -285,6 +261,7 @@ function strasseVon(titel: string) {
  * Zuletzt gesuchte Orte, das Zuhause und die letzte Strecke liegen im
  * localStorage des Browsers. Sie verlassen das Gerät nie, und wer keinen
  * Speicher erlaubt (privates Fenster), merkt davon nur, dass nichts bleibt.
+ * Einzig aufgezeichnete Fahrten liegen im Konto, siehe `fahrten-ui.tsx`.
  */
 const SCHLUESSEL = {
   verlauf: 'velonavi.verlauf',
@@ -294,32 +271,8 @@ const SCHLUESSEL = {
 }
 const VERLAUF_MAX = 10
 
-function lies<T>(schluessel: string, vorgabe: T): T {
-  try {
-    const roh = window.localStorage.getItem(schluessel)
-    return roh ? (JSON.parse(roh) as T) : vorgabe
-  } catch {
-    return vorgabe
-  }
-}
-function schreib(schluessel: string, wert: unknown) {
-  try {
-    if (wert === null) window.localStorage.removeItem(schluessel)
-    else window.localStorage.setItem(schluessel, JSON.stringify(wert))
-  } catch {
-    /* privates Fenster oder voller Speicher */
-  }
-}
-
 // ---------------------------------------------------------------- Formatierung
 
-function minuten(s: number) {
-  const m = Math.max(1, Math.round(s / 60))
-  return m < 60 ? `${m} Min.` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')}`
-}
-function km(m: number) {
-  return m < 1000 ? `${Math.round(m / 10) * 10} m` : `${(m / 1000).toFixed(1)} km`
-}
 const meter = (m: number) => `${nf(m)} m`
 const prozent = (teil: number, ganz: number) => `${Math.round((100 * teil) / Math.max(ganz, 1))}%`
 
@@ -377,13 +330,31 @@ export default function Velonavi() {
 
   const mobil = !useMedienabfrage('(min-width: 768px)')
 
-  const profile: Record<Variante, Profil> = useMemo(
-    () => ({
-      schnell: { schieben, ...VOREINSTELLUNGEN.schnell },
-      komfort: { schieben, ...gewichte },
-    }),
-    [schieben, gewichte]
-  )
+  // Konto, Aufzeichnung und das aus Fahrten Gelernte. `ortBeimRef` entsteht
+  // erst weiter unten; aufgerufen wird es, wenn eine Fahrt gespeichert wird.
+  const fahrten = useFahrten({
+    graph: graphBereit ? graphRef.current : null,
+    start,
+    ziel,
+    benenne: (lon, lat) => ortBeimRef.current(lon, lat, 17),
+    zeigeStrecke: (f) => {
+      setStart(f.start)
+      setStartText(f.start.titel)
+      setZiel(f.ziel)
+      setZielText(f.ziel.titel)
+      setZwischen([])
+      setZwischenText([])
+      setBlattOffen(true)
+    },
+  })
+
+  const profile: Record<Variante, Profil> = useMemo(() => {
+    const gelernt = fahrten.gelernt ?? undefined
+    return {
+      schnell: { schieben, ...VOREINSTELLUNGEN.schnell, gelernt },
+      komfort: { schieben, ...gewichte, gelernt },
+    }
+  }, [schieben, gewichte, fahrten.gelernt])
 
   // --- Thema: gemerkte Wahl, sonst nach Tageszeit
   useEffect(() => {
@@ -710,6 +681,8 @@ export default function Velonavi() {
       map.addSource('andere', { type: 'geojson', data: leer })
       map.addSource('route', { type: 'geojson', data: leer })
       map.addSource('route-ampeln', { type: 'geojson', data: leer })
+      map.addSource('fahrt', { type: 'geojson', data: leer })
+      map.addSource('standort', { type: 'geojson', data: leer })
       map.addSource('zeiger', { type: 'geojson', data: leer })
 
       // Der Stadtrand als Orientierung. Gefüllt wird nichts: Die Stadtkarte
@@ -826,6 +799,21 @@ export default function Velonavi() {
           'circle-stroke-color': TINTE,
           'circle-stroke-width': 1.5,
         },
+      })
+      // Die eigene Spur: schmal und ohne weisse Hülle, damit die Stufenfarben
+      // der Route daneben sichtbar bleiben, wo beide sich decken.
+      map.addLayer({
+        id: 'fahrt',
+        type: 'line',
+        source: 'fahrt',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-color': GEFAHREN, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.5, 16, 3] },
+      })
+      map.addLayer({
+        id: 'standort',
+        type: 'circle',
+        source: 'standort',
+        paint: { 'circle-radius': 7, 'circle-color': GEFAHREN, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2.5 },
       })
       map.addLayer({
         id: 'zeiger',
@@ -966,6 +954,31 @@ export default function Velonavi() {
       features: p ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: p } }] : [],
     })
   }, [kartenBereit, hover, r])
+
+  // --- Die eigene Spur, und während der Aufzeichnung der Standort
+  useEffect(() => {
+    const map = mapRef.current
+    if (!kartenBereit || !map) return
+    ;(map.getSource('fahrt') as GeoJSONSource).setData({
+      type: 'FeatureCollection',
+      features:
+        fahrten.linie.length > 1
+          ? [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: fahrten.linie } }]
+          : [],
+    })
+  }, [kartenBereit, fahrten.linie])
+
+  const standortJetzt = fahrten.laufend?.ort ?? null
+  useEffect(() => {
+    const map = mapRef.current
+    if (!kartenBereit || !map) return
+    ;(map.getSource('standort') as GeoJSONSource).setData({
+      type: 'FeatureCollection',
+      features: standortJetzt ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: standortJetzt } }] : [],
+    })
+    // Fährt man aus dem Bild, zieht die Karte nach.
+    if (standortJetzt && !map.getBounds().contains(standortJetzt)) map.easeTo({ center: standortJetzt, duration: 600 })
+  }, [kartenBereit, standortJetzt])
 
   // --- Start- und Zielmarken, verschiebbar
   const setzeMarke = useCallback((art: 'start' | 'ziel', p: Punkt | null) => {
@@ -1353,6 +1366,7 @@ export default function Velonavi() {
     <div className="flex flex-col gap-4" style={{ color: ui.fg }}>
       {fehler && <Hinweis>{fehler}</Hinweis>}
       {ergebnis && 'fehler' in ergebnis && <Hinweis>{ergebnis.fehler}</Hinweis>}
+      <Fahrtknopf f={fahrten} routen={routen?.routen ?? null} wahl={aktiv} />
       {routen?.notSchieben && (
         <p className="rounded-2xl px-3 py-2 text-[12px] leading-snug" style={{ background: ui.weich, color: ui.muted }}>
           Fahrend gibt es keinen Weg. Diese Route enthält ein kurzes Stück, auf dem du das Velo schiebst.
@@ -1377,6 +1391,13 @@ export default function Velonavi() {
         )
       )}
       {einstellungen}
+      <Kontobereich
+        f={fahrten}
+        graph={graphBereit ? graphRef.current : null}
+        start={start}
+        ziel={ziel}
+        routen={routen?.routen ?? null}
+      />
       <Legende />
       <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
         Grundlage ist das Fuss- und Velowegnetz der Stadt Zürich, ergänzt um Ampeln, Tempo,
@@ -1960,24 +1981,6 @@ function Themenschalter({ wahl, setWahl }: { wahl: Themenwahl; setWahl: (v: Them
   )
 }
 
-function Schalter({ an, setAn, titel, hilfe }: { an: boolean; setAn: (v: boolean) => void; titel: string; hilfe?: string }) {
-  return (
-    <button onClick={() => setAn(!an)} className="flex items-center justify-between gap-3 text-left text-[12px]" role="switch" aria-checked={an}>
-      <span>
-        {titel}
-        {hilfe && (
-          <span className="block text-[11px]" style={{ color: ui.muted }}>
-            {hilfe}
-          </span>
-        )}
-      </span>
-      <span className="relative h-5 w-9 shrink-0 rounded-full transition-colors" style={{ background: an ? ui.fg : ui.spur }}>
-        <span className="absolute top-0.5 h-4 w-4 rounded-full shadow transition-all" style={{ left: an ? 18 : 2, background: ui.bg }} />
-      </span>
-    </button>
-  )
-}
-
 function Legende() {
   return (
     <section className="flex flex-col gap-1.5 text-[11px]" style={{ color: ui.muted }}>
@@ -2036,27 +2039,6 @@ function Leerzustand({ geladen, statistik }: { geladen: boolean; statistik?: Vel
           : 'Velonetz wird geladen …'}
       </p>
     </section>
-  )
-}
-
-function Hinweis({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="rounded-2xl border px-3 py-2.5 text-[12px]" style={{ background: ui.panel, borderColor: ui.fg, color: ui.fg }}>
-      {children}
-    </p>
-  )
-}
-
-function KleinKnopf({ onClick, titel, children }: { onClick: () => void; titel: string; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      title={titel}
-      className="rounded-full border px-3 py-1.5 text-[12px] font-medium"
-      style={{ borderColor: ui.border, color: ui.fg }}
-    >
-      {children}
-    </button>
   )
 }
 

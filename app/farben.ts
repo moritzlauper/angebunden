@@ -35,6 +35,12 @@ export const PUNKT = KARMIN[2]
  */
 export const ZIEL = '#2563eb'
 
+/**
+ * Die eigene Spur im Velonavi, aufgezeichnet oder aus einer vergangenen Fahrt.
+ * Violett kommt weder in den Stufenfarben der Route noch sonst auf der Karte vor.
+ */
+export const GEFAHREN = '#7c3aed'
+
 /** Bedienung, Marker und Umrisse auf der Karte. */
 export const TINTE = '#18181b'
 
