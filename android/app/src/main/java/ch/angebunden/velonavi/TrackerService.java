@@ -127,23 +127,50 @@ public class TrackerService extends Service {
         }
         if (AKTION_ENDE.equals(aktion)) {
             // Android hält die Velofahrt für beendet. Bewegt man sich gleich weiter, läuft es weiter.
+            // Eine Aufzeichnung per Knopf endet per Knopf oder nach langem Stillstand, nicht, weil Android
+            // meint, man sei abgestiegen: An einer langen Ampel stand sie sonst nach anderthalb Minuten still.
             melden();
-            if (aktiv) {
+            if (!aktiv) {
+                stopSelf();
+            } else if (!"aufzeichnung".equals(quelle)) {
                 aktivitaetEnde = true;
                 aktivitaetEndeZeit = System.currentTimeMillis();
-            } else {
-                stopSelf();
             }
             return START_STICKY;
         }
         if (aktiv) {
-            String neu = AKTION_AUTO.equals(aktion) ? intent.getStringExtra(EXTRA_HINWEIS) : null;
-            if (neu == null || neu.equals(hinweis)) {
-                melden();
-                return START_STICKY;
+            if (AKTION_START.equals(aktion)) {
+                if ("aufzeichnung".equals(quelle)) {
+                    // Läuft schon per Knopf.
+                    melden();
+                    return START_STICKY;
+                }
+                if ("velo".equals(hinweis)) {
+                    // Die Erkennung zeichnet die Velofahrt schon auf. Der Knopf übernimmt sie, statt sie
+                    // abzuschneiden: Sie gilt ab jetzt als Aufzeichnung per Knopf und bekommt den Vorschlag.
+                    quelle = "aufzeichnung";
+                    String v = intent.getStringExtra(EXTRA_VORSCHLAG);
+                    if (v != null) vorschlag = v;
+                    aktivitaetEnde = false;
+                    letzteBewegung = System.currentTimeMillis();
+                    sichern();
+                    melden();
+                    return START_STICKY;
+                }
+                // Gehen, Joggen oder Fahrzeug: Dieser Abschnitt ist zu Ende, die Fahrt per Knopf beginnt neu.
+                abschliessen();
+            } else {
+                String neu = AKTION_AUTO.equals(aktion) ? intent.getStringExtra(EXTRA_HINWEIS) : null;
+                // Die Erkennung zerschneidet keine Aufzeichnung per Knopf. Bisher schloss die erste Meldung
+                // «Velo» von Android die laufende Fahrt ab, eine Minute nach dem Losfahren: Das Stück davor
+                // war meist zu kurz und verschwand, der Rest lief als automatische Fahrt ohne Vorschlag weiter.
+                if ("aufzeichnung".equals(quelle) || neu == null || neu.equals(hinweis)) {
+                    melden();
+                    return START_STICKY;
+                }
+                // Eine andere Art der Bewegung beginnt, etwa Velo nach dem Tram: der Abschnitt davor ist zu Ende.
+                abschliessen();
             }
-            // Eine andere Art der Bewegung beginnt, etwa Velo nach dem Tram: der Abschnitt davor ist zu Ende.
-            abschliessen();
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             melden();
