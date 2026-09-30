@@ -234,8 +234,16 @@ Biketrails am Uetliberg, die im Datensatz der Stadt als befahrbar gelten.
 Der Graph landet als Binärdatei in `public/data/zuerich/velo.graph`. Der Router in
 `app/velonavi/router.ts` sucht darauf im Browser mit A* über gerichtete Kanten. So kennt er
 Abbiegeverbote und rechnet an Lichtsignalen je nach Manöver unterschiedlich lange Wartezeiten.
-Geradeaus hängt die Wartezeit davon ab, wie breit die gequerte Strasse im Vergleich zur eigenen
-ist (im Mittel 22 Sekunden, von 3 bis 56), rechts abbiegen kostet praktisch nichts.
+Geradeaus hängt die Wartezeit davon ab, wie viel Verkehr die gequerte Strasse im Vergleich zur
+eigenen führt (im Mittel 22 Sekunden, von 3 bis 56), rechts abbiegen kostet praktisch nichts.
+
+Der Verkehr kommt an 120 der 419 Signalknoten aus der Verkehrszählung der Stadt: Stundenwerte
+der Detektoren an den Lichtsignalanlagen, gemittelt über die Werktage von 6 bis 20 Uhr. An den
+übrigen Knoten folgt er aus Strassenklasse und Fahrspuren. Auf Tramachsen erfasst die Zählung
+nur die Autos, dort gilt mindestens der Wert aus der Strassenklasse. Gemessene Grünzeiten gibt
+es für die städtischen Anlagen nicht als offene Daten. Die Lichtsignal-Schnittstelle des ASTRA
+auf opentransportdata.swiss liefert den Grünanteil nur für 37 Knoten an Kantonsstrassen
+ausserhalb der Stadt (Stand Mai 2026).
 
 Was in keiner Quelle stimmt, steht mit Begründung in `pipeline/velo-korrekturen.json`. Wie
 man dort etwas ergänzt, beschreibt [`docs/daten-anpassen.md`](docs/daten-anpassen.md). Die
@@ -261,7 +269,7 @@ pipeline/
   03-build-targets.ts    Gebäude, Adressen, Zielraster, Kartengrundlage
   04-compute-scores.ts   Reisezeitmatrix und Gebäudewerte
   verify.ts              Stichprobe gegen bekannte Verbindungen
-  10-velo-daten.ts       Velonavi: Geodaten der Stadt Zürich, Unfälle, OSM
+  10-velo-daten.ts       Velonavi: Geodaten der Stadt Zürich, Unfälle, Verkehrszählung, OSM
   11-velo-netz.ts        Velonavi: Routinggraph mit Stressstufen
   velo-korrekturen.json  Ortskenntnis, die in keinem Datensatz steht
   korrekturen-pruefen.ts prüft velo-korrekturen.json gegen das Schema
@@ -357,6 +365,6 @@ unter der Open Database License (ODbL). Wer sie weiterverwendet, nennt OpenStree
 stellt abgeleitete Datenbanken wieder unter die ODbL. Der Fahrplan kommt von
 opentransportdata.swiss, die Höhen von swisstopo. Beide sind offen nutzbar mit
 Quellenangabe. Der Velonavi nutzt zusätzlich Open Government Data der Stadt Zürich (Fuss-
-und Velowegnetz, Lichtsignale, Tempo, Velonetzplanung, Verkehrsunfälle), die
+und Velowegnetz, Lichtsignale, Tempo, Velonetzplanung, Verkehrsunfälle, Verkehrszählung), die
 Nutzungsbedingungen stehen auf [data.stadt-zuerich.ch](https://data.stadt-zuerich.ch). Die
 Rohdaten liegen nicht im Repository, die Pipeline lädt sie.

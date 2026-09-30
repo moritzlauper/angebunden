@@ -2,7 +2,7 @@ name: Velodaten
 
 # Holt die Grundlagen des Velonavi neu und baut den Routinggraphen: das Fuss-
 # und Velowegnetz der Stadt Zürich, Lichtsignale, Tempo, Velonetzplanung,
-# Unfälle, dazu Wege, Tramgleise und Hindernisse aus OpenStreetMap. Committet
+# Unfälle, Verkehrszählung, dazu Wege, Tramgleise und Hindernisse aus OpenStreetMap. Committet
 # wird nur, wenn sich am Ergebnis etwas ändert.
 #
 # Läuft am 3. jedes Monats und von Hand. Die Stadt aktualisiert ihre Geodaten
@@ -24,7 +24,9 @@ permissions:
 jobs:
   bauen:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Die Verkehrszählung ist eine Datei von rund 400 MB, der Abruf dauert
+    # allein vier bis sieben Minuten.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 

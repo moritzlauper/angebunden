@@ -1305,7 +1305,8 @@ console.log(
  *
  * Zwischen zwei Kreuzungen ändert sich der Verkehr auf einer Strasse wenig.
  * Eine Kreuzung ohne eigene Zählstelle übernimmt deshalb die nächste auf
- * derselben Strasse, wenn sie höchstens 500 m entfernt liegt.
+ * derselben Strasse, wenn sie höchstens 300 m entfernt liegt. Weiter weg
+ * liegt meist eine grosse Kreuzung dazwischen, an der viel Verkehr abbiegt.
  */
 console.log('Verkehrszählung')
 /** [Ampel, Strassenname, Fahrzeuge je Stunde im Querschnitt] */
@@ -1354,7 +1355,7 @@ let zaehlJahr = 0
     for (const name of strassen) {
       const achse = norm(name)
       let beste: Zaehlstelle | null = null
-      let besteD = 500
+      let besteD = 300
       for (const z of zaehlstellen.values()) {
         if (z.achse !== achse) continue
         const d = z.ampel === J ? 0 : Math.hypot(z.x - ampeln[J].x, z.y - ampeln[J].y)

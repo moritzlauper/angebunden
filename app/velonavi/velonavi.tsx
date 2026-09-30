@@ -685,7 +685,7 @@ export default function Velonavi() {
       new AttributionControl({
         compact: true,
         customAttribution:
-          'Velonetz, Ampeln, Tempo, Velonetzplanung, Unfälle © Stadt Zürich (OGD) · Wege, Belag, Tramgleise © OpenStreetMap-Mitwirkende · Höhen: AWS Terrain Tiles',
+          'Velonetz, Ampeln, Tempo, Velonetzplanung, Unfälle, Verkehrszählung © Stadt Zürich (OGD) · Wege, Belag, Tramgleise © OpenStreetMap-Mitwirkende · Höhen: AWS Terrain Tiles',
       }),
       'bottom-left'
     )

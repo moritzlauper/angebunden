@@ -363,11 +363,14 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           Gesucht wird im Browser mit A* über gerichtete Wegstücke statt über Kreuzungen. Nur so
           kennt der Router an jeder Kreuzung die Richtung, aus der man kommt. Bei den 419
           städtischen Signalknoten schätzt er die Grünzeit aus den Strassen, die sich dort kreuzen:
-          Jede Achse bekommt Grün im Verhältnis zu Strassenklasse und Fahrspuren, und breite
-          Strassen verlängern den Umlauf. Wer auf einer Nebenachse eine vierspurige Hauptstrasse
-          quert, wartet so gegen eine Minute, entlang der Hauptachse oft nur wenige Sekunden. Im
-          Mittel sind es 22 Sekunden. Links abbiegen heisst indirekt abbiegen, also zweimal
-          warten, rechts abbiegen kostet 1 Sekunde. Signalpläne veröffentlicht die Stadt nicht.
+          Jede Achse bekommt Grün im Verhältnis zu ihrem Verkehr, und breite Strassen verlängern
+          den Umlauf. An 120 dieser Kreuzungen kommt der Verkehr aus der Verkehrszählung der
+          Stadt, die an ihren Lichtsignalanlagen die Fahrzeuge je Stunde erfasst. An den übrigen
+          ergibt er sich aus Strassenklasse und Fahrspuren. Wer auf einer Nebenachse eine
+          vierspurige Hauptstrasse quert, wartet so gegen eine Minute, entlang der Hauptachse oft
+          nur wenige Sekunden. Im Mittel sind es 22 Sekunden. Links abbiegen heisst indirekt
+          abbiegen, also zweimal warten, rechts abbiegen kostet 1 Sekunde. Signalpläne und
+          gemessene Grünzeiten veröffentlicht die Stadt nicht.
           Jedes Abbiegen kostet zusätzlich einige Sekunden, sonst führt der Weg in Rasterquartieren
           im Zickzack durch die Blöcke. Eine Hauptstrasse ohne Ampel zu queren kostet ebenfalls.
         </p>

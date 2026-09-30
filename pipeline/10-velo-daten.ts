@@ -100,7 +100,7 @@ async function zaehlung() {
   const jahr = heute.getMonth() < 2 ? heute.getFullYear() - 1 : heute.getFullYear()
   const res = await fetch(
     `https://data.stadt-zuerich.ch/dataset/sid_dav_verkehrszaehlung_miv_od2031/download/sid_dav_verkehrszaehlung_miv_OD2031_${jahr}.csv`,
-    { signal: AbortSignal.timeout(1_800_000) }
+    { signal: AbortSignal.timeout(900_000) }
   )
   if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
   type Stelle = {

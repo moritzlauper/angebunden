@@ -143,7 +143,10 @@ export function ladeGraph(meta: VeloMeta, puffer: ArrayBuffer) {
       const kopfB = b & 1 ? kanteVon[e] : kanteNach[e]
       if (knotenAmpel[kopfB] === J && laenge[e] < 40) continue
       const fz = verkehr.get(J * 65536 + kanteName[e])
-      const gewicht = fz === undefined ? ARM_GEWICHT[k] * (spuren[e] || 2) : fz / FZ_JE_GEWICHT
+      let gewicht = ARM_GEWICHT[k] * (spuren[e] || 2)
+      // Die Zählung erfasst nur Autos. Das Tram hat an der Ampel Vorrang,
+      // eine Tramachse bekommt deshalb nie weniger als ihr Gewicht aus der Klasse.
+      if (fz !== undefined) gewicht = (merkmale[e] >> 17) & 1 ? Math.max(gewicht, fz / FZ_JE_GEWICHT) : fz / FZ_JE_GEWICHT
       armeJe[J].push(peilStart[b], gewicht, spuren[e] || 2)
     }
   }
@@ -439,12 +442,12 @@ const WARTEN = {
 const ARM_GEWICHT = [0, 0, 0.5, 1, 2, 3, 0, 0]
 /**
  * Fahrzeuge je Stunde (Querschnitt, werktags 6 bis 20 Uhr), die einer
- * Gewichtseinheit entsprechen. Geeicht an den Strassen mit Zählstelle: Dort
- * ist der gezählte Verkehr im Median so viel wie das Gewicht aus Klasse und
- * Spuren mal diese Zahl. So bleiben gezählte und geschätzte Strassen an
- * derselben Kreuzung vergleichbar.
+ * Gewichtseinheit entsprechen. Geeicht an den Sammel- und Hauptstrassen mit
+ * Zählstelle: Dort kommen im Median 112 und 123 Fahrzeuge auf eine Einheit
+ * aus Klasse und Spuren (Zählung 2026). So bleiben gezählte und geschätzte
+ * Strassen an derselben Kreuzung vergleichbar.
  */
-const FZ_JE_GEWICHT = 110
+const FZ_JE_GEWICHT = 120
 // Querachsen in `wartenAchse`: Peilung und grösstes Gewicht, höchstens vier.
 const querPeil = new Float32Array(4)
 const querGewicht = new Float32Array(4)
