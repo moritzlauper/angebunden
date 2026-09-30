@@ -54,14 +54,17 @@ bleibt statisch und `pnpm export` funktioniert wie zuvor. Ohne die beiden Variab
 erscheint im Velonavi kein Kontobereich.
 
 1. Bei Supabase ein Projekt anlegen. Für Nutzerinnen und Nutzer in der Schweiz liegt die
-   Region Zürich (`eu-central-2`) am nächsten.
-2. Die Tabelle anlegen: `supabase/migrations/20260930170000_velonavi_fahrten.sql` im SQL-Editor
-   des Dashboards ausführen, oder mit
-   `psql "$POSTGRES_URL_NON_POOLING" -f supabase/migrations/20260930170000_velonavi_fahrten.sql`.
-   Die Datei schaltet Row Level Security ein, jedes Konto sieht nur die eigenen Fahrten.
+   Region Zürich (`eu-central-2`) am nächsten. Der Text unter «Was gespeichert wird» in
+   `app/methode/page.tsx` nennt Zürich als Speicherort und ist bei einer anderen Region
+   anzupassen.
+2. Die Tabelle anlegen: die Dateien in `supabase/migrations/` der Reihe nach im SQL-Editor
+   des Dashboards ausführen, oder je mit `psql "$POSTGRES_URL_NON_POOLING" -f <datei>`. Sie
+   schalten Row Level Security ein, jedes Konto sieht nur die eigenen Fahrten.
 3. `NEXT_PUBLIC_SUPABASE_URL` und `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` setzen, lokal in
    `.env.local` und beim Hoster, danach neu bauen. Beide Werte sind öffentlich. Der geheime
-   Schlüssel (`service_role`, `sb_secret_…`) gehört nicht in die Seite.
+   Schlüssel (`service_role`, `sb_secret_…`) gehört nicht in die Seite. Wer das Projekt über
+   die Supabase-Integration von Vercel anlegt, muss nichts setzen: Die Seite liest auch deren
+   Namen (`NEXT_PUBLIC_SUPABASE_ANON_KEY`, mit oder ohne Präfix `STORAGE`).
 4. Im Dashboard unter Authentication, URL Configuration die eigene Adresse eintragen: als
    Site URL `https://deine-domain/velonavi`, als Redirect URLs dieselbe Adresse und für die
    Entwicklung `http://localhost:3000/velonavi`.

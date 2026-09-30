@@ -13,8 +13,19 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-const ADRESSE = process.env.NEXT_PUBLIC_SUPABASE_URL
-const SCHLUESSEL = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+// Die Supabase-Integration von Vercel legt die Variablen mit einem frei
+// gewählten Präfix an, bei angebunden.ch ist es `STORAGE`. Beide Schreibweisen
+// gelten, damit das Deployment ohne von Hand gesetzte Variablen auskommt. Next.js
+// setzt nur ausgeschriebene `process.env.NAME` in den Browsercode ein, deshalb
+// steht jeder Name einzeln da.
+const ADRESSE = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_STORAGE_SUPABASE_URL
+// Öffentlich ist bei der Integration nur der ältere anon-Schlüssel. Er darf
+// dasselbe wie der neuere `sb_publishable_…`.
+const SCHLUESSEL =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  process.env.NEXT_PUBLIC_STORAGE_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.NEXT_PUBLIC_STORAGE_SUPABASE_ANON_KEY
 
 export const KONTO_MOEGLICH = !!ADRESSE && !!SCHLUESSEL
 

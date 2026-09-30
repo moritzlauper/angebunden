@@ -423,8 +423,8 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
             wird dann deine E-Mail-Adresse. Schaltest du «Fahrten aufzeichnen» ein und startest eine
             Fahrt, kommen die GPS-Spur mit ihren Zeitstempeln sowie Start und Ziel dazu. Diese Daten
             liegen bei{' '}
-            <Aus href="https://supabase.com">Supabase</Aus> in einer Datenbank, in der jedes Konto nur
-            die eigenen Fahrten lesen kann. Die Anmeldung steht im Speicher des Browsers und nicht in
+            <Aus href="https://supabase.com">Supabase</Aus> in einer Datenbank in Zürich, in der jedes
+            Konto nur die eigenen Fahrten lesen kann. Die Anmeldung steht im Speicher des Browsers und nicht in
             einem Cookie. Einzelne Fahrten oder alle zusammen löschst du im Velonavi selbst. Das
             Konto lösche ich auf ein E-Mail an die Adresse unter <Aus href="#kontakt">Kontakt</Aus>.
           </p>
