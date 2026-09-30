@@ -66,8 +66,8 @@ erscheint im Velonavi kein Kontobereich.
    die Supabase-Integration von Vercel anlegt, muss nichts setzen: Die Seite liest auch deren
    Namen (`NEXT_PUBLIC_SUPABASE_ANON_KEY`, mit oder ohne Präfix `STORAGE`).
 4. Im Dashboard unter Authentication, URL Configuration die eigene Adresse eintragen: als
-   Site URL `https://deine-domain/velonavi`, als Redirect URLs dieselbe Adresse und für die
-   Entwicklung `http://localhost:3000/velonavi`.
+   Site URL `https://deine-domain`, als Redirect URLs dieselbe Adresse und für die Entwicklung
+   `http://localhost:3000`. Der Velonavi liegt auf der Startseite, die Anmeldung kehrt dorthin zurück.
 5. Für die Anmeldung mit Google unter Authentication, Providers Google einschalten. Client-ID
    und Secret stammen aus einem OAuth-Client in der Google Cloud Console, dessen Redirect-URI
    `https://<projekt>.supabase.co/auth/v1/callback` lautet. Der Knopf erscheint im Velonavi
@@ -79,6 +79,11 @@ erscheint im Velonavi kein Kontobereich.
 Aufgezeichnet wird mit dem Standortdienst des Browsers. Er liefert nur, solange die Seite im
 Vordergrund und der Bildschirm an ist. Wer das Handy in der Tasche hat, zeichnet mit einer
 anderen App auf und liest die GPX-Datei im Velonavi ein.
+
+Ohne Konto bleibt alles auf dem Gerät. Die Tabellen `velonavi_messungen_*` nehmen die Messwerte
+auf, die Nutzer freiwillig beitragen (`app/velonavi/gemeinschaft.ts`). Einfügen darf jeder mit dem
+öffentlichen Schlüssel, lesen niemand, die Funktion `velonavi_gemeinschaft()` gibt Durchschnitte erst
+ab fünf Messungen heraus. Sie brauchen kein Login.
 
 Gespeichert wird die rohe Spur. Welche Kanten befahren wurden und was daraus gelernt wird,
 rechnet `app/velonavi/fahrten.ts` bei jedem Laden neu, weil sich die Nummern der Kanten mit

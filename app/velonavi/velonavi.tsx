@@ -15,7 +15,7 @@ import {
 import { Blatt, useMedienabfrage } from '../blatt'
 import { Suchleiste, bauIndex, suchen, Sternsymbol, type Eintrag } from '../suche'
 import { Wortmarke } from '../marke'
-import { Seitenwahl } from '../seitenwahl'
+import { Seitenwahl, useKontoVorhanden } from '../seitenwahl'
 import { STAEDTE } from '../staedte'
 import { nf } from '../site'
 import { ZIEL, TINTE, GRAU, GEFAHREN } from '../farben'
@@ -318,6 +318,9 @@ export default function Velonavi() {
   const [hover, setHover] = useState<number | null>(null)
   const [kopiert, setKopiert] = useState(false)
   const [blattOffen, setBlattOffen] = useState(true)
+  // Die Wegweiser zur Erreichbarkeitskarte gibt es nur am Anfang und nie mit Konto.
+  const kontoDa = useKontoVorhanden()
+  const anfang = !start && !ziel
   const [menueOffen, setMenueOffen] = useState(false)
   const menueZu = useCallback(() => setMenueOffen(false), [])
   const [detailsOffen, setDetailsOffen] = useState(false)
@@ -1519,10 +1522,13 @@ export default function Velonavi() {
             className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-2 px-3"
             style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
           >
-            {/* Der Wechsel zur Erreichbarkeitskarte: ein schlichtes Segment über den Suchfeldern. */}
-            <div className="pointer-events-auto self-center">
-              <Seitenwahl ui={ui} aktiv="velonavi" />
-            </div>
+            {/* Der Wechsel zur Erreichbarkeitskarte: ein schlichtes Segment über den Suchfeldern,
+                nur am Anfang und nie mit Konto. Die Felder rücken mit, wenn es wegfällt. */}
+            {anfang && !kontoDa && (
+              <div className="pointer-events-auto self-center">
+                <Seitenwahl ui={ui} aktiv="velonavi" />
+              </div>
+            )}
             <div className="pointer-events-auto">{felder}</div>
           </div>
           <Blatt ui={ui} offen={blattOffen} onSchliessen={() => setBlattOffen(false)} onHoehe={setDeckung}>
@@ -1553,14 +1559,14 @@ export default function Velonavi() {
                   </Link>
                   <span style={{ color: ui.muted }}>Velonavi Zürich</span>
                   {/* Klein und leise: Die ÖV-Karte ist der zweite Teil von angebunden, aber nicht der erste Handgriff. */}
-                  <Link
+                  {anfang && !kontoDa && <Link
                     href="/erreichbarkeitskarte"
                     title="Erreichbarkeitskarte: wie gut jedes Haus an den ÖV angebunden ist"
                     className="text-[11px] font-normal underline-offset-2 hover:underline"
                     style={{ color: ui.muted, opacity: 0.75 }}
                   >
                     Erreichbarkeit
-                  </Link>
+                  </Link>}
                 </h2>
                 {/* Die Rechenzeit steht nur noch als Tooltip: Im Kopf war sie Unruhe, und «2 Routen» stimmte nicht, wenn beide Varianten zusammenfielen. */}
                 <span className="flex items-center gap-2 self-center" title={routen ? `Gerechnet in ${Math.round(routen.ms)} ms` : undefined}>

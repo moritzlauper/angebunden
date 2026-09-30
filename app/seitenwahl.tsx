@@ -1,6 +1,22 @@
-import Link from 'next/link'
+'use client'
 
-type Ui = { fg: string; muted: string; panel: string; border: string; aktiv: string; weich: string; schatten: string }
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import { kontoAngefangen } from './velonavi/konto'
+
+type Ui = { fg: string; muted: string; panel: string; border: string; aktiv: string; schatten: string }
+
+/**
+ * Ob dieses Gerät schon ein Konto benutzt hat. Wer eines hat, kennt die Seite
+ * und braucht keinen Wegweiser mehr. Vor dem Hydrieren gilt `false`, die
+ * Wegweiser sind also zuerst da: Für neue Besucher, die sie brauchen, flackert
+ * nichts, und wer ein Konto hat, sieht sie nur einen Moment.
+ */
+export function useKontoVorhanden() {
+  const [vorhanden, setVorhanden] = useState(false)
+  useEffect(() => setVorhanden(kontoAngefangen()), [])
+  return vorhanden
+}
 
 /**
  * Der Umschalter zwischen den beiden Teilen von angebunden: Velonavi und
@@ -8,8 +24,13 @@ type Ui = { fg: string; muted: string; panel: string; border: string; aktiv: str
  * Darstellung, ohne Symbole und ohne eigene Farbe. Es sind zwei Seiten, die
  * Segmente deshalb Links; das aktive ist keiner, er würde die Route im
  * Fragment verwerfen.
+ *
+ * Er steht nur am Anfang, solange noch nichts gewählt ist (`anfang`), und
+ * nie bei jemandem mit Konto. Danach gehört der Platz der Sache selbst.
  */
-export function Seitenwahl({ ui, aktiv }: { ui: Ui; aktiv: 'velonavi' | 'erreichbarkeit' }) {
+export function Seitenwahl({ ui, aktiv, anfang = true }: { ui: Ui; aktiv: 'velonavi' | 'erreichbarkeit'; anfang?: boolean }) {
+  const konto = useKontoVorhanden()
+  if (!anfang || konto) return null
   const segment = 'rounded-full px-3.5 py-1 text-[12px] font-medium whitespace-nowrap transition-colors'
   const stil = (an: boolean) => (an ? { background: ui.aktiv, color: ui.fg, boxShadow: '0 1px 2px rgba(0,0,0,0.08)' } : { color: ui.muted })
   return (

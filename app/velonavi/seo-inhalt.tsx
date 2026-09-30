@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { SITE_NAME, SITE_URL, nf } from '../site'
 import type { VeloMeta } from './router'
-import { KONTO_MOEGLICH } from './konto'
 
 /**
  * Der crawlbare Teil des Velonavi. Die Karte und das Bedienfeld liegen in einer
@@ -60,8 +59,7 @@ export function SeoInhalt({ statistik }: { statistik: VeloMeta['statistik'] }) {
         </p>
         <p>
           Gesucht wird im Browser, Start und Ziel verlassen das Gerät nicht.{' '}
-          {KONTO_MOEGLICH &&
-            'Wer sich anmeldet, kann Fahrten aufzeichnen und auswerten, und der Velonavi passt seine Fahrzeiten daran an. '}
+          Fahrten lassen sich aufzeichnen, auswerten und vergleichen; sie bleiben auf dem Gerät, und der Velonavi passt seine Fahrzeiten daran an.{' '}
           An Ampeln zählt
           die Wartezeit danach, ob man geradeaus über die Kreuzung muss oder nur abbiegt. Pfosten,
           Schranken und Drängelgitter kosten Sekunden.

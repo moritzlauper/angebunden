@@ -12,7 +12,7 @@ Drei Städte, je eine Route: Zürich auf `/` (47'085 Häuser), Basel auf `/basel
 Bern auf `/bern` (20'540). Im Bedienfeld ganz unten wechselt man zwischen ihnen. Alle drei
 laufen durch dieselbe Pipeline. Die Zahlen und Beispiele weiter unten sind die von Zürich.
 
-Dazu kommt für Zürich der **Velonavi** auf `/velonavi`, ein Velorouter, der ruhige Strecken,
+Für Zürich gibt es ausserdem den **Velonavi** auf der Startseite `/`, ein Velorouter, der ruhige Strecken,
 Steigung, Lichtsignale und Belag abwägt. Er rechnet vollständig im Browser, siehe
 [Velonavi](#velonavi).
 
@@ -245,11 +245,15 @@ es für die städtischen Anlagen nicht als offene Daten. Die Lichtsignal-Schnitt
 auf opentransportdata.swiss liefert den Grünanteil nur für 37 Knoten an Kantonsstrassen
 ausserhalb der Stadt (Stand Mai 2026).
 
-Wer sich im Velonavi anmeldet, kann Fahrten aufzeichnen oder als GPX einlesen.
+Wer im Velonavi Fahrten aufzeichnet oder als GPX einliest, bekommt sie auf dem Gerät ausgewertet.
 `app/velonavi/fahrten.ts` ordnet die Spur den Kanten zu, misst Fahrzeit und Standzeit vor
 Ampeln und leitet daraus das eigene Tempo, einen Faktor je Kante und eine Wartezeit je Ampel
-ab. Der Router rechnet danach mit diesen Werten. Das Konto braucht ein Supabase-Projekt und
-ist freiwillig, die Einrichtung steht in [`docs/betreiben.md`](docs/betreiben.md#konto-im-velonavi).
+ab. Der Router rechnet danach mit diesen Werten. `app/velonavi/vergleich.ts` vergleicht ähnliche
+Fahrten und Teilstrecken, die auf verschiedenen Wegen gefahren wurden. Alles liegt auf dem Gerät. Die
+Sicherung im Konto und das Lernen aus den Fahrten anderer (`gemeinschaft.ts`) brauchen ein
+Supabase-Projekt und sind freiwillig, die Einrichtung steht in
+[`docs/betreiben.md`](docs/betreiben.md#konto-im-velonavi). Die Android-App zeichnet auch im Hintergrund auf:
+[`docs/android.md`](docs/android.md).
 
 Was in keiner Quelle stimmt, steht mit Begründung in `pipeline/velo-korrekturen.json`. Wie
 man dort etwas ergänzt, beschreibt [`docs/daten-anpassen.md`](docs/daten-anpassen.md). Die
@@ -289,8 +293,10 @@ app/
   meta.ts, site.ts, seo.ts   geteilte Metadaten und SEO
   besucher-zaehler.tsx   GoatCounter-Einbindung
   og/                    Vorschaubilder je Stadt, beim Bauen gerendert
-  velonavi/              Route /velonavi, Oberfläche, Router, Konto und Fahrten
-supabase/                Tabelle für die aufgezeichneten Fahrten im Velonavi
+  velonavi/              Velonavi (Startseite /): Oberfläche, Router, Fahrten, Vergleich, Konto
+  erreichbarkeitskarte/  Route /erreichbarkeitskarte (Zürich)
+supabase/                Tabellen für die Sicherung der Fahrten und die Gemeinschaft
+android/                 Android-App (Capacitor mit eigenem Standort-Plugin), siehe docs/android.md
 docs/                    Daten anpassen, selbst betreiben und einbinden
 scripts/                 MapLibre-Worker und Schriftglyphen ins public-Verzeichnis
 analytics/               Besuche pro Tag, siehe analytics/README.md

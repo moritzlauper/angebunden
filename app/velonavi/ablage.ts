@@ -18,11 +18,25 @@ let offen: Promise<IDBDatabase> | null = null
 function datenbank() {
   offen ??= new Promise<IDBDatabase>((ok, fehler) => {
     if (typeof indexedDB === 'undefined') return fehler(new Error('Kein Speicher im Browser'))
-    const q = indexedDB.open(DATENBANK, 1)
-    q.onupgradeneeded = () => q.result.createObjectStore(TABELLE, { keyPath: 'id' })
-    q.onsuccess = () => ok(q.result)
-    q.onerror = () => fehler(q.error ?? new Error('Speicher nicht verfügbar'))
-    q.onblocked = () => fehler(new Error('Speicher gesperrt'))
+    const oeffnen = (version: number) => {
+      const q = indexedDB.open(DATENBANK, version)
+      q.onupgradeneeded = () => {
+        if (!q.result.objectStoreNames.contains(TABELLE)) q.result.createObjectStore(TABELLE, { keyPath: 'id' })
+      }
+      q.onsuccess = () => {
+        // Eine leere Datenbank gleichen Namens (zum Beispiel aus einem Test) hat die Tabelle nie angelegt: eine Version höher nachholen.
+        if (!q.result.objectStoreNames.contains(TABELLE)) {
+          const v = q.result.version
+          q.result.close()
+          oeffnen(v + 1)
+          return
+        }
+        ok(q.result)
+      }
+      q.onerror = () => fehler(q.error ?? new Error('Speicher nicht verfügbar'))
+      q.onblocked = () => fehler(new Error('Speicher gesperrt'))
+    }
+    oeffnen(1)
   })
   // Ein Fehlversuch soll nicht für immer haften bleiben.
   offen.catch(() => (offen = null))

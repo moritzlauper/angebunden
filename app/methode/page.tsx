@@ -387,22 +387,36 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           durch die Stadt fährt «Schnell» 32% der Strecke auf Stufe 3 oder 4, «Komfort» 12%.
           Vorzugsrouten bekommen 15% Rabatt, das Hauptnetz 5%.
         </p>
+        <p className="mt-4">
+          Wer im Velonavi Fahrten aufzeichnet, bekommt Fahrzeiten, die sich nach den eigenen
+          Messungen richten. Der Velonavi legt jede aufgezeichnete Spur auf das Velonetz und misst,
+          wie lange jeder Abschnitt gedauert hat und wie lange du vor jeder Ampel gestanden bist.
+          Daraus entstehen drei Korrekturen: Dein Tempo im Verhältnis zu den 23 km/h des Modells,
+          ein Faktor für jeden befahrenen Abschnitt und eine Wartezeit für jede Ampel, getrennt
+          nach Anfahrtsrichtung und Manöver. Ob eine Ampel grün ist, entscheidet der Zufall,
+          deshalb verschiebt eine einzelne Fahrt ihre Wartezeit nur um die Hälfte. Fährst du eine
+          eigene Strecke schneller, als «Schnell» für seinen Vorschlag rechnet, werden ihre
+          Abschnitte schneller und der nächste Vorschlag rückt an deine Strecke heran. Aus einer
+          einzelnen Fahrt lässt sich nicht trennen, ob du schnell fährst oder ob die Strecke
+          schnell ist. Zu Beginn schreibt der Velonavi die Abweichung deshalb der Strecke zu. Nach
+          rund zwei Stunden aufgezeichneter Fahrzeit bestimmt die Messung dein Tempo zu vier
+          Fünfteln.
+        </p>
+        <p className="mt-4">
+          Der Velonavi vergleicht Fahrten auch untereinander. Ähnlich ist eine Fahrt, wenn sie in
+          der Nähe beginnt und endet oder zu grossen Teilen auf denselben Kanten liegt, die genaue
+          Adresse spielt keine Rolle. Dazu kommen Teilstrecken: Wo du zwischen zwei Kreuzungen
+          schon auf verschiedenen Wegen gefahren bist, steht der schnellere zuerst.
+        </p>
         {KONTO_MOEGLICH && (
           <p className="mt-4">
-            Wer sich im Velonavi anmeldet und Fahrten aufzeichnet, bekommt Fahrzeiten, die sich nach
-            den eigenen Messungen richten. Der Velonavi legt jede aufgezeichnete Spur auf das
-            Velonetz und misst, wie lange jeder Abschnitt gedauert hat und wie lange du vor jeder
-            Ampel gestanden bist. Daraus entstehen drei Korrekturen: Dein Tempo im Verhältnis zu den
-            23 km/h des Modells, ein Faktor für jeden befahrenen Abschnitt und eine Wartezeit für
-            jede Ampel, getrennt nach Anfahrtsrichtung und Manöver. Ob eine Ampel grün ist,
-            entscheidet der Zufall, deshalb verschiebt eine einzelne Fahrt ihre Wartezeit nur um die
-            Hälfte. Fährst du eine eigene Strecke schneller, als «Schnell» für seinen Vorschlag
-            rechnet, werden ihre Abschnitte schneller und der nächste Vorschlag rückt an deine
-            Strecke heran. Aus einer einzelnen Fahrt lässt sich nicht trennen, ob du schnell fährst
-            oder ob die Strecke schnell ist. Zu Beginn schreibt der Velonavi die Abweichung deshalb
-            der Strecke zu. Nach rund zwei Stunden aufgezeichneter Fahrzeit bestimmt die Messung
-            dein Tempo zu vier Fünfteln. Das Gelernte gilt nur für dein Konto und lässt sich im
-            Velonavi abschalten.
+            Auf Wunsch lernt der Velonavi auch aus den Fahrten anderer. Wer mitmacht, schickt keine
+            Fahrt, sondern einzelne Messwerte: je Abschnitt das Verhältnis der gefahrenen zur
+            erwarteten Zeit, je Ampel die Wartezeit. Jeder Wert steht für sich, ohne Zeitpunkt,
+            Kennung und Reihenfolge, und die ersten und letzten 150 Meter einer Fahrt fehlen. Die
+            Datenbank gibt einen Wert erst weiter, wenn mindestens fünf Messungen dazu vorliegen.
+            Ein einzelner Wert lässt sich so keiner Person und keiner Fahrt zuordnen. Mitmachen ist
+            ausgeschaltet, bis du es im Menü einschaltest.
           </p>
         )}
         <p className="mt-4">
@@ -413,20 +427,29 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
 
         <H2>Was gespeichert wird</H2>
         <p className="mt-4">
-          {KONTO_MOEGLICH ? 'Ohne Anmeldung gibt es kein Konto, und Cookies setzt die Seite nie.' : 'Kein Konto, keine Cookies.'}{' '}
+          Ein Konto braucht es nicht, und Cookies setzt die Seite nie.{' '}
           Die Adresssuche rechnet im Browser, und welches Haus du dir ansiehst, bleibt dort. Es steht
           im Link hinter dem <code>#</code> und wird nie an einen Server geschickt.
         </p>
+        <p className="mt-4">
+          Aufgezeichnete Fahrten bleiben auf deinem Gerät, in der Datenbank des Browsers oder der
+          Android-App. Auswerten, Vergleichen und Lernen rechnen dort, der Standort geht nirgendwohin.
+          Die Android-App zeichnet auf Wunsch im Hintergrund auf und erkennt Velofahrten von selbst;
+          dafür braucht sie den Standort «immer» und die Bewegungserkennung, und eine sichtbare
+          Benachrichtigung zeigt, wenn sie aufzeichnet. Einzelne Fahrten oder alle zusammen löschst du
+          im Velonavi selbst.
+        </p>
         {KONTO_MOEGLICH && (
           <p className="mt-4">
-            Im Velonavi kannst du dich anmelden, mit Google oder mit einem Link per E-Mail. Gespeichert
-            wird dann deine E-Mail-Adresse. Schaltest du «Fahrten aufzeichnen» ein und startest eine
-            Fahrt, kommen die GPS-Spur mit ihren Zeitstempeln sowie Start und Ziel dazu. Diese Daten
-            liegen bei{' '}
-            <Aus href="https://supabase.com">Supabase</Aus> in einer Datenbank in Zürich, in der jedes
-            Konto nur die eigenen Fahrten lesen kann. Die Anmeldung steht im Speicher des Browsers und nicht in
-            einem Cookie. Einzelne Fahrten oder alle zusammen löschst du im Velonavi selbst. Das
-            Konto lösche ich auf ein E-Mail an die Adresse unter <Aus href="#kontakt">Kontakt</Aus>.
+            Zwei Dinge gehen darüber hinaus, beide freiwillig und ausgeschaltet. Die Sicherung im
+            Konto, damit die Fahrten auf einem neuen Gerät wieder da sind: Dafür wird deine
+            E-Mail-Adresse gespeichert und eine gekürzte Kopie jeder Fahrt, ohne die ersten und
+            letzten 150 Meter, ohne Adressen und mit dem Beginn auf die Stunde gerundet. Und das
+            Beitragen von Messwerten, wie oben beschrieben. Beides liegt bei{' '}
+            <Aus href="https://supabase.com">Supabase</Aus> in einer Datenbank in Zürich. Jedes
+            Konto kann nur die eigenen Fahrten lesen, die Messwerte kann niemand einzeln lesen. Die
+            Anmeldung steht im Speicher des Browsers und nicht in einem Cookie. Das Konto lösche ich
+            auf ein E-Mail an die Adresse unter <Aus href="#kontakt">Kontakt</Aus>.
           </p>
         )}
         <p className="mt-4">

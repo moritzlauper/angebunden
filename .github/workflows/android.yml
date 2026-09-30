@@ -1,0 +1,104 @@
+name: Android-App
+
+# Baut die Android-App (ein Rahmen um die Seite mit eigenem Standort-Plugin,
+# siehe docs/android.md) und legt die APK als Release ab, damit man sie direkt
+# von GitHub aufs Handy laden kann.
+#
+# Läuft von selbst, wenn sich an der App etwas ändert, und auf Knopfdruck unter
+# «Actions». Ohne die Schlüssel-Secrets (docs/android.md) ist die APK mit einem
+# Debug-Schlüssel signiert: Sie lässt sich installieren, ein Update geht aber
+# nur nach Deinstallation der alten Fassung.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - 'android-web/**'
+      - 'capacitor.config.ts'
+      - '.github/workflows/android.yml'
+
+concurrency:
+  group: android
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VELONAVI_VERSION_CODE: ${{ github.run_number }}
+      VELONAVI_VERSION_NAME: 1.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Die pnpm-Version kommt aus `packageManager` in der package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Abhängigkeiten
+        run: pnpm install --frozen-lockfile
+
+      - name: Capacitor abgleichen
+        run: pnpm exec cap sync android
+
+      # Mit eigenem Schlüssel, wenn die Secrets gesetzt sind, sonst bleibt der
+      # Debug-Schlüssel des Läufers. Den halten wir zwischen den Läufen im
+      # Cache, damit Updates zumindest meistens über die alte Fassung gehen.
+      - name: Schlüssel aus den Secrets
+        id: schluessel
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/velonavi.jks"
+            echo "VELONAVI_KEYSTORE=$RUNNER_TEMP/velonavi.jks" >> "$GITHUB_ENV"
+            echo "eigener=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "eigener=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Debug-Schlüssel aus dem Cache
+        if: steps.schluessel.outputs.eigener == 'false'
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
+
+      - name: APK bauen
+        working-directory: android
+        env:
+          VELONAVI_KEYSTORE_PASSWORT: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          VELONAVI_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          VELONAVI_KEY_PASSWORT: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease
+
+      - name: APK benennen
+        run: cp android/app/build/outputs/apk/release/app-release.apk velonavi.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: velonavi-apk
+          path: velonavi.apk
+
+      - name: Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "android-${{ github.run_number }}" velonavi.apk \
+            --title "Velonavi für Android ${{ github.run_number }}" \
+            --notes "APK zum Installieren. Android fragt einmal, ob diese Quelle Apps installieren darf. Einrichtung und Datenschutz: docs/android.md." \
+            --target "${{ github.sha }}"

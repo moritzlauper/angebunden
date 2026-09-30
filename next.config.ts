@@ -8,6 +8,9 @@ import type { NextConfig } from 'next'
  */
 const nextConfig: NextConfig = {
   output: process.env.STATISCH ? 'export' : undefined,
+  // Der Android-Emulator erreicht den Rechner unter 10.0.2.2. Ohne diese Angabe blockiert der
+  // Entwicklungsserver die Skripte, und die Seite in der App wird nie interaktiv.
+  allowedDevOrigins: ['10.0.2.2'],
 }
 
 export default nextConfig

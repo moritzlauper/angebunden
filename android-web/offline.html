@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Velonavi</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; font: 16px/1.5 system-ui, sans-serif; background: #f7f7f5; color: #18181b; }
+    @media (prefers-color-scheme: dark) { body { background: #0f0f11; color: #ececef; } }
+    main { max-width: 22rem; padding: 1.5rem; text-align: center; }
+    p { color: #71717a; }
+    button { margin-top: 1rem; border: 1px solid currentColor; border-radius: 999px; padding: 0.6rem 1.4rem; background: none; color: inherit; font: inherit; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Keine Verbindung</h1>
+    <p>Der Velonavi lädt Karte und Netz aus dem Internet. Eine laufende Aufzeichnung geht trotzdem weiter.</p>
+    <button onclick="location.href = 'https://angebunden.ch'">Nochmals versuchen</button>
+  </main>
+</body>
+</html>

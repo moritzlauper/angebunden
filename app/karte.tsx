@@ -1698,15 +1698,15 @@ export default function Karte({ meta, stadt }: { meta: Meta; stadt: Stadt }) {
           />
         </div>
 
-        {/* Vergleich und Velonavi gleich gross. Darunter ÖV und Kultur, einzeln
-            oder beide zusammen an; einer bleibt immer an. Wo es keinen Velonavi
-            gibt, fällt die obere Reihe weg und ÖV/Kultur rückt in deren Grösse
-            nach: Sonst hinge dort ein winziger Umschalter im Nichts. */}
+        {/* Velonavi und Erreichbarkeit als Segment, dasselbe wie im Velonavi.
+            Darunter ÖV und Kultur, einzeln oder beide zusammen an; einer bleibt
+            immer an. Wo es keinen Velonavi gibt, fällt die obere Reihe weg und
+            ÖV/Kultur rückt in deren Grösse nach: Sonst hinge dort ein winziger
+            Umschalter im Nichts. */}
         <Hauptwahl
           ui={ui}
-          aktiv="vergleich"
-          vergleichHref={stadt.pfad}
           velonavi={stadt.schluessel === 'zuerich'}
+          anfang={!treffer}
           unten={
             <div className="flex items-center gap-1.5">
               <div

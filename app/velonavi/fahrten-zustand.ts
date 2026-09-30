@@ -374,7 +374,20 @@ export function useFahrten({
     const sichtbar = () => document.visibilityState === 'visible' && nachsehen()
     document.addEventListener('visibilitychange', sichtbar)
     // Läuft eine Aufzeichnung, den Stand der App regelmässig nachziehen.
-    const uhr = window.setInterval(() => document.visibilityState === 'visible' && nativ.status().then((s) => !weg && nativStand(s), () => {}), 3000)
+    // Endet die Aufzeichnung ausserhalb der Seite (Knopf in der Benachrichtigung, Leerlauf), holt die Seite die Fahrt gleich ab.
+    const uhr = window.setInterval(
+      () =>
+        document.visibilityState === 'visible' &&
+        nativ.status().then(
+          (s) => {
+            if (weg) return
+            nativStand(s)
+            if (!s.laeuft) holeNativ(nativ)
+          },
+          () => {}
+        ),
+      3000
+    )
     return () => {
       weg = true
       document.removeEventListener('visibilitychange', sichtbar)
