@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { GEFAHREN, GRAU } from '../farben'
 import { anmeldewege, type Anbieter } from './konto'
-import { deckung, type Fahrt, type Ort } from './fahrten.ts'
+import { deckung, modellZeit, type Fahrt, type Ort } from './fahrten.ts'
 import { aehnliche, teilstrecken, type Teilstrecke } from './vergleich.ts'
 import { MODI, modusName } from './modus.ts'
 import type { Graph, Route } from './router'
@@ -255,9 +255,6 @@ export function Fahrtenmenue({ f, graph, mobil, onSchliessen }: { f: Fahrtenstan
               />
             </div>
           )}
-          <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
-            Die Fahrten bleiben auf diesem Gerät{f.sicherung && f.nutzer ? ', eine gekürzte Kopie liegt im Konto' : ''}.
-          </p>
         </div>
 
         <Abschnitt titel="Fahrten" zusatz={String(f.fahrten.length)} offen>
@@ -433,7 +430,7 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-[12px] leading-snug" style={{ color: ui.muted }}>
-        Ohne Konto bleibt alles auf diesem Gerät. Mit Konto liegt zusätzlich eine gekürzte Kopie bei Supabase in Zürich, sie ist nur für dich lesbar.
+        Mit Konto liegt zusätzlich eine gekürzte Kopie deiner Velofahrten bei Supabase in Zürich, sie ist nur für dich lesbar.
       </p>
       {wege === null && (
         <p className="text-[12px]" style={{ color: ui.muted }}>
@@ -651,12 +648,34 @@ function Auswertung({
     })
     if (z.pausen > 0) zeilen.push({ titel: 'Pausen', wert: dauerText(z.pausen), hilfe: 'zählen nicht zur Fahrzeit' })
   }
-  const damals = fahrt.vorschlag?.schnell
-  if (damals) zeilen.push({ titel: '«Schnell» beim Losfahren', wert: dauerText(damals.zeit), hilfe: `du warst ${unterschied(dauer, damals.zeit, ['schneller', 'langsamer'])}` })
-  if (z) zeilen.push({ titel: 'Modell für deine Strecke', wert: dauerText(z.modell), hilfe: 'ohne Gelerntes, bei 23 km/h in der Ebene' })
-  if (heute && graph && z)
-    for (const [titel, r] of [['«Schnell» heute', heute.schnell], ['«Komfort» heute', heute.komfort]] as const)
-      if (r) zeilen.push({ titel, wert: dauerText(r.zeit), hilfe: `folgt zu ${prozent(deckung(graph, z.stuecke, r))} deiner Strecke` })
+  // Alle Strecken mit demselben Modell gerechnet, bei Modelltempo. So zählt nur die Wahl der Strecke,
+  // nicht wie zügig du gerade getreten hast. Bei deinem Tempo: dieselbe Zeit mal dein Tempofaktor.
+  const modell = useMemo(() => {
+    if (!graph || !z) return null
+    return {
+      meine: modellZeit(graph, z.stuecke),
+      schnell: heute?.schnell ? modellZeit(graph, heute.schnell.stuecke) : null,
+      komfort: heute?.komfort ? modellZeit(graph, heute.komfort.stuecke) : null,
+    }
+  }, [graph, z, heute?.schnell, heute?.komfort])
+  if (z) {
+    const p = Math.round(100 * Math.abs(1 - z.tempo))
+    zeilen.push({
+      titel: 'Dein Tempo auf dieser Fahrt',
+      wert: p < 2 ? 'wie das Modell' : `${p}% ${z.tempo < 1 ? 'schneller' : 'langsamer'}`,
+      hilfe: 'als das Modell, das mit 23 km/h in der Ebene rechnet',
+    })
+  }
+  if (modell && z) {
+    zeilen.push({ titel: 'Deine Strecke bei Modelltempo', wert: dauerText(modell.meine), hilfe: 'Grundlage für den Vergleich, unabhängig von deinem Tempo' })
+    for (const [titel, m, r] of [['«Schnell» heute', modell.schnell, heute?.schnell], ['«Komfort» heute', modell.komfort, heute?.komfort]] as const)
+      if (m !== null && r && graph)
+        zeilen.push({
+          titel,
+          wert: dauerText(m),
+          hilfe: `${unterschied(modell.meine, m, ['länger', 'kürzer'])} als deine Strecke · bei deinem Tempo ${dauerText(m * z.tempo)} · folgt zu ${prozent(deckung(graph, z.stuecke, r))} deiner Strecke`,
+        })
+  }
 
   return (
     <div className="flex flex-col gap-2 rounded-2xl border px-3 py-2.5" style={{ borderColor: ui.border }}>
@@ -758,14 +777,18 @@ function Aehnliche({ f, fahrt, graph }: { f: Fahrtenstand; fahrt: Fahrt; graph: 
   const treffer = useMemo(() => (graph && lauf ? aehnliche(graph, lauf, f.laeufe) : []), [graph, lauf, f.laeufe])
   if (!lauf || !treffer.length) return null
 
+  // Sortiert nach der Modellzeit, also bei gleichem Tempo: Die Strecke zählt, nicht die Tagesform.
   const zeilen = [
-    { id: fahrt.id, fahrt, netto: lauf.zuordnung.netto, distanz: lauf.zuordnung.distanz, gemeinsam: 1 },
-    ...treffer.map((t) => ({ id: t.fahrt.id, fahrt: t.fahrt, netto: t.zuordnung.netto, distanz: t.zuordnung.distanz, gemeinsam: t.gemeinsam })),
-  ].sort((a, b) => a.netto - b.netto)
+    { id: fahrt.id, fahrt, netto: lauf.zuordnung.netto, modell: lauf.zuordnung.modell, distanz: lauf.zuordnung.distanz, gemeinsam: 1 },
+    ...treffer.map((t) => ({ id: t.fahrt.id, fahrt: t.fahrt, netto: t.zuordnung.netto, modell: t.zuordnung.modell, distanz: t.zuordnung.distanz, gemeinsam: t.gemeinsam })),
+  ].sort((a, b) => a.modell - b.modell)
 
   return (
     <div className="flex flex-col gap-1 border-t pt-2" style={{ borderColor: ui.border }}>
-      <h4 className="text-[12px] font-medium">Ähnliche Fahrten</h4>
+      <h4 className="text-[12px] font-medium">
+        Ähnliche Fahrten
+        <span className="font-normal" style={{ color: ui.muted }}> · bei gleichem Tempo verglichen</span>
+      </h4>
       <ul className="-mx-2 flex flex-col">
         {zeilen.map((z, i) => {
           const diese = z.id === fahrt.id
@@ -787,11 +810,12 @@ function Aehnliche({ f, fahrt, graph }: { f: Fahrtenstand; fahrt: Fahrt; graph: 
                     {i === 0 && <span style={{ color: ui.muted }}> · schnellste</span>}
                   </span>
                   <span className="block text-[11px]" style={{ color: ui.muted }}>
-                    {diese ? datumText(fahrt.begonnen) : `folgt zu ${prozent(z.gemeinsam)} derselben Strecke · ${unterschied(lauf.zuordnung.netto, z.netto, ['langsamer', 'schneller'])}`}
+                    {diese ? datumText(fahrt.begonnen) : `folgt zu ${prozent(z.gemeinsam)} derselben Strecke · ${unterschied(lauf.zuordnung.modell, z.modell, ['länger', 'kürzer'])}`}
+                    {` · gefahren ${dauerText(z.netto)}`}
                   </span>
                 </span>
                 <span className="shrink-0 tabular-nums" style={{ color: ui.muted }}>
-                  {dauerText(z.netto)} · {km(z.distanz)}
+                  {dauerText(z.modell)} · {km(z.distanz)}
                 </span>
               </button>
             </li>
@@ -810,7 +834,7 @@ function Teilvergleich({ f, t }: { f: Fahrtenstand; t: Teilstrecke }) {
         <div className="min-w-0 text-[12px]">
           <div className="truncate font-medium">{teilTitel(t)}</div>
           <div className="text-[11px]" style={{ color: ui.muted }}>
-            {dauerText(t.vorsprung)} schneller, auf {t.fahrten} Fahrten
+            {dauerText(t.vorsprung)} schneller bei gleichem Tempo, auf {t.fahrten} Fahrten
           </div>
         </div>
         <button onClick={() => f.zeigenTeil(null)} aria-label="Vergleich schliessen" className="px-1 text-[16px] leading-none" style={{ color: ui.muted }}>

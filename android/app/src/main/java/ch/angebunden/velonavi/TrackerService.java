@@ -42,7 +42,7 @@ import org.json.JSONObject;
  *
  * Die Punkte entstehen im Sekundentakt. Eine fertige Fahrt landet als Datei im
  * privaten Ordner der App und wartet dort, bis die Seite sie abholt. Nichts
- * verlässt das Gerät.
+ * schickt der Dienst selbst nichts ins Netz.
  */
 public class TrackerService extends Service {
     static final String AKTION_START = "ch.angebunden.velonavi.START";
@@ -190,7 +190,7 @@ public class TrackerService extends Service {
         Notification n = new NotificationCompat.Builder(this, KANAL_LAUFEND)
                 .setSmallIcon(android.R.drawable.ic_menu_directions)
                 .setContentTitle("Velonavi zeichnet die Fahrt auf")
-                .setContentText("Der Standort bleibt auf diesem Gerät.")
+                .setContentText("Die Spur wird auf diesem Gerät gespeichert.")
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setContentIntent(oeffnen)

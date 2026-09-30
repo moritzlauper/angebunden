@@ -59,7 +59,7 @@ export function SeoInhalt({ statistik }: { statistik: VeloMeta['statistik'] }) {
         </p>
         <p>
           Gesucht wird im Browser, Start und Ziel verlassen das Gerät nicht.{' '}
-          Fahrten lassen sich aufzeichnen, auswerten und vergleichen; sie bleiben auf dem Gerät, und der Velonavi passt seine Fahrzeiten daran an.{' '}
+          Fahrten lassen sich aufzeichnen, auswerten und vergleichen, und der Velonavi passt seine Fahrzeiten daran an.{' '}
           An Ampeln zählt
           die Wartezeit danach, ob man geradeaus über die Kreuzung muss oder nur abbiegt. Pfosten,
           Schranken und Drängelgitter kosten Sekunden.

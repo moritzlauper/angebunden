@@ -249,7 +249,7 @@ Wer im Velonavi Fahrten aufzeichnet oder als GPX einliest, bekommt sie auf dem G
 `app/velonavi/fahrten.ts` ordnet die Spur den Kanten zu, misst Fahrzeit und Standzeit vor
 Ampeln und leitet daraus das eigene Tempo, einen Faktor je Kante und eine Wartezeit je Ampel
 ab. Der Router rechnet danach mit diesen Werten. `app/velonavi/vergleich.ts` vergleicht ähnliche
-Fahrten und Teilstrecken, die auf verschiedenen Wegen gefahren wurden. Alles liegt auf dem Gerät. Die
+Fahrten und Teilstrecken, die auf verschiedenen Wegen gefahren wurden. Die Spuren liegen auf dem Gerät. Die
 Sicherung im Konto und das Lernen aus den Fahrten anderer (`gemeinschaft.ts`) brauchen ein
 Supabase-Projekt und sind freiwillig, die Einrichtung steht in
 [`docs/betreiben.md`](docs/betreiben.md#konto-im-velonavi). Die Android-App zeichnet auch im Hintergrund auf:

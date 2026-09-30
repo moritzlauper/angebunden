@@ -80,7 +80,7 @@ Aufgezeichnet wird mit dem Standortdienst des Browsers. Er liefert nur, solange 
 Vordergrund und der Bildschirm an ist. Wer das Handy in der Tasche hat, zeichnet mit einer
 anderen App auf und liest die GPX-Datei im Velonavi ein.
 
-Ohne Konto bleibt alles auf dem Gerät. Die Tabellen `velonavi_messungen_*` nehmen die Messwerte
+Ohne Konto bleiben die Spuren auf dem Gerät. Die Tabellen `velonavi_messungen_*` nehmen die Messwerte
 auf, die Nutzer freiwillig beitragen (`app/velonavi/gemeinschaft.ts`). Einfügen darf jeder mit dem
 öffentlichen Schlüssel, lesen niemand, die Funktion `velonavi_gemeinschaft()` gibt Durchschnitte erst
 ab fünf Messungen heraus. Sie brauchen kein Login.

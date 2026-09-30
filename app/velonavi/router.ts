@@ -1107,6 +1107,14 @@ export function ausschnitt(g: Graph, a: number, von: number, bis: number) {
   return pts
 }
 
+/**
+ * Die Fahrzeit einer Kette von Stücken für ein Profil, mit Abbiegen und Ampeln. Damit lassen sich
+ * zwei Strecken mit demselben Profil vergleichen, unabhängig davon, wie schnell jemand sie gefahren ist.
+ */
+export function zeitVon(g: Graph, p: Profil, stuecke: Stueck[]): number {
+  return auswerten(g, p, stuecke, 0).zeit
+}
+
 function auswerten(g: Graph, p: Profil, stuecke: Stueck[], kostenSumme: number): Route {
   const { zeit } = kantenKosten(g, p)
   const r: Route = {

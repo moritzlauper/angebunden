@@ -150,6 +150,69 @@ export function Blatt({
 
   const zugAmInhalt = rast !== 'voll'
 
+  // Ganz offen scrollt der Inhalt. Steht er dabei ganz oben, zieht ein Wisch nach unten das Blatt
+  // herunter, wie bei jedem Blatt auf dem Handy. Die Zeiger-Ereignisse reichen dafür nicht: Sobald der
+  // Browser einen Wisch als Scrollen übernimmt, bricht er sie ab. Deshalb echte Touch-Ereignisse,
+  // die das Scrollen mit `preventDefault` verhindern dürfen.
+  const inhaltRef = useRef<HTMLDivElement>(null)
+  const stand = useRef({ rast, hoehe, halbeHoehe, rasten })
+  stand.current = { rast, hoehe, halbeHoehe, rasten }
+  useEffect(() => {
+    const el = inhaltRef.current
+    if (!el) return
+    let y0 = 0
+    let aktiv = false
+    let letztY = 0
+    let letztZeit = 0
+    let tempo = 0
+    let aktuell = 0
+    const runter = (e: TouchEvent) => {
+      y0 = letztY = e.touches[0].clientY
+      letztZeit = performance.now()
+      aktiv = false
+      tempo = 0
+    }
+    const bewegt = (e: TouchEvent) => {
+      const { rast: r, hoehe: h } = stand.current
+      if (r !== 'voll') return
+      const y = e.touches[0].clientY
+      const weg = y - y0
+      if (!aktiv) {
+        if (el.scrollTop > 0 || weg < 8) return
+        aktiv = true
+        setZiehend(true)
+      }
+      e.preventDefault()
+      const jetzt = performance.now()
+      const dt = jetzt - letztZeit
+      if (dt > 0) tempo = (y - letztY) / dt
+      letztY = y
+      letztZeit = jetzt
+      aktuell = Math.min(h, Math.max(0, weg))
+      setVerschub(aktuell)
+    }
+    const hoch = () => {
+      if (!aktiv) return
+      aktiv = false
+      setZiehend(false)
+      const { hoehe: h, halbeHoehe: hh, rasten: ra } = stand.current
+      // Von ganz offen aus: ein Stück oder ein schneller Wisch bis halb, weit bis zu.
+      if (tempo > 0.6) return ra(aktuell > (h - hh) * 0.9 ? 'zu' : 'halb')
+      const naechste = ([['voll', 0], ['halb', h - hh], ['zu', h]] as [Rast, number][]).sort((a, b) => Math.abs(a[1] - aktuell) - Math.abs(b[1] - aktuell))[0][0]
+      ra(naechste)
+    }
+    el.addEventListener('touchstart', runter, { passive: true })
+    el.addEventListener('touchmove', bewegt, { passive: false })
+    el.addEventListener('touchend', hoch)
+    el.addEventListener('touchcancel', hoch)
+    return () => {
+      el.removeEventListener('touchstart', runter)
+      el.removeEventListener('touchmove', bewegt)
+      el.removeEventListener('touchend', hoch)
+      el.removeEventListener('touchcancel', hoch)
+    }
+  }, [])
+
   return (
     <div
       ref={ref}
@@ -173,12 +236,13 @@ export function Blatt({
         onPointerMove={bewegung}
         onPointerUp={schluss}
         onPointerCancel={schluss}
-        className="shrink-0 touch-none select-none px-4 pb-1 pt-2.5"
+        className="shrink-0 touch-none select-none px-4 pb-3 pt-4"
       >
         <div className="mx-auto h-1 w-10 rounded-full" style={{ background: ui.border }} />
       </div>
 
       <div
+        ref={inhaltRef}
         onPointerDown={zugAmInhalt ? beginn : undefined}
         onPointerMove={zugAmInhalt ? bewegung : undefined}
         onPointerUp={zugAmInhalt ? schluss : undefined}

@@ -31,8 +31,9 @@ Die Fassung entsteht bei jeder Änderung am Android-Teil von selbst
 
 Die fertigen Fahrten liegen im privaten Ordner der App und warten dort, bis die Seite sie
 beim nächsten Öffnen abholt. Sie landen in der Datenbank der Seite, dort werten Velonavi die
-Fahrten aus, vergleichen sie und lernen daraus. Nichts verlässt das Gerät, ausser man schaltet
-die Sicherung im Konto oder das Beitragen von Messwerten ein.
+Fahrten aus, vergleichen sie und lernen daraus. Die Spur verlässt das Gerät nur als
+gekürzte Kopie, wenn die Sicherung im Konto an ist. Standardmässig gehen ausserdem anonyme Messwerte
+weg (Beitragen, im Menü abschaltbar).
 
 Android-Hersteller mit scharfem Energiesparen (Xiaomi, Huawei, Samsung) beenden Hintergrunddienste
 gern. Hilft nichts, die App in den Einstellungen von der Akkuoptimierung ausnehmen.

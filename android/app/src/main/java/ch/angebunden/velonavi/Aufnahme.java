@@ -7,7 +7,7 @@ import java.io.File;
 /**
  * Was Dienst und Plugin gemeinsam wissen: der Stand der laufenden Aufzeichnung,
  * der Schalter für die automatische Erkennung und der Ordner mit den fertigen
- * Fahrten. Alles bleibt auf dem Gerät.
+ * Fahrten. Der Dienst schickt nichts ins Netz.
  */
 final class Aufnahme {
     private Aufnahme() {}

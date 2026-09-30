@@ -11,6 +11,11 @@
  *    verschiedenen Wegen gefahren, und welcher war schneller? Dafür braucht es
  *    keine ähnliche Fahrt als Ganzes, ein gemeinsames Stück reicht.
  *
+ * Verglichen wird bei gleichem Tempo: Ob eine Strecke besser war, soll nicht davon abhängen, wie
+ * zügig man gerade gefahren ist. Dafür zählt die Modellzeit der Strecke (`Zuordnung.modell`),
+ * bei Teilstrecken die Zeit geteilt durch das Tempo der jeweiligen Fahrt (`Zuordnung.tempo`).
+ * Die gefahrene Zeit steht daneben.
+ *
  * Beides rechnet auf den Knoten, die `zuordnen` für jede Fahrt liefert. Zwei
  * Fahrten gehen an denselben Knoten vorbei und trennen sich dazwischen: Dort
  * liegt eine Teilstrecke mit Alternativen.
@@ -44,6 +49,8 @@ export type Aehnliche = {
   gemeinsam: number
   /** Fahrzeit ohne Pausen minus die der Bezugsfahrt, in Sekunden; negativ heisst schneller. */
   unterschied: number
+  /** Dasselbe bei gleichem Tempo gerechnet: Modellzeit der Strecke minus die der Bezugsfahrt. */
+  unterschiedModell: number
 }
 
 function kantenMengeVon(z: Zuordnung, g: Graph) {
@@ -71,7 +78,13 @@ export function aehnliche(g: Graph, bezug: Lauf, andere: Lauf[]): Aehnliche[] {
     const laenge = l.zuordnung.distanz / Math.max(bezug.zuordnung.distanz, 1)
     if (laenge < 0.5 || laenge > 2) continue
     if (!nah && Math.max(anteil, anteilL) < UEBERLAPP) continue
-    out.push({ fahrt: l.fahrt, zuordnung: l.zuordnung, gemeinsam: anteil, unterschied: l.zuordnung.netto - bezug.zuordnung.netto })
+    out.push({
+      fahrt: l.fahrt,
+      zuordnung: l.zuordnung,
+      gemeinsam: anteil,
+      unterschied: l.zuordnung.netto - bezug.zuordnung.netto,
+      unterschiedModell: l.zuordnung.modell - bezug.zuordnung.modell,
+    })
   }
   return out.sort((a, b) => b.gemeinsam - a.gemeinsam)
 }
@@ -89,7 +102,7 @@ export type Weg = {
   meter: number
   /** Die Strasse, auf der der grösste Teil des Wegs liegt. */
   strasse: string
-  /** Fahrzeit je Fahrt, die diesen Weg genommen hat. */
+  /** Fahrzeit je Fahrt, die diesen Weg genommen hat, auf das Modelltempo umgerechnet (bei gleichem Tempo). */
   zeiten: { id: string; t: number }[]
   median: number
   koordinaten: [number, number][]
@@ -184,7 +197,8 @@ export function teilstrecken(g: Graph, laeufe: Lauf[], max = 6): Teilstrecke[] {
       const ia = pos[f].get(von)
       const ib = pos[f].get(nach)
       if (ia === undefined || ib === undefined || ib <= ia) return
-      const t = ks[f][ib].t - ks[f][ia].t
+      // Durch das Tempo dieser Fahrt geteilt: Wer müde war, soll die Strecke nicht schlechter aussehen lassen.
+      const t = (ks[f][ib].t - ks[f][ia].t) / laeufe[f].zuordnung.tempo
       const meter = ks[f][ib].s - ks[f][ia].s
       if (!(t > 0) || meter < MEHR_ALS_METER) return
       const kanten = weg(f, ia, ib)

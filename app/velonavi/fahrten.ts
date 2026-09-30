@@ -14,7 +14,7 @@
 
 import {
   ausschnitt, einrastenAlle, kantenKosten, leererUebergang, reinZeitlich, schiebenErlaubt, sucheStuecke, uebergang,
-  veloErlaubt,
+  veloErlaubt, zeitVon,
   type Einrastung, type Gelernt, type Graph, type Profil, type Route, type Stueck,
 } from './router.ts'
 import { ampelNummer, kantenIndex, type Gemeinschaft } from './gemeinschaft.ts'
@@ -208,6 +208,12 @@ export type Zuordnung = {
   gewartet: number
   /** Was das Modell ohne Gelerntes für dieselbe Strecke rechnet. */
   modell: number
+  /**
+   * Das Tempo dieser Fahrt im Verhältnis zum Modell: gemessene durch erwartete Fahrzeit der
+   * Kanten. Unter 1 heisst schneller als das Modell. Damit lassen sich Strecken vergleichen,
+   * ohne dass zählt, wie zügig man gerade gefahren ist.
+   */
+  tempo: number
   /** Anteil der Spurpunkte, die auf der zugeordneten Strecke liegen. */
   treffer: number
   /** Je ganz befahrener Kante: gemessene Fahrzeit und die des Modells. */
@@ -585,9 +591,23 @@ export function zuordnen(g: Graph, spur: Spurpunkt[]): Zuordnung | null {
 
   return {
     stuecke, distanz: laenge, netto: Math.max(0, P[P.length - 1].t - P[0].t - pausen), pausen, gewartet, modell,
-    treffer: zeit.length / P.length, kanten, ampeln, knoten,
+    treffer: zeit.length / P.length, kanten, ampeln, knoten, tempo: fahrtTempo(kanten),
   }
 }
+
+/** Gemessene durch erwartete Fahrzeit über alle Kanten, nie extremer als 0.4 bis 2.5. */
+function fahrtTempo(kanten: Zuordnung['kanten']) {
+  let fahr = 0
+  let modell = 0
+  for (const k of kanten) {
+    fahr += k.fahr
+    modell += k.modell
+  }
+  return modell > 30 ? Math.max(0.4, Math.min(2.5, fahr / modell)) : 1
+}
+
+/** Die Modellzeit einer Strecke, ohne alles Gelernte: Grundlage für den Vergleich bei gleichem Tempo. */
+export const modellZeit = (g: Graph, stuecke: Stueck[]) => zeitVon(g, PROFIL_MODELL, stuecke)
 
 // ------------------------------------------------------------ Lernen
 
@@ -618,10 +638,13 @@ const TEMPO_VORWISSEN = 1800
  */
 const VORWISSEN = 1
 /**
- * Vorwissen je Ampel, in Durchfahrten. Ob es grün ist, entscheidet der Zufall:
- * Eine einzelne Fahrt verschiebt die erwartete Wartezeit deshalb nur zur Hälfte.
+ * Vorwissen je Ampel, in Durchfahrten: So viele Durchfahrten wiegt die Wartezeit, die das Modell
+ * erwartet, gegen die eigenen Messungen. Ob es grün ist, entscheidet der Zufall. Mit einer einzigen
+ * Durchfahrt als Gewicht halbierte schon ein Mal Grün die erwartete Wartezeit, und drei Ampeln
+ * mit Glück an einem Tag machten eine Route um eine halbe Minute billiger. Mit vier Durchfahrten
+ * bewegt ein einzelnes Grün die Erwartung um einen Fünftel, erst viele Fahrten verschieben sie.
  */
-const VORWISSEN_AMPEL = 1
+const VORWISSEN_AMPEL = 4
 
 export type Lernstand = Gelernt & {
   /** Wie viele Fahrten, Kanten und Ampeln in das Gelernte eingeflossen sind. */
