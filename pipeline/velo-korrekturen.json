@@ -141,11 +141,11 @@
       "bbox": [
         8.5187,
         47.3742,
-        8.5217,
+        8.5215,
         47.3753
       ],
       "stress": 4,
-      "grund": "Die Badenerstrasse-Brücke über die Seebahn beim Lochergut und das Stück davor bis zur Kalkbreitestrasse: Tramgleise in der Fahrbahn, viel Verkehr, enge Spuren - mit dem Velo der unangenehmste Ort im Quartier. Der Datensatz stufte die Brücke je nach Richtung auf 1 bzw. 3 ein, weil in einer Richtung ein Streifen markiert ist; das entspricht nicht der Realität. Ortskenntnis des Betreibers."
+      "grund": "Die Badenerstrasse-Brücke über die Seebahn beim Lochergut und das Stück davor bis zur Kalkbreitestrasse: Tramgleise in der Fahrbahn, viel Verkehr, enge Spuren - mit dem Velo der unangenehmste Ort im Quartier. Der Datensatz stufte die Brücke je nach Richtung auf 1 bzw. 3 ein, weil in einer Richtung ein Streifen markiert ist; das entspricht nicht der Realität. Der Ausschnitt endet knapp westlich des Knotens an der Kalkbreitestrasse (8.52155): Eine Regel trifft jede Kante mit einem Punkt im Ausschnitt, und mit dem Knoten darin war auch das Stück östlich der Kalkbreite bis zur Körnerstrasse auf Stufe 4, das nicht härter ist als der Rest bis zum Stauffacher. Ortskenntnis des Betreibers."
     },
     {
       "strasse": "Kalkbreitestrasse",
