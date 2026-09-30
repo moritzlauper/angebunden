@@ -18,6 +18,7 @@ import {
   type Einrastung, type Gelernt, type Graph, type Profil, type Route, type Stueck,
 } from './router.ts'
 import { ampelNummer, kantenIndex, type Gemeinschaft } from './gemeinschaft.ts'
+import type { Modus } from './modus.ts'
 
 /** Ein Punkt der Spur: Länge, Breite, Sekunden seit dem Start, Genauigkeit in Metern. */
 export type Spurpunkt = [lon: number, lat: number, t: number, genau?: number]
@@ -43,6 +44,8 @@ export type Fahrt = {
   vorschlag: Vorschlag | null
   /** `auto`: von der Android-App von selbst erkannt und aufgezeichnet. */
   quelle: 'aufzeichnung' | 'gpx' | 'auto'
+  /** Womit man unterwegs war. Fehlt es, war es ein Velo. Gelernt wird nur aus Velofahrten. */
+  modus?: Modus
 }
 
 // ------------------------------------------------------------ Spur aufbereiten

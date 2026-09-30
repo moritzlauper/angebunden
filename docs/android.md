@@ -1,7 +1,7 @@
 # Android-App
 
 Die App ist ein Rahmen um die Seite ([Capacitor](https://capacitorjs.com)) mit einem eigenen
-Plugin für den Standort. Sie lädt `angebunden.ch`, alles andere bleibt die Web-App. Was sie
+Plugin für den Standort. Sie lädt `www.angebunden.ch` (die kanonische Adresse: `angebunden.ch` leitet dorthin weiter, und eine Weiterleitung auf einen anderen Host würde die App in den Browser schicken), alles andere bleibt die Web-App. Was sie
 zusätzlich kann, schafft ein Browser nicht: im Hintergrund aufzeichnen, bei ausgeschaltetem
 Bildschirm, und Velofahrten von selbst erkennen.
 
@@ -19,13 +19,15 @@ Die Fassung entsteht bei jeder Änderung am Android-Teil von selbst
 - **Auf Knopfdruck:** im Velonavi bei einer Route «Aufzeichnen». Die App braucht den Standort.
   Ein Dienst im Vordergrund sammelt im Sekundentakt Punkte, eine Benachrichtigung zeigt es an
   und hat einen Knopf zum Beenden.
-- **Von selbst:** im Menü «Konto und Fahrten» den Schalter «Von selbst aufzeichnen». Dafür
+- **Von selbst:** im Menü «Konto und Fahrten» den Schalter «Von selbst aufzeichnen». Mit der Option «Auch Gehen, Joggen, Tram und Auto» erkennt die App jede Art der Bewegung und trennt die Wege in Abschnitte, etwa Gehen, Tram, Velo. Die Seite bestimmt die Art aus Tempo und Halten (`app/velonavi/modus.ts`), Haltestellen unterscheiden Tram und Bus vom Auto. Gelernt wird nur aus Velofahrten, die Art lässt sich in der Auswertung korrigieren. Dafür
   braucht die App den Standort «Immer zulassen» und die Bewegungserkennung («Körperliche
   Aktivität»). Die Bewegungserkennung von Android meldet, wenn man aufs Velo steigt, das kostet
   kaum Akku. Erst dann schaltet die App den Standort ein. Die Aufzeichnung endet, wenn man
   sich fünf Minuten nicht mehr bewegt.
-- Fahrten unter 300 Metern oder zwei Minuten, und solche mit über 43 km/h im Mittel, verwirft
-  die App bei der automatischen Aufzeichnung: Das waren keine Velofahrten.
+- Fahrten unter 300 Metern oder zwei Minuten und solche, die für die erkannte Art zu schnell sind
+  (Velo über 43 km/h im Mittel), verwirft die App bei der automatischen Aufzeichnung.
+- Beim ersten Start fragt die App einmal nach Standort und Mitteilungen. Den Standort «Immer» und
+  die Bewegungserkennung fragt sie erst, wenn du das automatische Aufzeichnen einschaltest.
 
 Die fertigen Fahrten liegen im privaten Ordner der App und warten dort, bis die Seite sie
 beim nächsten Öffnen abholt. Sie landen in der Datenbank der Seite, dort werten Velonavi die

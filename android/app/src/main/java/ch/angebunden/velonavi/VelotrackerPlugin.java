@@ -57,6 +57,14 @@ public class VelotrackerPlugin extends Plugin {
         JSObject o = new JSObject();
         o.put("laeuft", Aufnahme.laeuft);
         o.put("auto", Aufnahme.auto(getContext()));
+        o.put("alle", Aufnahme.alle(getContext()));
+        android.content.SharedPreferences p = Aufnahme.prefs(getContext());
+        o.put("bereitSeit", p.getLong("bereitSeit", 0));
+        o.put("bereitFehler", p.getString("bereitFehler", ""));
+        o.put("letzteArt", p.getString("letzteArt", ""));
+        o.put("letzteBeginn", p.getBoolean("letzteBeginn", false));
+        o.put("letzteZeit", p.getLong("letzteZeit", 0));
+        o.put("hinweis", Aufnahme.hinweis);
         o.put("beginn", Aufnahme.beginn);
         o.put("distanz", Aufnahme.distanz);
         o.put("lon", Double.isNaN(Aufnahme.lon) ? null : Aufnahme.lon);
@@ -141,6 +149,7 @@ public class VelotrackerPlugin extends Plugin {
     public void auto(PluginCall call) {
         Context c = getContext();
         boolean aktiv = Boolean.TRUE.equals(call.getBoolean("aktiv", false));
+        if (call.getData().has("alle")) Aufnahme.setAlle(c, Boolean.TRUE.equals(call.getBoolean("alle", false)));
         if (aktiv) {
             if (!AktivitaetReceiver.anmelden(c)) {
                 call.reject("Bewegungserkennung nicht freigegeben");

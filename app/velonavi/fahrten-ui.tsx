@@ -5,6 +5,7 @@ import { GEFAHREN, GRAU } from '../farben'
 import { anmeldewege, type Anbieter } from './konto'
 import { deckung, type Fahrt, type Ort } from './fahrten.ts'
 import { aehnliche, teilstrecken, type Teilstrecke } from './vergleich.ts'
+import { MODI, modusName } from './modus.ts'
 import type { Graph, Route } from './router'
 import type { Fahrtenstand } from './fahrten-zustand'
 import { ui, km, minuten, Hinweis, KleinKnopf, Schalter } from './teile'
@@ -27,6 +28,18 @@ function datumText(iso: string) {
 }
 
 const prozent = (anteil: number) => `${Math.round(100 * anteil)}%`
+
+const ART_NAMEN: Record<string, string> = { velo: 'Velo', gehen: 'Gehen', laufen: 'Joggen', fahrzeug: 'Fahrzeug' }
+
+/** «gerade eben», «vor 3 Min.», «vor 2 h», «vor 4 Tagen». */
+function vorText(ms: number) {
+  const s = Math.max(0, (Date.now() - ms) / 1000)
+  if (s < 60) return 'gerade eben'
+  if (s < 3600) return `vor ${Math.round(s / 60)} Min.`
+  if (s < 86400) return `vor ${Math.round(s / 3600)} h`
+  const t = Math.round(s / 86400)
+  return `vor ${t} ${t === 1 ? 'Tag' : 'Tagen'}`
+}
 
 /** «1 Min. 20 s schneller» oder «… langsamer», ab fünf Sekunden Unterschied. */
 function unterschied(gefahren: number, vergleich: number, wort: [string, string]) {
@@ -54,8 +67,10 @@ function Symbol() {
  * daneben. Läuft eine Aufzeichnung, trägt er einen violetten Punkt.
  */
 export function Fahrtenknopf({ f, offen, onClick, pille }: { f: Fahrtenstand; offen: boolean; onClick: () => void; pille?: boolean }) {
-  const punkt = f.laufend && (
-    <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full" style={{ background: GEFAHREN, boxShadow: `0 0 0 2px ${ui.bg}` }} />
+  // Violett: Es wird gerade aufgezeichnet. Grün: Die Erkennung ist bereit und wartet auf die nächste Fahrt.
+  const bereit = !!f.nativ && f.autoAn && !!f.erkennung?.bereitSeit
+  const punkt = (f.laufend || bereit) && (
+    <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full" style={{ background: f.laufend ? GEFAHREN : '#16a34a', boxShadow: `0 0 0 2px ${ui.bg}` }} />
   )
   if (pille)
     return (
@@ -180,17 +195,36 @@ export function Fahrtenmenue({ f, graph, mobil, onSchliessen }: { f: Fahrtenstan
             }
           />
           {f.nativ ? (
-            <Schalter
-              an={f.autoAn}
-              setAn={f.setAuto}
-              titel="Von selbst aufzeichnen"
-              hilfe="Erkennt Velofahrten und zeichnet sie im Hintergrund auf. Braucht Standort «Immer» und Bewegungserkennung"
-            />
+            <>
+              <Schalter
+                an={f.autoAn}
+                setAn={f.setAuto}
+                titel="Von selbst aufzeichnen"
+                hilfe="Erkennt Velofahrten und zeichnet sie im Hintergrund auf. Braucht Standort «Immer» und Bewegungserkennung"
+              />
+              <Erkennung f={f} gross />
+            </>
           ) : (
             <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
               Von selbst im Hintergrund aufzeichnen geht nur mit der Android-App.
             </p>
           )}
+          {f.nativ && f.autoAn && (
+            <div className="flex flex-col gap-2.5 border-l-2 pl-3" style={{ borderColor: ui.border }}>
+              <Schalter
+                an={f.autoAlle}
+                setAn={f.setAutoAlle}
+                titel="Auch Gehen, Joggen, Tram und Auto"
+                hilfe="Zeichnet jeden Weg auf und erkennt, womit du unterwegs warst. Gelernt wird nur aus Velofahrten, der Rest bleibt auf dem Gerät. Kostet mehr Akku"
+              />
+            </div>
+          )}
+          <Schalter
+            an={f.ortZeigen}
+            setAn={f.setOrtZeigen}
+            titel="Meinen Standort zeigen"
+            hilfe="Ein blauer Punkt auf der Karte, auch ohne Aufzeichnung. Er wird nirgends gespeichert. Im Browser fragt der Schalter einmal nach der Freigabe"
+          />
           <Schalter
             an={f.lernen}
             setAn={f.setLernen}
@@ -217,7 +251,7 @@ export function Fahrtenmenue({ f, graph, mobil, onSchliessen }: { f: Fahrtenstan
                 an={f.beitragen}
                 setAn={f.setBeitragen}
                 titel="Meine Messwerte anonym beitragen"
-                hilfe="Es gehen einzelne Werte je Abschnitt und Ampel weg, ohne Zeit, Reihenfolge und Kennung und ohne die ersten und letzten 150 Meter. Nie eine Spur"
+                hilfe="Standardmässig an. Es gehen einzelne Werte je Abschnitt und Ampel weg, ohne Zeit, Reihenfolge und Kennung und ohne die ersten und letzten 150 Meter. Nie eine Spur, nie ein Weg zu Fuss oder im Fahrzeug"
               />
             </div>
           )}
@@ -250,6 +284,7 @@ export function Fahrtenmenue({ f, graph, mobil, onSchliessen }: { f: Fahrtenstan
                     </span>
                     <span className="block text-[11px]" style={{ color: ui.muted }}>
                       {datumText(x.begonnen)}
+                      {x.modus && x.modus !== 'velo' && ` · ${modusName(x.modus)}`}
                       {x.quelle === 'auto' && ' · von selbst'}
                       {x.quelle === 'gpx' && ' · GPX'}
                     </span>
@@ -473,6 +508,7 @@ export function Fahrtbereich({
     <>
       <Meldung f={f} />
       {f.laufend && <Laufend f={f} />}
+      {!f.laufend && <Erkennung f={f} />}
       {/* Steht keine Route da, hängt der Knopf nicht an ihr: Man kann auch ohne Plan losfahren. */}
       {!routen && !f.laufend && <AufzeichnenKnopf f={f} routen={routen} wahl={wahl} gross />}
       {f.gezeigteFahrt && <Auswertung f={f} fahrt={f.gezeigteFahrt} graph={graph} start={start} ziel={ziel} routen={routen} />}
@@ -508,6 +544,44 @@ export function AufzeichnenKnopf({ f, routen, wahl, gross }: { f: Fahrtenstand; 
     >
       Fahrt aufzeichnen
     </button>
+  )
+}
+
+/**
+ * Bestätigt, dass die automatische Erkennung läuft: bereit seit wann, und was
+ * Android zuletzt gemeldet hat, auch wenn daraus keine Aufzeichnung wurde.
+ * Ohne diese Zeile sähe man der App nicht an, ob sie noch lebt.
+ */
+function Erkennung({ f, gross }: { f: Fahrtenstand; gross?: boolean }) {
+  // Die Zeit «vor …» soll weiterlaufen, auch wenn sich sonst nichts ändert.
+  const [, setTakt] = useState(0)
+  useEffect(() => {
+    const uhr = window.setInterval(() => setTakt((n) => n + 1), 30_000)
+    return () => window.clearInterval(uhr)
+  }, [])
+  const e = f.erkennung
+  if (!f.nativ || !f.autoAn || !e) return null
+  const bereit = e.bereitSeit > 0
+  const letzte = e.letzteZeit > 0 && e.letzteArt ? `${ART_NAMEN[e.letzteArt] ?? e.letzteArt} ${e.letzteBeginn ? 'begonnen' : 'beendet'}, ${vorText(e.letzteZeit)}` : null
+  return (
+    <div className={gross ? 'flex flex-col gap-1 text-[12px]' : 'flex items-start gap-2 text-[11px] leading-snug'} style={{ color: ui.muted }}>
+      <span className="mt-[3px] inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: bereit ? '#16a34a' : '#d03b3b' }} aria-hidden />
+      <span>
+        {bereit ? (
+          <>
+            <span style={{ color: ui.fg }}>Erkennung aktiv</span>
+            {' · '}
+            {letzte ? `zuletzt: ${letzte}` : 'noch keine Bewegung gemeldet'}
+            {gross && <span className="block">Bereit seit {vorText(e.bereitSeit).replace('vor ', '')}. Zeichnet von selbst auf, sobald Android eine Bewegung erkennt.</span>}
+          </>
+        ) : (
+          <>
+            <span style={{ color: ui.fg }}>Erkennung nicht aktiv</span>
+            {e.bereitFehler ? `: ${e.bereitFehler}` : '. Schalter aus- und wieder einschalten.'}
+          </>
+        )}
+      </span>
+    </div>
   )
 }
 
@@ -559,7 +633,8 @@ function Auswertung({
   ziel: Ort | null
   routen: Routen | null
 }) {
-  const z = f.zuordnung(fahrt.id)
+  const velo = (fahrt.modus ?? 'velo') === 'velo'
+  const z = velo ? f.zuordnung(fahrt.id) : null
   const dauer = z ? z.netto : fahrt.dauer
   const distanz = z ? z.distanz : fahrt.distanz
   // Die heutigen Vorschläge gelten nur, solange der Routenplaner noch die Strecke der Fahrt zeigt.
@@ -606,7 +681,30 @@ function Auswertung({
           {km(distanz)} · {((distanz / Math.max(dauer, 1)) * 3.6).toFixed(1)} km/h
         </div>
       </div>
-      {!z && (
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-wrap gap-1" role="group" aria-label="Art der Fahrt">
+          {MODI.map((m) => {
+            const an = (fahrt.modus ?? 'velo') === m.id
+            return (
+              <button
+                key={m.id}
+                onClick={() => f.setModus(fahrt.id, m.id)}
+                aria-pressed={an}
+                className="rounded-full border px-2.5 py-0.5 text-[11px] font-medium"
+                style={{ borderColor: an ? ui.fg : ui.border, background: an ? ui.weich : 'transparent', color: an ? ui.fg : ui.muted }}
+              >
+                {m.name}
+              </button>
+            )
+          })}
+        </div>
+        {!velo && (
+          <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
+            Keine Velofahrt: Sie zählt nicht fürs Lernen und wird nicht verglichen. Stimmt die Art nicht, oben ändern.
+          </p>
+        )}
+      </div>
+      {velo && !z && (
         <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
           {graph ? 'Die Spur liess sich dem Velonetz nicht zuordnen. Sie liegt wohl ausserhalb der Stadt.' : 'Velonetz wird geladen …'}
         </p>

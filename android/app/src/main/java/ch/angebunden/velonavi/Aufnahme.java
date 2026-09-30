@@ -18,9 +18,12 @@ final class Aufnahme {
     static volatile double distanz = 0;
     static volatile double lon = Double.NaN;
     static volatile double lat = Double.NaN;
+    /** Womit die laufende Aufzeichnung begann: velo, gehen, laufen, fahrzeug. Leer bei einem Start per Knopf. */
+    static volatile String hinweis = "";
 
     private static final String PREFS = "velotracker";
     private static final String AUTO = "auto";
+    private static final String ALLE = "alle";
 
     static SharedPreferences prefs(Context c) {
         return c.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE);
@@ -34,7 +37,33 @@ final class Aufnahme {
         prefs(c).edit().putBoolean(AUTO, an).apply();
     }
 
+    /** Ob die automatische Erkennung auch Gehen, Joggen und Fahrzeuge aufzeichnet, nicht nur Velofahrten. */
+    static boolean alle(Context c) {
+        return prefs(c).getBoolean(ALLE, false);
+    }
+
+    static void setAlle(Context c, boolean an) {
+        prefs(c).edit().putBoolean(ALLE, an).apply();
+    }
+
     /** Fertige Fahrten, die die Seite noch nicht abgeholt hat. */
+    /** Die Erkennung ist angemeldet: seit wann, oder warum nicht. */
+    static void setBereit(Context c, boolean bereit, String fehler) {
+        prefs(c).edit()
+                .putLong("bereitSeit", bereit ? System.currentTimeMillis() : 0)
+                .putString("bereitFehler", fehler == null ? "" : fehler)
+                .apply();
+    }
+
+    /** Die letzte Meldung der Bewegungserkennung, auch wenn daraus keine Aufzeichnung wurde. */
+    static void setLetzteMeldung(Context c, String art, boolean beginn) {
+        prefs(c).edit()
+                .putString("letzteArt", art)
+                .putBoolean("letzteBeginn", beginn)
+                .putLong("letzteZeit", System.currentTimeMillis())
+                .apply();
+    }
+
     static File fahrtenOrdner(Context c) {
         File d = new File(c.getFilesDir(), "fahrten");
         if (!d.exists()) d.mkdirs();

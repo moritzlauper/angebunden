@@ -14,6 +14,7 @@ import { alleEntfernen, alleFahrten, entfernen, speichern, type Gespeichert } fr
 import { tracker, type NativeFahrt, type NativStatus, type Tracker } from './native.ts'
 import { ausKonto, fuerKonto, type Zeile } from './sicherung.ts'
 import { beitrag, type Gemeinschaft } from './gemeinschaft.ts'
+import { erkenne, type Hinweis, type Modus } from './modus.ts'
 import { ladeGemeinschaft, sendeBeitrag } from './gemeinschaft-netz'
 import { lies, schreib } from './teile'
 
@@ -28,6 +29,8 @@ const SCHLUESSEL = {
   sicherung: 'velonavi.sicherung',
   vonAnderen: 'velonavi.vonanderen',
   beitragen: 'velonavi.beitragen',
+  nativGefragt: 'velonavi.nativ.gefragt',
+  ortZeigen: 'velonavi.ortzeigen',
   laufend: 'velonavi.laufend',
 }
 
@@ -49,7 +52,7 @@ const mx = (lat: number) => 111320 * Math.cos((lat * Math.PI) / 180)
 const abstand = (lon0: number, lat0: number, lon1: number, lat1: number) =>
   Math.hypot((lon1 - lon0) * mx(lat0), (lat1 - lat0) * MY)
 
-type Offen = { beginn: number; spur: Spurpunkt[]; vorschlag: Vorschlag | null; quelle?: Fahrt['quelle'] }
+type Offen = { beginn: number; spur: Spurpunkt[]; vorschlag: Vorschlag | null; quelle?: Fahrt['quelle']; hinweis?: Hinweis }
 
 /** Stand der laufenden Aufzeichnung, für die Anzeige. */
 export type Aufzeichnung = {
@@ -76,7 +79,7 @@ const alsLinie = (spur: Spurpunkt[], rolle: Linie['rolle']): Linie => ({ koord: 
  * Aufzeichnung darf das nicht beenden.
  */
 export function useFahrten({
-  graph, start, ziel, benenne, zeigeStrecke,
+  graph, start, ziel, benenne, zeigeStrecke, haltestellen,
 }: {
   graph: import('./router').Graph | null
   start: Ort | null
@@ -85,6 +88,8 @@ export function useFahrten({
   benenne: (lon: number, lat: number) => Ort
   /** Start und Ziel einer Fahrt in den Routenplaner übernehmen. */
   zeigeStrecke: (f: Fahrt) => void
+  /** Die ÖV-Haltestellen der Stadt, damit sich Tram und Bus vom Auto unterscheiden lassen. */
+  haltestellen: [number, number][] | null
 }) {
   // Was die Rückrufe des Standortdienstes brauchen, steht in Refs: Sie leben
   // länger als ein Anstrich und sähen sonst veraltete Werte.
@@ -96,6 +101,8 @@ export function useFahrten({
   benenneRef.current = benenne
   const zeigeStreckeRef = useRef(zeigeStrecke)
   zeigeStreckeRef.current = zeigeStrecke
+  const haltestellenRef = useRef(haltestellen)
+  haltestellenRef.current = haltestellen
 
   const [fahrten, setFahrten] = useState<Gespeichert[]>([])
   const fahrtenRef = useRef(fahrten)
@@ -107,7 +114,7 @@ export function useFahrten({
   const [lernen, setLernenRoh] = useState(true)
   const [sicherung, setSicherungRoh] = useState(false)
   const [vonAnderen, setVonAnderenRoh] = useState(true)
-  const [beitragen, setBeitragenRoh] = useState(false)
+  const [beitragen, setBeitragenRoh] = useState(true)
   const [gemeinschaft, setGemeinschaft] = useState<Gemeinschaft | null>(null)
   const [laufend, setLaufend] = useState<Aufzeichnung | null>(null)
   const [gezeigt, setGezeigt] = useState<string | null>(null)
@@ -117,7 +124,15 @@ export function useFahrten({
   const [meldung, setMeldung] = useState<string | null>(null)
   const [nativ, setNativ] = useState<Tracker | null>(null)
   const [autoAn, setAutoAn] = useState(false)
+  const [autoAlle, setAutoAlle] = useState(false)
+  /** Der Stand der Erkennung in der App: bereit, zuletzt gemeldete Bewegung, Fehler. */
+  const [erkennung, setErkennung] = useState<NativStatus | null>(null)
+  /** Der eigene Standort als Punkt auf der Karte, auch ohne Aufzeichnung. */
+  const [ich, setIch] = useState<[number, number] | null>(null)
+  const [ortZeigen, setOrtZeigenRoh] = useState(false)
   const nutzerId = nutzer?.id
+  /** Nur Velofahrten werden dem Netz zugeordnet, verglichen und fürs Lernen genutzt. */
+  const istVelo = (f: { modus?: Modus }) => (f.modus ?? 'velo') === 'velo'
 
   // --- Start: Schalter, Fahrten vom Gerät, Rückkehr von der Anmeldung
   useEffect(() => {
@@ -125,8 +140,11 @@ export function useFahrten({
     setLernenRoh(lies(SCHLUESSEL.lernen, true))
     setSicherungRoh(lies(SCHLUESSEL.sicherung, false))
     setVonAnderenRoh(lies(SCHLUESSEL.vonAnderen, true))
-    setBeitragenRoh(lies(SCHLUESSEL.beitragen, false))
-    setNativ(tracker())
+    setBeitragenRoh(lies(SCHLUESSEL.beitragen, true))
+    const t = tracker()
+    setNativ(t)
+    // In der App gehört der Standort dazu, im Browser erst, wenn man ihn einmal freigegeben hat.
+    setOrtZeigenRoh(lies(SCHLUESSEL.ortZeigen, !!t))
     alleFahrten()
       .then((f) => setFahrten(f.slice(0, FAHRTEN_MAX)))
       .catch(() => setMeldung('Der Speicher dieses Browsers ist nicht verfügbar. Fahrten gehen beim Schliessen der Seite verloren.'))
@@ -179,7 +197,8 @@ export function useFahrten({
   sichernImKonto.current = !!nutzerId && sicherung
 
   const hochladen = useCallback(async (liste: Gespeichert[]) => {
-    const zeilen = liste.map((f) => ({ f, z: fuerKonto(f) }))
+    // Nur Velofahrten gehen in die Sicherung: Der Rest bleibt auf dem Gerät.
+    const zeilen = liste.filter((f) => (f.modus ?? 'velo') === 'velo').map((f) => ({ f, z: fuerKonto(f) }))
     const brauchbar = zeilen.filter((x): x is { f: Gespeichert; z: Zeile } => !!x.z)
     if (!brauchbar.length) return
     const sb = await konto()
@@ -224,6 +243,8 @@ export function useFahrten({
         spur,
         vorschlag: wieGeplant ? offen.vorschlag : null,
         quelle: offen.quelle ?? 'aufzeichnung',
+        // Wer per Knopf im Routenplaner aufzeichnet, fährt Velo. Alles andere erkennt die Seite aus dem Tempo und den Halten.
+        modus: offen.quelle === 'aufzeichnung' || (!offen.quelle && !offen.hinweis) ? 'velo' : erkenne(spur, haltestellenRef.current, offen.hinweis),
       }
       try {
         await speichern(f)
@@ -336,7 +357,7 @@ export function useFahrten({
         for (const x of neu as NativeFahrt[]) {
           if (bekannt.has(x.id)) continue
           const f = await ablegen(
-            { beginn: x.beginn, spur: x.spur, vorschlag: x.vorschlag ? (JSON.parse(x.vorschlag) as Vorschlag) : null, quelle: x.quelle },
+            { beginn: x.beginn, spur: x.spur, vorschlag: x.vorschlag ? (JSON.parse(x.vorschlag) as Vorschlag) : null, quelle: x.quelle, hinweis: x.hinweis },
             x.id,
             x.quelle === 'auto'
           )
@@ -353,8 +374,50 @@ export function useFahrten({
 
   const nativStand = useCallback((s: NativStatus) => {
     setAutoAn(s.auto)
+    setAutoAlle(!!s.alle)
+    setErkennung(s)
     setLaufend(s.laeuft ? { seit: s.beginn, distanz: s.distanz, ort: s.lon !== null && s.lat !== null ? [s.lon, s.lat] : null } : null)
   }, [])
+
+  // Den eigenen Standort zeigen, solange die Seite sichtbar ist. Das braucht keine Aufzeichnung: Es ist
+  // der blaue Punkt, an dem man sieht, dass der Standort ankommt.
+  useEffect(() => {
+    if (!ortZeigen || typeof navigator === 'undefined' || !navigator.geolocation) return
+    let id: number | null = null
+    const starten = () => {
+      if (id !== null) return
+      id = navigator.geolocation.watchPosition(
+        (p) => setIch([p.coords.longitude, p.coords.latitude]),
+        (e) => {
+          // Ohne Freigabe bleibt der Punkt weg und die Einstellung wird zurückgesetzt, statt bei jedem Start zu fragen.
+          if (e.code === e.PERMISSION_DENIED) {
+            setOrtZeigenRoh(false)
+            setIch(null)
+          }
+        },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 30_000 }
+      )
+    }
+    const anhalten = () => {
+      if (id !== null) navigator.geolocation.clearWatch(id)
+      id = null
+    }
+    const sichtbar = () => (document.visibilityState === 'visible' ? starten() : anhalten())
+    sichtbar()
+    document.addEventListener('visibilitychange', sichtbar)
+    return () => {
+      document.removeEventListener('visibilitychange', sichtbar)
+      anhalten()
+    }
+  }, [ortZeigen])
+
+  // Beim ersten Start in der App einmal nach Standort und Mitteilungen fragen, wie jede Navigationsapp.
+  // Wer ablehnt, wird erst wieder gefragt, wenn er etwas auslöst, das sie braucht.
+  useEffect(() => {
+    if (!nativ || !geladen || lies(SCHLUESSEL.nativGefragt, false)) return
+    schreib(SCHLUESSEL.nativGefragt, true)
+    nativ.berechtigen({ auto: false }).catch(() => {})
+  }, [nativ, geladen])
 
   // Beim Öffnen und bei jeder Rückkehr in die App nachsehen, was im Hintergrund entstanden ist.
   useEffect(() => {
@@ -445,6 +508,19 @@ export function useFahrten({
     schreib(SCHLUESSEL.laufend, null)
   }, [nativ, anhalten])
 
+  /** Auch Gehen, Joggen, Tram und Auto von selbst aufzeichnen, nicht nur Velofahrten. */
+  const setAutoAlleWert = useCallback(
+    async (alle: boolean) => {
+      if (!nativ) return
+      try {
+        nativStand(await nativ.auto({ aktiv: autoAn, alle }))
+      } catch {
+        setMeldung('Die Einstellung liess sich nicht übernehmen.')
+      }
+    },
+    [nativ, autoAn, nativStand]
+  )
+
   const setAuto = useCallback(
     async (an: boolean) => {
       if (!nativ) return
@@ -456,12 +532,12 @@ export function useFahrten({
         }
       }
       try {
-        nativStand(await nativ.auto({ aktiv: an }))
+        nativStand(await nativ.auto({ aktiv: an, alle: autoAlle }))
       } catch {
         setMeldung('Die automatische Erkennung liess sich nicht umschalten.')
       }
     },
-    [nativ, nativStand]
+    [nativ, nativStand, autoAlle]
   )
 
   // Die Bildschirmsperre fällt weg, sobald die Seite in den Hintergrund geht.
@@ -534,6 +610,15 @@ export function useFahrten({
     [nutzerId]
   )
 
+  /** Die Art der Fahrt von Hand korrigieren. Velo zählt fürs Lernen, alles andere nicht. */
+  const setModus = useCallback(async (id: string, modus: Modus) => {
+    const alt = fahrtenRef.current.find((f) => f.id === id)
+    if (!alt || (alt.modus ?? 'velo') === modus) return
+    const neu = { ...alt, modus, geteilt: false }
+    setFahrten((liste) => liste.map((f) => (f.id === id ? neu : f)))
+    await speichern(neu).catch(() => setMeldung('Die Änderung liess sich nicht speichern.'))
+  }, [])
+
   const abmelden = useCallback(async () => {
     const sb = await konto()
     await sb.auth.signOut()
@@ -582,7 +667,7 @@ export function useFahrten({
     if (!graph) return
     let weg = false
     let uhr = 0
-    const offen = fahrten.filter((f) => !zuRef.current.has(f.id))
+    const offen = fahrten.filter((f) => istVelo(f) && !zuRef.current.has(f.id))
     const schritt = () => {
       if (weg) return
       const t0 = performance.now()
@@ -621,7 +706,7 @@ export function useFahrten({
   // Das Gelernte: die eigenen Fahrten, dazu wenn gewünscht die Durchschnitte der anderen.
   useEffect(() => {
     if (!graph) return
-    const alle = fahrtenRef.current.map((f) => zuRef.current.get(f.id)).filter((z): z is Zuordnung => !!z)
+    const alle = fahrtenRef.current.filter(istVelo).map((f) => zuRef.current.get(f.id)).filter((z): z is Zuordnung => !!z)
     setStand(lerne(graph, alle, vonAnderen ? gemeinschaft : null))
   }, [graph, zugeordnet, gemeinschaft, vonAnderen])
 
@@ -629,7 +714,7 @@ export function useFahrten({
   const teilt = useRef(false)
   useEffect(() => {
     if (!KONTO_MOEGLICH || !beitragen || !graph || !stand || teilt.current) return
-    const offen = fahrtenRef.current.filter((f) => !f.geteilt && (zuRef.current.get(f.id)?.treffer ?? 0) >= 0.7)
+    const offen = fahrtenRef.current.filter((f) => istVelo(f) && !f.geteilt && (zuRef.current.get(f.id)?.treffer ?? 0) >= 0.7)
     if (!offen.length) return
     teilt.current = true
     ;(async () => {
@@ -656,7 +741,7 @@ export function useFahrten({
   const laeufe = useMemo(
     (): Lauf[] =>
       fahrten.flatMap((fahrt) => {
-        const zuordnung = zuRef.current.get(fahrt.id)
+        const zuordnung = istVelo(fahrt) ? zuRef.current.get(fahrt.id) : null
         return zuordnung ? [{ fahrt, zuordnung }] : []
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -681,7 +766,14 @@ export function useFahrten({
       schreib(SCHLUESSEL.aufzeichnen, v)
     },
     /** Die Android-App, sonst null. Nur sie zeichnet im Hintergrund und von selbst auf. */
-    nativ, autoAn, setAuto,
+    nativ, autoAn, setAuto, autoAlle, setAutoAlle: setAutoAlleWert, erkennung,
+    ich, ortZeigen,
+    /** Den Standort als Punkt zeigen; im Browser wird dabei zum ersten Mal nach der Freigabe gefragt. */
+    setOrtZeigen: (v: boolean) => {
+      setOrtZeigenRoh(v)
+      schreib(SCHLUESSEL.ortZeigen, v)
+    },
+    setModus,
     laufend, starten, beenden, verwerfen, linien, ansicht,
     lernen,
     setLernen: (v: boolean) => {

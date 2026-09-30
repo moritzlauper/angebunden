@@ -416,7 +416,8 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
             Kennung und Reihenfolge, und die ersten und letzten 150 Meter einer Fahrt fehlen. Die
             Datenbank gibt einen Wert erst weiter, wenn mindestens fünf Messungen dazu vorliegen.
             Ein einzelner Wert lässt sich so keiner Person und keiner Fahrt zuordnen. Mitmachen ist
-            ausgeschaltet, bis du es im Menü einschaltest.
+            standardmässig eingeschaltet und lässt sich im Menü jederzeit ausschalten. Es gehen nur
+            Messwerte aus Velofahrten weg, nie ein Weg zu Fuss oder im Fahrzeug.
           </p>
         )}
         <p className="mt-4">
@@ -434,18 +435,20 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
         <p className="mt-4">
           Aufgezeichnete Fahrten bleiben auf deinem Gerät, in der Datenbank des Browsers oder der
           Android-App. Auswerten, Vergleichen und Lernen rechnen dort, der Standort geht nirgendwohin.
-          Die Android-App zeichnet auf Wunsch im Hintergrund auf und erkennt Velofahrten von selbst;
-          dafür braucht sie den Standort «immer» und die Bewegungserkennung, und eine sichtbare
-          Benachrichtigung zeigt, wenn sie aufzeichnet. Einzelne Fahrten oder alle zusammen löschst du
+          Die Android-App zeichnet auf Wunsch im Hintergrund auf und erkennt von selbst, ob du Velo
+          fährst, gehst, joggst oder im Tram oder Auto sitzt. Dafür braucht sie den Standort «immer»
+          und die Bewegungserkennung, und eine sichtbare Benachrichtigung zeigt, wenn sie aufzeichnet.
+          Gelernt wird nur aus Velofahrten. Einzelne Fahrten oder alle zusammen löschst du
           im Velonavi selbst.
         </p>
         {KONTO_MOEGLICH && (
           <p className="mt-4">
-            Zwei Dinge gehen darüber hinaus, beide freiwillig und ausgeschaltet. Die Sicherung im
-            Konto, damit die Fahrten auf einem neuen Gerät wieder da sind: Dafür wird deine
-            E-Mail-Adresse gespeichert und eine gekürzte Kopie jeder Fahrt, ohne die ersten und
-            letzten 150 Meter, ohne Adressen und mit dem Beginn auf die Stunde gerundet. Und das
-            Beitragen von Messwerten, wie oben beschrieben. Beides liegt bei{' '}
+            Zwei Dinge gehen darüber hinaus. Das Beitragen von Messwerten, wie oben beschrieben,
+            ist standardmässig an und braucht kein Konto. Die Sicherung im Konto ist aus, bis du
+            dich anmeldest und sie einschaltest: Damit die Fahrten auf einem neuen Gerät wieder da
+            sind, wird deine E-Mail-Adresse gespeichert und eine gekürzte Kopie jeder Velofahrt, ohne
+            die ersten und letzten 150 Meter, ohne Adressen und mit dem Beginn auf die Stunde
+            gerundet. Beides liegt bei{' '}
             <Aus href="https://supabase.com">Supabase</Aus> in einer Datenbank in Zürich. Jedes
             Konto kann nur die eigenen Fahrten lesen, die Messwerte kann niemand einzeln lesen. Die
             Anmeldung steht im Speicher des Browsers und nicht in einem Cookie. Das Konto lösche ich

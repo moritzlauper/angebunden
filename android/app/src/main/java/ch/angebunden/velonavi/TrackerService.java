@@ -50,6 +50,7 @@ public class TrackerService extends Service {
     static final String AKTION_STOP = "ch.angebunden.velonavi.STOP";
     static final String AKTION_ENDE = "ch.angebunden.velonavi.AKTIVITAET_ENDE";
     static final String EXTRA_VORSCHLAG = "vorschlag";
+    static final String EXTRA_HINWEIS = "hinweis";
 
     private static final String KANAL_LAUFEND = "aufzeichnung";
     private static final String KANAL_FERTIG = "fertig";
@@ -68,8 +69,12 @@ public class TrackerService extends Service {
     /** Eine von selbst erkannte Fahrt muss mindestens so lang sein, sonst war es etwas anderes. */
     private static final double AUTO_MIN_DISTANZ_M = 300;
     private static final long AUTO_MIN_DAUER_MS = 120_000L;
-    /** Schneller als 43 km/h im Mittel ist kein Velo. */
-    private static final double AUTO_MAX_MITTEL_MS = 12;
+    /** Schneller als das im Mittel gibt es für die jeweilige Art der Bewegung nicht (Velo 43 km/h, zu Fuss 22 km/h). */
+    private static double maxMittel(String hinweis) {
+        if ("velo".equals(hinweis)) return 12;
+        if ("gehen".equals(hinweis) || "laufen".equals(hinweis)) return 6;
+        return 50;
+    }
 
     private FusedLocationProviderClient client;
     private LocationCallback callback;
@@ -79,6 +84,7 @@ public class TrackerService extends Service {
     private String id;
     private String quelle = "aufzeichnung";
     private String vorschlag;
+    private String hinweis = "";
     private long beginn;
     private double distanz;
     private double zaehlLon = Double.NaN, zaehlLat = Double.NaN;
@@ -131,8 +137,13 @@ public class TrackerService extends Service {
             return START_STICKY;
         }
         if (aktiv) {
-            melden();
-            return START_STICKY;
+            String neu = AKTION_AUTO.equals(aktion) ? intent.getStringExtra(EXTRA_HINWEIS) : null;
+            if (neu == null || neu.equals(hinweis)) {
+                melden();
+                return START_STICKY;
+            }
+            // Eine andere Art der Bewegung beginnt, etwa Velo nach dem Tram: der Abschnitt davor ist zu Ende.
+            abschliessen();
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             melden();
@@ -149,6 +160,9 @@ public class TrackerService extends Service {
             id = UUID.randomUUID().toString();
             quelle = AKTION_AUTO.equals(aktion) ? "auto" : "aufzeichnung";
             vorschlag = intent.getStringExtra(EXTRA_VORSCHLAG);
+            String h = intent.getStringExtra(EXTRA_HINWEIS);
+            hinweis = h == null ? "" : h;
+            Aufnahme.hinweis = hinweis;
             beginn = System.currentTimeMillis();
             punkte.clear();
             distanz = 0;
@@ -268,6 +282,7 @@ public class TrackerService extends Service {
         o.put("beginn", beginn);
         o.put("quelle", quelle);
         if (vorschlag != null) o.put("vorschlag", vorschlag);
+        if (!hinweis.isEmpty()) o.put("hinweis", hinweis);
         o.put("spur", spur);
         return o;
     }
@@ -305,6 +320,8 @@ public class TrackerService extends Service {
             id = o.getString("id");
             quelle = o.optString("quelle", "aufzeichnung");
             vorschlag = o.has("vorschlag") ? o.getString("vorschlag") : null;
+            hinweis = o.optString("hinweis", "");
+            Aufnahme.hinweis = hinweis;
             beginn = beginnAlt;
             punkte.clear();
             for (int i = 0; i < spur.length(); i++) {
@@ -331,12 +348,9 @@ public class TrackerService extends Service {
         }
     }
 
-    /** Beendet die Aufzeichnung und legt die Fahrt ab, wenn sie etwas taugt. */
-    private void beenden() {
-        if (!aktiv) {
-            stopSelf();
-            return;
-        }
+    /** Schliesst den laufenden Abschnitt ab und legt ihn ab, wenn er etwas taugt. Der Dienst läuft weiter. */
+    private void abschliessen() {
+        if (!aktiv) return;
         aktiv = false;
         handler.removeCallbacks(pruefer);
         if (client != null && callback != null) client.removeLocationUpdates(callback);
@@ -346,12 +360,13 @@ public class TrackerService extends Service {
             brauchbar = brauchbar
                     && distanz >= AUTO_MIN_DISTANZ_M
                     && dauerMs >= AUTO_MIN_DAUER_MS
-                    && distanz / Math.max(dauerMs / 1000.0, 1) <= AUTO_MAX_MITTEL_MS;
+                    && distanz / Math.max(dauerMs / 1000.0, 1) <= maxMittel(hinweis);
         }
         if (brauchbar) {
             try {
                 schreiben(new File(Aufnahme.fahrtenOrdner(this), id + ".json"), alsJson().toString());
-                if ("auto".equals(quelle)) gespeichertMelden(dauerMs);
+                // Nur Velofahrten melden die Benachrichtigung, sonst käme sie bei jedem Gang zum Bus.
+                if ("auto".equals(quelle) && "velo".equals(hinweis)) gespeichertMelden(dauerMs);
             } catch (Exception e) {
                 brauchbar = false;
             }
@@ -361,7 +376,13 @@ public class TrackerService extends Service {
         Aufnahme.distanz = 0;
         Aufnahme.lon = Double.NaN;
         Aufnahme.lat = Double.NaN;
+        Aufnahme.hinweis = "";
         punkte.clear();
+    }
+
+    /** Beendet die Aufzeichnung ganz: abschliessen, Benachrichtigung weg, Dienst stoppen. */
+    private void beenden() {
+        abschliessen();
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
     }

@@ -7,7 +7,9 @@ import type { CapacitorConfig } from '@capacitor/cli'
  * den lokalen Entwicklungsserver: `VELONAVI_URL=http://10.0.2.2:3000`, die
  * Adresse, unter der der Android-Emulator den Rechner erreicht.
  */
-const url = process.env.VELONAVI_URL ?? 'https://angebunden.ch'
+// angebunden.ch leitet auf www.angebunden.ch weiter. Die App startet gleich dort: Eine Weiterleitung auf
+// einen anderen Host würde sie als externen Link in den Browser schicken, ohne das Plugin.
+const url = process.env.VELONAVI_URL ?? 'https://www.angebunden.ch'
 
 const config: CapacitorConfig = {
   appId: 'ch.angebunden.velonavi',
@@ -18,6 +20,7 @@ const config: CapacitorConfig = {
     url,
     cleartext: url.startsWith('http://'),
     errorPath: 'offline.html',
+    allowNavigation: ['angebunden.ch', 'www.angebunden.ch'],
   },
   android: {
     // Nur Debug-Fassungen lassen sich mit Chrome (chrome://inspect) untersuchen.

@@ -332,6 +332,8 @@ export default function Velonavi() {
   type Feld = 'start' | 'ziel' | `via${number}`
   const [offenFeld, setOffenFeld] = useState<Feld | null>(null)
   const [indexBereit, setIndexBereit] = useState(false)
+  /** Die ÖV-Haltestellen, damit sich Tram und Bus beim Aufzeichnen vom Auto unterscheiden lassen. */
+  const [haltestellen, setHaltestellen] = useState<[number, number][] | null>(null)
   const [verlauf, setVerlauf] = useState<Punkt[]>([])
   const [zuhause, setZuhause] = useState<Punkt | null>(null)
 
@@ -344,6 +346,7 @@ export default function Velonavi() {
     start,
     ziel,
     benenne: (lon, lat) => ortBeimRef.current(lon, lat, 17),
+    haltestellen,
     zeigeStrecke: (f) => {
       setStart(f.start)
       setStartText(f.start.titel)
@@ -448,6 +451,7 @@ export default function Velonavi() {
       if (weg) return
       const haeuser = adressen.map(([s, n, x, y]) => ({ properties: { s, n: n ?? undefined, x, y }, geometry: { coordinates: [x, y] } }))
       indexRef.current = bauIndex(haeuser, kultur.features, halte.features, ARTEN_NAMEN, STADT.name)
+      setHaltestellen(halte.features.map((f: { geometry: { coordinates: [number, number] } }) => f.geometry.coordinates))
       setIndexBereit(true)
     })()
     return () => {
@@ -690,6 +694,7 @@ export default function Velonavi() {
       map.addSource('route-ampeln', { type: 'geojson', data: leer })
       map.addSource('fahrt', { type: 'geojson', data: leer })
       map.addSource('standort', { type: 'geojson', data: leer })
+      map.addSource('ich', { type: 'geojson', data: leer })
       map.addSource('zeiger', { type: 'geojson', data: leer })
 
       // Der Stadtrand als Orientierung. Gefüllt wird nichts: Die Stadtkarte
@@ -818,6 +823,19 @@ export default function Velonavi() {
           'line-color': ['match', ['get', 'rolle'], 'daneben', GRAU, GEFAHREN],
           'line-width': ['interpolate', ['linear'], ['zoom'], 11, 1.5, 16, 3],
         },
+      })
+      // Der eigene Standort, auch ohne Aufzeichnung: ein Punkt mit Hof, wie in jeder Kartenapp.
+      map.addLayer({
+        id: 'ich-hof',
+        type: 'circle',
+        source: 'ich',
+        paint: { 'circle-radius': 16, 'circle-color': '#0ea5e9', 'circle-opacity': 0.22 },
+      })
+      map.addLayer({
+        id: 'ich',
+        type: 'circle',
+        source: 'ich',
+        paint: { 'circle-radius': 6.5, 'circle-color': '#0ea5e9', 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 2.5 },
       })
       map.addLayer({
         id: 'standort',
@@ -996,6 +1014,16 @@ export default function Velonavi() {
     // Die Fahrt setzt Start und Ziel selbst; ohne Route soll `fitBounds` von dort nicht nochmals eingreifen.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fahrten.ansicht, kartenBereit])
+
+  const ich = fahrten.ich
+  useEffect(() => {
+    const map = mapRef.current
+    if (!kartenBereit || !map) return
+    ;(map.getSource('ich') as GeoJSONSource).setData({
+      type: 'FeatureCollection',
+      features: ich ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: ich } }] : [],
+    })
+  }, [kartenBereit, ich])
 
   const standortJetzt = fahrten.laufend?.ort ?? null
   useEffect(() => {
@@ -1178,6 +1206,8 @@ export default function Velonavi() {
         const p = { lon: pos.coords.longitude, lat: pos.coords.latitude, titel: 'Mein Standort' }
         setStart(p)
         setStartText(p.titel)
+        // Die Freigabe ist jetzt da: Der Standort bleibt als Punkt auf der Karte.
+        fahrten.setOrtZeigen(true)
       },
       () => setFehler('Der Standort ist nicht verfügbar.'),
       { enableHighAccuracy: true, timeout: 8000 }

@@ -13,6 +13,7 @@
  */
 
 import type { Spurpunkt } from './fahrten.ts'
+import type { Hinweis } from './modus.ts'
 
 export type NativeFahrt = {
   id: string
@@ -22,14 +23,28 @@ export type NativeFahrt = {
   quelle: 'aufzeichnung' | 'auto'
   /** Was `start` mitgegeben wurde, als JSON. */
   vorschlag?: string
+  /** Womit die automatische Erkennung die Fahrt begann, nach Android. Fehlt bei einem Start per Knopf. */
+  hinweis?: Hinweis
 }
 
 export type NativStatus = {
   laeuft: boolean
   /** Ob die automatische Erkennung eingeschaltet ist. */
   auto: boolean
+  /** Ob sie auch Gehen, Joggen und Fahrzeuge aufzeichnet, nicht nur Velofahrten. */
+  alle: boolean
   beginn: number
   distanz: number
+  /** Seit wann die Bewegungserkennung von Android angemeldet ist, Millisekunden seit 1970, sonst 0. */
+  bereitSeit: number
+  /** Warum sie es nicht ist. */
+  bereitFehler: string
+  /** Die letzte Meldung von Android, auch wenn daraus keine Aufzeichnung wurde: velo, gehen, laufen oder fahrzeug. */
+  letzteArt: Hinweis | ''
+  letzteBeginn: boolean
+  letzteZeit: number
+  /** Womit die laufende Aufzeichnung begann. */
+  hinweis: Hinweis | ''
   lon: number | null
   lat: number | null
   /** Was der Nutzer noch freigeben muss: `standort`, `hintergrund`, `bewegung`, `mitteilung`. */
@@ -42,7 +57,7 @@ export type Tracker = {
   berechtigen(o: { auto: boolean }): Promise<{ fehlt: string[] }>
   start(o: { vorschlag?: string }): Promise<void>
   stop(): Promise<void>
-  auto(o: { aktiv: boolean }): Promise<NativStatus>
+  auto(o: { aktiv: boolean; alle?: boolean }): Promise<NativStatus>
   abholen(): Promise<{ fahrten: NativeFahrt[] }>
   quittieren(o: { ids: string[] }): Promise<void>
 }
