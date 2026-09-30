@@ -56,11 +56,14 @@ async function ladeVeloMeta(): Promise<VeloMeta> {
  * Seite hell aus dem Server, und der Wechsel auf dunkel würde nach dem
  * Hydrieren sichtbar aufblitzen. Die Regel muss zu `themaAuto` in
  * `velonavi/velonavi.tsx` passen: ab 20 Uhr dunkel, tagsüber wie das Betriebssystem.
+ * Dazu `data-konto`, wenn dieses Gerät eine Sitzung hat: Dann bleiben die Wegweiser
+ * zur Erreichbarkeitskarte schon vor dem Hydrieren weg (`useKontoVorhanden`).
  */
 const THEMA_SKRIPT = `try{
 var w=localStorage.getItem('velonavi.thema'),v=w?JSON.parse(w):'auto',h=new Date().getHours();
 document.documentElement.dataset.thema=
   v==='dunkel'||(v==='auto'&&(h>=20||h<7||matchMedia('(prefers-color-scheme: dark)').matches))?'dunkel':'hell';
+if(localStorage.getItem('velonavi.konto')!==null)document.documentElement.dataset.konto='';
 }catch(e){}`
 
 export default async function Page() {

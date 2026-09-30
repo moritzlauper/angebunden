@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import {
-  anmeldeFehler, codeOhnePruefwert, konto, kontoAngefangen, rueckkehr, KONTO_MOEGLICH, TABELLE, type Anbieter,
+  anmeldeFehler, codeOhnePruefwert, konto, kontoAngefangen, KONTO_WECHSEL, rueckkehr, KONTO_MOEGLICH, TABELLE, type Anbieter,
 } from './konto'
 import {
   lerne, spurAusGpx, spurDistanz, verdichten, zuordnen, DISTANZ_SCHRITT,
@@ -32,7 +32,16 @@ const SCHLUESSEL = {
   nativGefragt: 'velonavi.nativ.gefragt',
   ortZeigen: 'velonavi.ortzeigen',
   laufend: 'velonavi.laufend',
+  geloescht: 'velonavi.geloescht',
 }
+
+/**
+ * Gelöschte Fahrten, deren Kopie im Konto noch nicht sicher weg ist (kein Netz, nicht angemeldet).
+ * Der nächste Abgleich löscht sie dort und holt sie nicht zurück.
+ */
+const GRABSTEINE_MAX = 2000
+const grabsteine = () => lies<string[]>(SCHLUESSEL.geloescht, [])
+const setGrabsteine = (ids: string[]) => schreib(SCHLUESSEL.geloescht, ids.length ? ids.slice(-GRABSTEINE_MAX) : null)
 
 /** Ungenauere Standorte (Mobilfunkzelle statt GPS) kommen nicht in die Spur. */
 const GENAU_MAX = 60
@@ -44,6 +53,14 @@ const ORT_NAH = 80
 const WEITER_BIS = 10 * 60_000
 /** Mehr Fahrten lädt und lernt der Velonavi nicht, die neusten zuerst. */
 const FAHRTEN_MAX = 200
+/**
+ * So viele Fahrten gehen in einer Anfrage ins Konto. Eine Spur wiegt schnell 50 KB, und eine
+ * einzelne Zeile, die die Datenbank ablehnt, soll nicht alle anderen mitreissen.
+ */
+const PAKET = 10
+/** Frühestens nach so vielen Millisekunden gleicht die Seite bei der Rückkehr in die App erneut ab. */
+const ABGLEICH_PAUSE = 60_000
+const KEIN_NETZ = 'Gerade keine Verbindung zum Konto. Die Fahrten gehen hinein, sobald das Netz zurück ist.'
 const FREMDER_BROWSER =
   'Die Anmeldung hat nicht geklappt. Den Link aus der E-Mail im selben Browser öffnen, in dem du ihn angefordert hast.'
 
@@ -112,7 +129,8 @@ export function useFahrten({
   const [nutzer, setNutzer] = useState<User | null>(null)
   const [aufzeichnen, setAufzeichnenRoh] = useState(true)
   const [lernen, setLernenRoh] = useState(true)
-  const [sicherung, setSicherungRoh] = useState(false)
+  // Das Konto ist zum Sichern da: Wer sich anmeldet, will die Fahrten dort haben. Ausschalten lässt es sich.
+  const [sicherung, setSicherungRoh] = useState(true)
   const [vonAnderen, setVonAnderenRoh] = useState(true)
   const [beitragen, setBeitragenRoh] = useState(true)
   const [gemeinschaft, setGemeinschaft] = useState<Gemeinschaft | null>(null)
@@ -131,6 +149,8 @@ export function useFahrten({
   const [ich, setIch] = useState<[number, number] | null>(null)
   const [ortZeigen, setOrtZeigenRoh] = useState(false)
   const nutzerId = nutzer?.id
+  const nutzerIdRef = useRef(nutzerId)
+  nutzerIdRef.current = nutzerId
   /** Nur Velofahrten werden dem Netz zugeordnet, verglichen und fürs Lernen genutzt. */
   const istVelo = (f: { modus?: Modus }) => (f.modus ?? 'velo') === 'velo'
 
@@ -138,7 +158,7 @@ export function useFahrten({
   useEffect(() => {
     setAufzeichnenRoh(lies(SCHLUESSEL.aufzeichnen, true))
     setLernenRoh(lies(SCHLUESSEL.lernen, true))
-    setSicherungRoh(lies(SCHLUESSEL.sicherung, false))
+    setSicherungRoh(lies(SCHLUESSEL.sicherung, true))
     setVonAnderenRoh(lies(SCHLUESSEL.vonAnderen, true))
     setBeitragenRoh(lies(SCHLUESSEL.beitragen, true))
     const t = tracker()
@@ -164,7 +184,10 @@ export function useFahrten({
     konto()
       .then(async (sb) => {
         if (weg) return
-        const { data } = sb.auth.onAuthStateChange((_ereignis, sitzung) => setNutzer(sitzung?.user ?? null))
+        const { data } = sb.auth.onAuthStateChange((_ereignis, sitzung) => {
+          setNutzer(sitzung?.user ?? null)
+          window.dispatchEvent(new Event(KONTO_WECHSEL))
+        })
         abbestellen = () => data.subscription.unsubscribe()
         // Scheitert das Einlösen des Codes, ist er abgelaufen oder schon benutzt.
         const { error } = await sb.auth.initialize()
@@ -196,22 +219,59 @@ export function useFahrten({
   const sichernImKonto = useRef(false)
   sichernImKonto.current = !!nutzerId && sicherung
 
-  const hochladen = useCallback(async (liste: Gespeichert[]) => {
-    // Nur Velofahrten gehen in die Sicherung: Der Rest bleibt auf dem Gerät.
-    const zeilen = liste.filter((f) => (f.modus ?? 'velo') === 'velo').map((f) => ({ f, z: fuerKonto(f) }))
-    const brauchbar = zeilen.filter((x): x is { f: Gespeichert; z: Zeile } => !!x.z)
-    if (!brauchbar.length) return
-    const sb = await konto()
-    const { error } = await sb.from(TABELLE).upsert(brauchbar.map((x) => x.z))
-    if (error) {
-      setMeldung(`Die Sicherung im Konto hat nicht geklappt: ${error.message}`)
-      return
-    }
-    const gesichert = brauchbar.map((x) => ({ ...x.f, gesichert: true }))
-    const ids = new Set(gesichert.map((x) => x.id))
+  /** Hält fest, dass diese Fahrten im Konto liegen, in der Liste und auf dem Gerät. */
+  const alsGesichert = useCallback(async (liste: Gespeichert[]) => {
+    if (!liste.length) return
+    const ids = new Set(liste.map((f) => f.id))
     setFahrten((alt) => alt.map((f) => (ids.has(f.id) ? { ...f, gesichert: true } : f)))
-    await Promise.all(gesichert.map((f) => speichern(f).catch(() => {})))
+    await Promise.all(liste.map((f) => speichern({ ...f, gesichert: true }).catch(() => {})))
   }, [])
+
+  /**
+   * Lädt Fahrten gekürzt ins Konto. Scheitert ein Paket, weil die Datenbank eine Zeile ablehnt, geht
+   * der Rest einzeln; fehlt das Netz, bleibt alles für den nächsten Abgleich liegen. `still` schweigt
+   * zu einem fehlenden Netz, etwa beim Nachholen im Hintergrund.
+   */
+  const hochladen = useCallback(
+    async (liste: Gespeichert[], still = false) => {
+      // Nur Velofahrten gehen in die Sicherung: Der Rest bleibt auf dem Gerät.
+      const zeilen = liste.filter((f) => (f.modus ?? 'velo') === 'velo').map((f) => ({ f, z: fuerKonto(f) }))
+      const brauchbar = zeilen.filter((x): x is { f: Gespeichert; z: Zeile } => !!x.z)
+      if (!brauchbar.length) return
+      let sb: Awaited<ReturnType<typeof konto>>
+      try {
+        sb = await konto()
+      } catch {
+        if (!still) setMeldung(KEIN_NETZ)
+        return
+      }
+      const ok: Gespeichert[] = []
+      let abgelehnt: string | null = null
+      let keinNetz = false
+      for (let i = 0; i < brauchbar.length && !keinNetz; i += PAKET) {
+        const teil = brauchbar.slice(i, i + PAKET)
+        const { error } = await sb.from(TABELLE).upsert(teil.map((x) => x.z))
+        if (!error) {
+          ok.push(...teil.map((x) => x.f))
+          continue
+        }
+        // Ohne Code kam die Anfrage gar nicht an: kein Netz. Dann nicht Zeile für Zeile weiterversuchen.
+        if (!error.code) {
+          keinNetz = true
+          break
+        }
+        for (const x of teil) {
+          const r = await sb.from(TABELLE).upsert(x.z)
+          if (!r.error) ok.push(x.f)
+          else abgelehnt ??= r.error.message
+        }
+      }
+      await alsGesichert(ok)
+      if (abgelehnt) setMeldung(`${brauchbar.length - ok.length} Fahrten liessen sich nicht im Konto sichern: ${abgelehnt}`)
+      else if (keinNetz && !still) setMeldung(KEIN_NETZ)
+    },
+    [alsGesichert]
+  )
 
   const ablegen = useCallback(
     async (offen: Offen, id?: string, still = false): Promise<Fahrt | null> => {
@@ -348,7 +408,7 @@ export function useFahrten({
 
   // --- Aufzeichnung in der Android-App
   /** Fahrten, die der Dienst der App fertig hat, aufs Gerät übernehmen. */
-  const holeNativ = useCallback(
+  const holeNativJetzt = useCallback(
     async (t: Tracker): Promise<Fahrt | null> => {
       let letzte: Fahrt | null = null
       try {
@@ -371,6 +431,37 @@ export function useFahrten({
     },
     [ablegen]
   )
+
+  // Nacheinander, nie zweimal gleichzeitig: Sonst legten Uhr und Beenden dieselbe Datei doppelt ab.
+  const holKette = useRef<Promise<unknown>>(Promise.resolve())
+  const holeNativ = useCallback(
+    (t: Tracker): Promise<Fahrt | null> => {
+      const lauf = holKette.current.then(() => holeNativJetzt(t))
+      holKette.current = lauf.catch(() => {})
+      return lauf
+    },
+    [holeNativJetzt]
+  )
+
+  /**
+   * Solange die Seite selbst startet, beendet oder verwirft, fasst die Uhr den Stand der App nicht an:
+   * Sie sähe den Dienst kurz vor dem Anlaufen oder beim Ablegen und würde dazwischenfunken.
+   */
+  const nativBeschaeftigt = useRef(false)
+
+  /**
+   * Wartet, bis der Dienst läuft (`an`) oder die Fahrt abgelegt hat. `stop` und `start` kehren sofort
+   * zurück, der Dienst arbeitet danach: Ohne Warten fand das Beenden die Fahrt noch nicht, sie tauchte
+   * erst später still auf, und das Verwerfen erwischte sie gar nicht.
+   */
+  const warteAufDienst = useCallback(async (t: Tracker, an: boolean) => {
+    const bis = Date.now() + 5000
+    for (;;) {
+      const s = await t.status()
+      if (s.laeuft === an || Date.now() > bis) return s
+      await new Promise((r) => setTimeout(r, 150))
+    }
+  }, [])
 
   const nativStand = useCallback((s: NativStatus) => {
     setAutoAn(s.auto)
@@ -430,9 +521,10 @@ export function useFahrten({
     if (!nativ || !geladen) return
     let weg = false
     const nachsehen = async () => {
+      if (nativBeschaeftigt.current) return
       try {
         const s = await nativ.status()
-        if (weg) return
+        if (weg || nativBeschaeftigt.current) return
         nativStand(s)
         if (!s.laeuft) await holeNativ(nativ)
       } catch {
@@ -440,6 +532,13 @@ export function useFahrten({
       }
     }
     nachsehen()
+    // Was beim letzten Mal schiefging, etwa ein Absturz: einmal sagen, sonst bleibt es ein Rätsel.
+    nativ
+      .panne?.()
+      .then((p) => {
+        if (!weg && p.text) setMeldung(`Beim letzten Mal ging in der App etwas schief: ${p.text}`)
+      })
+      .catch(() => {})
     const sichtbar = () => document.visibilityState === 'visible' && nachsehen()
     document.addEventListener('visibilitychange', sichtbar)
     // Läuft eine Aufzeichnung, den Stand der App regelmässig nachziehen.
@@ -447,9 +546,10 @@ export function useFahrten({
     const uhr = window.setInterval(
       () =>
         document.visibilityState === 'visible' &&
+        !nativBeschaeftigt.current &&
         nativ.status().then(
           (s) => {
-            if (weg) return
+            if (weg || nativBeschaeftigt.current) return
             nativStand(s)
             if (!s.laeuft) holeNativ(nativ)
           },
@@ -474,45 +574,75 @@ export function useFahrten({
       setGezeigt(null)
       setMeldung(null)
       if (nativ) {
-        const r = await nativ.berechtigen({ auto: false })
-        if (r.fehlt.includes('standort')) return setMeldung(freigaben(r.fehlt))
-        await nativ.start({ vorschlag: vorschlag ? JSON.stringify(vorschlag) : undefined })
-        nativStand(await nativ.status())
+        nativBeschaeftigt.current = true
+        try {
+          const r = await nativ.berechtigen({ auto: false })
+          if (r.fehlt.includes('standort')) return setMeldung(freigaben(r.fehlt))
+          await nativ.start({ vorschlag: vorschlag ? JSON.stringify(vorschlag) : undefined })
+          const s = await warteAufDienst(nativ, true)
+          nativStand(s)
+          if (!s.laeuft) {
+            const p = await nativ.panne?.().catch(() => null)
+            setMeldung(p?.text || 'Die Aufzeichnung ist nicht angelaufen. Ist der Standort für die App freigegeben?')
+          }
+        } catch (e) {
+          setMeldung(e instanceof Error && e.message ? e.message : 'Die Aufzeichnung liess sich nicht starten.')
+        } finally {
+          nativBeschaeftigt.current = false
+        }
         return
       }
       offenRef.current = { beginn: Date.now(), spur: [], vorschlag }
       horchen()
     },
-    [nativ, nativStand, horchen]
+    [nativ, nativStand, horchen, warteAufDienst]
   )
 
   const beenden = useCallback(async () => {
     if (nativ) {
-      await nativ.stop()
-      setLaufend(null)
-      const f = await holeNativ(nativ)
-      if (f) zeigen(f)
+      nativBeschaeftigt.current = true
+      try {
+        await nativ.stop()
+        await warteAufDienst(nativ, false)
+        setLaufend(null)
+        const f = await holeNativ(nativ)
+        if (f) zeigen(f)
+      } catch {
+        setMeldung('Die Aufzeichnung liess sich nicht beenden.')
+      } finally {
+        nativBeschaeftigt.current = false
+      }
       return
     }
     if (watchRef.current === null) return
     anhalten()
     const f = await ablegen(offenRef.current)
     if (f) zeigen(f)
-  }, [nativ, holeNativ, anhalten, ablegen, zeigen])
+  }, [nativ, holeNativ, warteAufDienst, anhalten, ablegen, zeigen])
   beendenRef.current = beenden
 
   const verwerfen = useCallback(async () => {
     if (nativ) {
-      // Der Dienst legt beim Beenden die Fahrt ab; sie wird abgeholt und gleich gelöscht.
-      await nativ.stop()
-      setLaufend(null)
-      const { fahrten: neu } = await nativ.abholen().catch(() => ({ fahrten: [] as NativeFahrt[] }))
-      if (neu.length) await nativ.quittieren({ ids: neu.map((x) => x.id) })
+      nativBeschaeftigt.current = true
+      try {
+        // Was vorher fertig wurde (etwa der Weg zum Velo), bleibt: erst abholen, dann beenden.
+        await holeNativ(nativ)
+        // Der Dienst legt beim Beenden die Fahrt ab. Nur sie wird abgeholt und gleich gelöscht.
+        await nativ.stop()
+        await warteAufDienst(nativ, false)
+        setLaufend(null)
+        const { fahrten: neu } = await nativ.abholen().catch(() => ({ fahrten: [] as NativeFahrt[] }))
+        if (neu.length) await nativ.quittieren({ ids: neu.map((x) => x.id) })
+      } catch {
+        setMeldung('Die Aufzeichnung liess sich nicht verwerfen.')
+      } finally {
+        nativBeschaeftigt.current = false
+      }
       return
     }
     anhalten()
     schreib(SCHLUESSEL.laufend, null)
-  }, [nativ, anhalten])
+  }, [nativ, anhalten, holeNativ, warteAufDienst])
 
   /** Auch Gehen, Joggen, Tram und Auto von selbst aufzeichnen, nicht nur Velofahrten. */
   const setAutoAlleWert = useCallback(
@@ -595,6 +725,7 @@ export function useFahrten({
 
   const loeschen = useCallback(
     async (welche: 'alle' | string) => {
+      const weg = welche === 'alle' ? fahrtenRef.current.map((f) => f.id) : [welche]
       try {
         if (welche === 'alle') await alleEntfernen()
         else await entfernen(welche)
@@ -606,11 +737,22 @@ export function useFahrten({
       setGezeigt((g) => (welche === 'alle' || g === welche ? null : g))
       setAnzeige([])
       setTeilGezeigt(null)
-      // Die Kopie im Konto verschwindet mit.
+      // Die Kopie im Konto verschwindet mit. Klappt das jetzt nicht, merkt sich das Gerät die Fahrt,
+      // und der nächste Abgleich holt das Löschen nach, statt sie zurückzuholen.
+      setGrabsteine([...new Set([...grabsteine(), ...weg])])
       if (nutzerId) {
-        const sb = await konto()
-        const { error } = welche === 'alle' ? await sb.from(TABELLE).delete().not('id', 'is', null) : await sb.from(TABELLE).delete().eq('id', welche)
-        if (error) setMeldung(`Die Kopie im Konto liess sich nicht löschen: ${error.message}`)
+        try {
+          const sb = await konto()
+          const { error } = welche === 'alle' ? await sb.from(TABELLE).delete().not('id', 'is', null) : await sb.from(TABELLE).delete().eq('id', welche)
+          if (error) {
+            if (error.code) setMeldung(`Die Kopie im Konto liess sich nicht löschen: ${error.message}`)
+          } else {
+            const erledigt = new Set(weg)
+            setGrabsteine(grabsteine().filter((id) => !erledigt.has(id)))
+          }
+        } catch {
+          /* Kein Netz: Der nächste Abgleich holt es nach. */
+        }
       }
     },
     [nutzerId]
@@ -631,35 +773,88 @@ export function useFahrten({
   }, [])
 
   // --- Sicherung: Fahrten von anderen Geräten holen, eigene gekürzt hochladen
-  useEffect(() => {
-    if (!nutzerId || !geladen) return
-    let weg = false
-    ;(async () => {
+  const gleichtAb = useRef(false)
+  /** Holt, was im Konto liegt und hier fehlt, und lädt hoch, was dort fehlt. `still` schweigt zu fehlendem Netz. */
+  const abgleichen = useCallback(
+    async (still = false) => {
+      const fuer = nutzerIdRef.current
+      if (!fuer || gleichtAb.current) return
+      gleichtAb.current = true
       try {
         const sb = await konto()
+        // Erst nachholen, was auf diesem Gerät gelöscht wurde, als es nicht ging.
+        const offenWeg = grabsteine()
+        for (let i = 0; i < offenWeg.length; i += 100) {
+          const teil = offenWeg.slice(i, i + 100)
+          const { error } = await sb.from(TABELLE).delete().in('id', teil)
+          if (error) break
+          const erledigt = new Set(teil)
+          setGrabsteine(grabsteine().filter((id) => !erledigt.has(id)))
+        }
+        const begraben = new Set(grabsteine())
         const { data, error } = await sb.from(TABELLE).select('*').order('begonnen', { ascending: false }).limit(FAHRTEN_MAX)
         if (error) throw error
-        if (weg) return
+        // Inzwischen ab- oder umgemeldet: nichts mehr anfassen.
+        if (nutzerIdRef.current !== fuer) return
+        const zeilen = (data as Zeile[]).filter((z) => !begraben.has(z.id))
         const lokal = new Set(fahrtenRef.current.map((f) => f.id))
-        const daId = new Set((data as Zeile[]).map((z) => z.id))
-        const neu = (data as Zeile[]).filter((z) => !lokal.has(z.id)).map((z): Gespeichert => ({ ...ausKonto(z, benenneRef.current), gesichert: true }))
+        const daId = new Set(zeilen.map((z) => z.id))
+        const neu = zeilen.filter((z) => !lokal.has(z.id)).map((z): Gespeichert => ({ ...ausKonto(z, benenneRef.current), gesichert: true }))
         if (neu.length) {
           await Promise.all(neu.map((f) => speichern(f).catch(() => {})))
-          if (!weg) setFahrten((alt) => [...alt, ...neu].sort((a, b) => (a.begonnen < b.begonnen ? 1 : -1)))
+          setFahrten((alt) => [...alt, ...neu.filter((n) => !alt.some((a) => a.id === n.id))].sort((a, b) => (a.begonnen < b.begonnen ? 1 : -1)))
         }
-        // Was schon im Konto liegt, ist gesichert; was fehlt, geht hoch, wenn die Sicherung an ist.
+        // Was schon im Konto liegt, ist gesichert, auch wenn ein anderes Gerät es hochgeladen hat.
+        await alsGesichert(fahrtenRef.current.filter((f) => daId.has(f.id) && !f.gesichert))
+        // Was fehlt, geht hoch, wenn die Sicherung an ist.
         if (sichernImKonto.current) {
           const fehlt = fahrtenRef.current.filter((f) => !daId.has(f.id))
-          if (fehlt.length) await hochladen(fehlt)
+          if (fehlt.length) await hochladen(fehlt, still)
         }
       } catch (e) {
-        if (!weg) setMeldung(`Die Sicherung im Konto hat nicht geklappt: ${(e as Error).message}`)
+        if (!still) setMeldung(`Die Sicherung im Konto hat nicht geklappt: ${(e as Error).message}`)
+      } finally {
+        gleichtAb.current = false
       }
-    })()
-    return () => {
-      weg = true
+    },
+    [hochladen, alsGesichert]
+  )
+  useEffect(() => {
+    if (!nutzerId || !geladen) return
+    abgleichen()
+    // In der App bleibt die Seite oft tagelang offen. Was ohne Netz aufgenommen wurde, geht hoch,
+    // sobald die Verbindung zurück ist oder die App wieder in den Vordergrund kommt.
+    let zuletzt = Date.now()
+    const nochmal = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - zuletzt < ABGLEICH_PAUSE) return
+      zuletzt = Date.now()
+      abgleichen(true)
     }
-  }, [nutzerId, geladen, sicherung, hochladen])
+    const online = () => {
+      zuletzt = Date.now()
+      abgleichen(true)
+    }
+    document.addEventListener('visibilitychange', nochmal)
+    window.addEventListener('online', online)
+    return () => {
+      document.removeEventListener('visibilitychange', nochmal)
+      window.removeEventListener('online', online)
+    }
+  }, [nutzerId, geladen, sicherung, abgleichen])
+
+  /** Wie viele Velofahrten im Konto liegen, noch fehlen oder für die Sicherung zu kurz sind. */
+  const sicherungsStand = useMemo(() => {
+    let gesichert = 0
+    let offen = 0
+    let zuKurz = 0
+    for (const f of fahrten) {
+      if ((f.modus ?? 'velo') !== 'velo') continue
+      if (f.gesichert) gesichert++
+      else if (!fuerKonto(f)) zuKurz++
+      else offen++
+    }
+    return { gesichert, offen, zuKurz }
+  }, [fahrten])
 
   // --- Zuordnen und Lernen
   // Jede Fahrt wird einmal je Sitzung dem Netz zugeordnet, in kleinen
@@ -800,7 +995,9 @@ export function useFahrten({
       setBeitragenRoh(v)
       schreib(SCHLUESSEL.beitragen, v)
     },
-    sicherung,
+    sicherung, sicherungsStand,
+    /** Den Abgleich mit dem Konto sofort anstossen, etwa nach einem Fehler. */
+    jetztSichern: () => abgleichen(),
     setSicherung: (v: boolean) => {
       setSicherungRoh(v)
       schreib(SCHLUESSEL.sicherung, v)

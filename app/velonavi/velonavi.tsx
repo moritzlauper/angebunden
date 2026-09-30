@@ -1713,7 +1713,7 @@ export default function Velonavi() {
             ) : (
               <>
                 {anfang && !kontoDa && (
-                  <div className="pointer-events-auto self-center">
+                  <div className="ohne-konto pointer-events-auto self-center">
                     <Seitenwahl ui={ui} aktiv="velonavi" />
                   </div>
                 )}
@@ -1752,7 +1752,7 @@ export default function Velonavi() {
                   {anfang && !kontoDa && <Link
                     href="/erreichbarkeitskarte"
                     title="Erreichbarkeitskarte: wie gut jedes Haus an den ÖV angebunden ist"
-                    className="text-[11px] font-normal underline-offset-2 hover:underline"
+                    className="ohne-konto text-[11px] font-normal underline-offset-2 hover:underline"
                     style={{ color: ui.muted, opacity: 0.75 }}
                   >
                     Erreichbarkeit

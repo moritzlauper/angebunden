@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { kontoAngefangen } from './velonavi/konto'
+import { kontoAngefangen, KONTO_WECHSEL } from './velonavi/konto'
 
 type Ui = { fg: string; muted: string; panel: string; border: string; aktiv: string; schatten: string }
 
@@ -14,7 +14,22 @@ type Ui = { fg: string; muted: string; panel: string; border: string; aktiv: str
  */
 export function useKontoVorhanden() {
   const [vorhanden, setVorhanden] = useState(false)
-  useEffect(() => setVorhanden(kontoAngefangen()), [])
+  useEffect(() => {
+    const pruefen = () => {
+      const da = kontoAngefangen()
+      setVorhanden(da)
+      // Das Skript in page.tsx setzt `data-konto` vor dem Hydrieren, nach einem Abmelden muss es wieder weg.
+      document.documentElement.toggleAttribute('data-konto', da)
+    }
+    pruefen()
+    // Meldet sich jemand an, verschwinden die Wegweiser sofort, nicht erst beim nächsten Laden.
+    window.addEventListener(KONTO_WECHSEL, pruefen)
+    window.addEventListener('storage', pruefen)
+    return () => {
+      window.removeEventListener(KONTO_WECHSEL, pruefen)
+      window.removeEventListener('storage', pruefen)
+    }
+  }, [])
   return vorhanden
 }
 

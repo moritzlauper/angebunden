@@ -64,6 +64,51 @@ final class Aufnahme {
                 .apply();
     }
 
+    /**
+     * Hält fest, was zuletzt schiefging: ein Absturz der App, der Seite oder des Dienstes. Die Seite
+     * zeigt es beim nächsten Öffnen an (`VelotrackerPlugin.panne`). Synchron geschrieben, weil der
+     * Prozess nach einem Absturz gleich endet.
+     */
+    static void setPanne(Context c, String was) {
+        prefs(c).edit().putString("panne", was).putLong("panneZeit", System.currentTimeMillis()).commit();
+    }
+
+    private static volatile boolean wache = false;
+
+    /** Merkt sich unbehandelte Ausnahmen, bevor Android den Prozess beendet. Einmal je Prozess. */
+    static synchronized void absturzMerken(Context c) {
+        if (wache) return;
+        wache = true;
+        final Context app = c.getApplicationContext();
+        final Thread.UncaughtExceptionHandler vorher = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            try {
+                // Eine Panne von eben (etwa ein abgelehnter Dienst im Vordergrund) ist meist die Ursache: behalten.
+                SharedPreferences p = prefs(app);
+                String vorige = System.currentTimeMillis() - p.getLong("panneZeit", 0) < 30_000 ? p.getString("panne", "") : "";
+                setPanne(app, (vorige.isEmpty() ? "" : vorige + " Danach ") + "Absturz: " + kurz(e));
+            } catch (Throwable ignoriert) {
+                /* Nichts darf den eigentlichen Absturz verdecken. */
+            }
+            if (vorher != null) vorher.uncaughtException(t, e);
+        });
+    }
+
+    /** Art, Meldung und die erste Stelle im eigenen Code, gut genug, um den Fehler zu finden. */
+    static String kurz(Throwable e) {
+        Throwable wurzel = e;
+        while (wurzel.getCause() != null && wurzel.getCause() != wurzel) wurzel = wurzel.getCause();
+        StringBuilder b = new StringBuilder(wurzel.getClass().getSimpleName());
+        if (wurzel.getMessage() != null) b.append(": ").append(wurzel.getMessage());
+        for (StackTraceElement s : wurzel.getStackTrace()) {
+            if (s.getClassName().startsWith("ch.angebunden")) {
+                b.append(" (").append(s.getFileName()).append(':').append(s.getLineNumber()).append(')');
+                break;
+            }
+        }
+        return b.length() > 400 ? b.substring(0, 400) : b.toString();
+    }
+
     static File fahrtenOrdner(Context c) {
         File d = new File(c.getFilesDir(), "fahrten");
         if (!d.exists()) d.mkdirs();

@@ -1,5 +1,5 @@
 /**
- * Was von einer Fahrt ins Konto geht, wenn man die Sicherung einschaltet.
+ * Was von einer Fahrt ins Konto geht, wenn man angemeldet ist und die Sicherung an ist.
  *
  * Auf dem Gerät liegt die Fahrt vollständig. Ins Konto geht eine Fassung, die
  * sich nicht mehr auf eine Wohnung oder einen Arbeitsplatz zurückführen lässt:

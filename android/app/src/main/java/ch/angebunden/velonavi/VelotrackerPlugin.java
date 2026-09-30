@@ -42,6 +42,11 @@ import org.json.JSONObject;
         })
 public class VelotrackerPlugin extends Plugin {
 
+    @Override
+    public void load() {
+        Aufnahme.absturzMerken(getContext());
+    }
+
     private boolean hat(String erlaubnis) {
         return ContextCompat.checkSelfPermission(getContext(), erlaubnis) == PackageManager.PERMISSION_GRANTED;
     }
@@ -155,8 +160,26 @@ public class VelotrackerPlugin extends Plugin {
         Intent i = new Intent(getContext(), TrackerService.class).setAction(TrackerService.AKTION_START);
         String vorschlag = call.getString("vorschlag");
         if (vorschlag != null) i.putExtra(TrackerService.EXTRA_VORSCHLAG, vorschlag);
-        ContextCompat.startForegroundService(getContext(), i);
+        try {
+            ContextCompat.startForegroundService(getContext(), i);
+        } catch (RuntimeException e) {
+            // Etwa ForegroundServiceStartNotAllowedException: nicht die App mitreissen, sondern der Seite sagen.
+            Aufnahme.setPanne(getContext(), "Die Aufzeichnung liess sich nicht starten: " + Aufnahme.kurz(e));
+            call.reject("Die Aufzeichnung liess sich nicht starten: " + Aufnahme.kurz(e));
+            return;
+        }
         call.resolve();
+    }
+
+    /** Was zuletzt schiefging (`Aufnahme.setPanne`), einmal: Danach ist es gelöscht. */
+    @PluginMethod
+    public void panne(PluginCall call) {
+        android.content.SharedPreferences p = Aufnahme.prefs(getContext());
+        JSObject o = new JSObject();
+        o.put("text", p.getString("panne", ""));
+        o.put("zeit", p.getLong("panneZeit", 0));
+        p.edit().remove("panne").remove("panneZeit").apply();
+        call.resolve(o);
     }
 
     @PluginMethod

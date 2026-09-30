@@ -35,8 +35,16 @@ Die Fassung entsteht bei jeder Änderung am Android-Teil von selbst
 Die fertigen Fahrten liegen im privaten Ordner der App und warten dort, bis die Seite sie
 beim nächsten Öffnen abholt. Sie landen in der Datenbank der Seite, dort werten Velonavi die
 Fahrten aus, vergleichen sie und lernen daraus. Die Spur verlässt das Gerät nur als
-gekürzte Kopie, wenn die Sicherung im Konto an ist. Standardmässig gehen ausserdem anonyme Messwerte
+gekürzte Kopie, wenn man angemeldet ist (die Sicherung im Konto ist dann an, im Menü abschaltbar).
+Ein Deinstallieren löscht die Fahrten auf dem Gerät; was im Konto liegt, kommt nach dem Anmelden
+zurück. Standardmässig gehen ausserdem anonyme Messwerte
 weg (Beitragen, im Menü abschaltbar).
+
+Geht etwas schief, merkt sich die App die Ursache und die Seite zeigt sie beim nächsten Öffnen
+einmal an: ein Absturz der App (Art des Fehlers und Stelle im Code), ein Dienst im Vordergrund, den
+Android ablehnt, oder eine Seite, die abgestürzt ist oder die Android wegen Speicher beendet hat. In
+diesem Fall lädt die App die Seite neu, statt mit einer Fehlerseite stehenzubleiben; eine laufende
+Aufzeichnung läuft im Dienst weiter.
 
 Android-Hersteller mit scharfem Energiesparen (Xiaomi, Huawei, Samsung) beenden Hintergrunddienste
 gern. Hilft nichts, die App in den Einstellungen von der Akkuoptimierung ausnehmen.

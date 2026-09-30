@@ -419,9 +419,41 @@ function Konto({ f }: { f: Fahrtenstand }) {
         titel="Fahrten im Konto sichern"
         hilfe="Damit sie auf einem neuen Gerät wieder da sind. Es geht eine gekürzte Kopie: ohne die ersten und letzten 150 Meter, ohne Adressen, mit dem Beginn auf die Stunde gerundet"
       />
+      {f.sicherung && <SicherungsStand f={f} />}
       <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
         Gelöschte Fahrten verschwinden auch aus dem Konto.
       </p>
+    </div>
+  )
+}
+
+/** Wie viele Velofahrten schon im Konto liegen und was noch fehlt, mit einem Knopf zum Nachholen. */
+function SicherungsStand({ f }: { f: Fahrtenstand }) {
+  const [laeuft, setLaeuft] = useState(false)
+  const { gesichert, offen, zuKurz } = f.sicherungsStand
+  const teile = [
+    `${gesichert} ${gesichert === 1 ? 'Velofahrt' : 'Velofahrten'} im Konto`,
+    offen ? `${offen} noch nicht` : null,
+    // Nach dem Kürzen um je 150 Meter bleibt bei ganz kurzen Fahrten nichts übrig, sie bleiben auf dem Gerät.
+    zuKurz ? `${zuKurz} zu kurz zum Sichern` : null,
+  ].filter(Boolean)
+  return (
+    <div className="flex items-center justify-between gap-3 text-[11px]" style={{ color: ui.muted }}>
+      <span>{teile.join(' · ')}</span>
+      {offen > 0 && (
+        <button
+          disabled={laeuft}
+          onClick={async () => {
+            setLaeuft(true)
+            await f.jetztSichern()
+            setLaeuft(false)
+          }}
+          className="shrink-0 underline underline-offset-2"
+          style={{ color: ui.fg, opacity: laeuft ? 0.5 : 1 }}
+        >
+          {laeuft ? 'Sichert …' : 'Jetzt sichern'}
+        </button>
+      )}
     </div>
   )
 }

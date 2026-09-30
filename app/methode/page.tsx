@@ -445,8 +445,8 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
         {KONTO_MOEGLICH && (
           <p className="mt-4">
             Zwei Dinge gehen darüber hinaus. Das Beitragen von Messwerten, wie oben beschrieben,
-            ist standardmässig an und braucht kein Konto. Die Sicherung im Konto ist aus, bis du
-            dich anmeldest und sie einschaltest: Damit die Fahrten auf einem neuen Gerät wieder da
+            ist standardmässig an und braucht kein Konto. Die Sicherung im Konto gibt es erst, wenn
+            du dich anmeldest; dann ist sie an und lässt sich im Menü ausschalten: Damit die Fahrten auf einem neuen Gerät wieder da
             sind, wird deine E-Mail-Adresse gespeichert und eine gekürzte Kopie jeder Velofahrt, ohne
             die ersten und letzten 150 Meter, ohne Adressen und mit dem Beginn auf die Stunde
             gerundet. Beides liegt bei{' '}

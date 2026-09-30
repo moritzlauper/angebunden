@@ -1,6 +1,7 @@
 /**
- * Die Fahrten liegen auf dem Gerät, in IndexedDB. Sie verlassen es nur, wenn
- * man die Sicherung im Konto einschaltet (`konto.ts`). Ein localStorage würde
+ * Die Fahrten liegen auf dem Gerät, in IndexedDB. Sie verlassen es nur als
+ * gekürzte Kopie, wenn man angemeldet ist und die Sicherung im Konto nicht
+ * ausgeschaltet hat (`konto.ts`, `sicherung.ts`). Ein localStorage würde
  * nach etwa 60 Fahrten voll sein, eine Spur mit einem Punkt pro Sekunde
  * braucht gut 70 KB für eine halbe Stunde.
  *

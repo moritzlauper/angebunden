@@ -197,13 +197,26 @@ public class TrackerService extends Service {
         }
         aktivitaetEnde = false;
         letzteBewegung = System.currentTimeMillis();
-        melden();
+        if (!melden()) {
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         starten();
         return START_STICKY;
     }
 
-    /** Die Benachrichtigung, die einen Dienst im Vordergrund ausweist. */
-    private void melden() {
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Aufnahme.absturzMerken(this);
+    }
+
+    /**
+     * Die Benachrichtigung, die einen Dienst im Vordergrund ausweist. Lehnt Android den Dienst im
+     * Vordergrund ab (fehlende Freigabe, Start aus dem Hintergrund), stürzt die App nicht ab: Die
+     * Ursache landet bei der Seite, und `false` sagt, dass nicht aufgezeichnet werden kann.
+     */
+    private boolean melden() {
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (Build.VERSION.SDK_INT >= 26) {
             nm.createNotificationChannel(new NotificationChannel(KANAL_LAUFEND, "Aufzeichnung läuft", NotificationManager.IMPORTANCE_LOW));
@@ -223,10 +236,16 @@ public class TrackerService extends Service {
                 .setContentIntent(oeffnen)
                 .addAction(0, "Beenden", beenden)
                 .build();
-        if (Build.VERSION.SDK_INT >= 29) {
-            ServiceCompat.startForeground(this, ID_LAUFEND, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
-        } else {
-            startForeground(ID_LAUFEND, n);
+        try {
+            if (Build.VERSION.SDK_INT >= 29) {
+                ServiceCompat.startForeground(this, ID_LAUFEND, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+            } else {
+                startForeground(ID_LAUFEND, n);
+            }
+            return true;
+        } catch (RuntimeException e) {
+            Aufnahme.setPanne(this, "Die Aufzeichnung liess sich nicht starten: " + Aufnahme.kurz(e));
+            return false;
         }
     }
 

@@ -53,6 +53,9 @@ export function konto(): Promise<SupabaseClient> {
   return client
 }
 
+/** Geht an `window`, sobald sich jemand an- oder abmeldet, damit sich die Wegweiser gleich anpassen. */
+export const KONTO_WECHSEL = 'velonavi-konto'
+
 /** Ob schon eine Sitzung besteht oder gerade eine Anmeldung zurückkommt. */
 export function kontoAngefangen() {
   if (!KONTO_MOEGLICH) return false

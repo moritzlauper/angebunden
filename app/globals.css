@@ -194,6 +194,11 @@ body {
   --ab-schatten: 0 1px 1px rgba(24, 24, 27, 0.03), 0 10px 30px -12px rgba(24, 24, 27, 0.22);
 }
 
+/* Wer angemeldet ist, sieht die Wegweiser zur Erreichbarkeitskarte nicht, auch nicht kurz vor dem Hydrieren (page.tsx). */
+html[data-konto] .ohne-konto {
+  display: none !important;
+}
+
 html[data-thema='dunkel'] {
   --ab-papier: #0f0f11;
   --ab-blatt: rgba(26, 26, 30, 0.9);
