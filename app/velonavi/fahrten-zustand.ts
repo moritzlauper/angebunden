@@ -219,6 +219,14 @@ export function useFahrten({
     return !error
   }, [])
 
+  /** Löst den Code aus der Anmelde-E-Mail ein. Anders als der Link braucht er keinen bestimmten Browser. */
+  const perCode = useCallback(async (mail: string, code: string) => {
+    const sb = await konto()
+    const { error } = await sb.auth.verifyOtp({ email: mail, token: code.replace(/\s/g, ''), type: 'email' })
+    if (error) setMeldung(`Der Code stimmt nicht oder ist abgelaufen: ${error.message}`)
+    return !error
+  }, [])
+
   // --- Ablegen: erst auf dem Gerät, dann, wenn gewünscht, im Konto
   const sichernImKonto = useRef(false)
   sichernImKonto.current = !!nutzerId && sicherung
@@ -989,7 +997,7 @@ export function useFahrten({
   )
 
   return {
-    nutzer, anbinden, mit, perMail, abmelden, kontoMoeglich: KONTO_MOEGLICH,
+    nutzer, anbinden, mit, perMail, perCode, abmelden, kontoMoeglich: KONTO_MOEGLICH,
     fahrten, geladen, gezeigteFahrt, teilGezeigt, zeigen, zeigenMit, zeigenTeil, loeschen, importieren,
     zuordnung: (id: string) => zuRef.current.get(id) ?? null, laeufe,
     aufzeichnen,

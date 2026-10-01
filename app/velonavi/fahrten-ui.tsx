@@ -461,6 +461,7 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
   const [mail, setMail] = useState('')
   const [geschickt, setGeschickt] = useState(false)
   const [wartet, setWartet] = useState(false)
+  const [code, setCode] = useState('')
 
   // Erst mit dem Öffnen des Abschnitts wird Supabase geladen und gefragt, welche Anmeldewege es gibt.
   const { anbinden } = f
@@ -498,9 +499,32 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
           ))}
           {wege.mail &&
             (geschickt ? (
-              <p className="rounded-2xl px-3 py-2 text-[12px] leading-snug" style={{ background: ui.weich }}>
-                Der Anmeldelink ist unterwegs an {mail}. Öffne ihn in diesem Browser.
-              </p>
+              <form
+                className="flex flex-col gap-2"
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  setWartet(true)
+                  await f.perCode(mail.trim(), code)
+                  setWartet(false)
+                }}
+              >
+                <p className="rounded-2xl px-3 py-2 text-[12px] leading-snug" style={{ background: ui.weich }}>
+                  Die E-Mail ist unterwegs an {mail}. Gib hier den Code daraus ein. Der Link in der E-Mail öffnet den Browser und nicht die App.
+                </p>
+                <input
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="Code aus der E-Mail"
+                  className={feld}
+                  style={{ background: ui.bg, borderColor: ui.border, color: ui.fg }}
+                />
+                <button type="submit" disabled={wartet || code.trim().length < 6} className={knopf} style={{ background: ui.fg, borderColor: ui.fg, color: ui.bg }}>
+                  {wartet ? 'Wird geprüft …' : 'Anmelden'}
+                </button>
+              </form>
             ) : (
               <form
                 className="flex flex-col gap-2"
@@ -525,7 +549,7 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
                   />
                 </label>
                 <button type="submit" disabled={wartet} className={knopf} style={{ background: ui.fg, borderColor: ui.fg, color: ui.bg }}>
-                  {wartet ? 'Wird verschickt …' : 'Anmeldelink schicken'}
+                  {wartet ? 'Wird verschickt …' : 'Code per E-Mail schicken'}
                 </button>
               </form>
             ))}
