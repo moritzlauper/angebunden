@@ -792,15 +792,63 @@ export function lerne(g: Graph, zuordnungen: Zuordnung[], gemeinschaft?: Gemeins
   }
 }
 
-/** Anteil der gefahrenen Meter, die auf Kanten von `r` liegen. */
+/** So nah an der Route gilt ein Stück als gefolgt: eine Strassenbreite mit Trottoir. */
+const DECKUNG_M = 20
+
+/**
+ * Anteil der gefahrenen Meter, die nah an `r` liegen. Gemessen wird der Abstand und nicht, ob es
+ * dieselbe Kante des Netzes ist: Viele Strassen haben Fahrbahn, Velostreifen und Trottoir als eigene
+ * Kanten, oft je Seite. Wer auf dem Streifen neben der vorgeschlagenen Fahrbahn fuhr, folgte der
+ * Route, zählte aber nicht dazu. Eine Fahrt, die bis auf das letzte Stück der Route folgte, kam so
+ * auf 59 statt gut 85 Prozent.
+ */
 export function deckung(g: Graph, stuecke: Stueck[], r: Route) {
-  const kanten = new Set(r.stuecke.map((s) => s.a >> 1))
+  const pts = r.koordinaten
+  if (pts.length < 2) return 0
+  const kx = mx(pts[0][1])
+  const xy = (lon: number, lat: number) => [lon * kx, lat * MY] as const
+  // Die Abschnitte der Route in einem Gitter aus Feldern von 50 m, damit jede Probe nur die nahen prüft.
+  const FELD = 50
+  const gitter = new Map<string, number[]>()
+  const routeXY = pts.map(([lon, lat]) => xy(lon, lat))
+  for (let i = 0; i + 1 < routeXY.length; i++) {
+    const [ax, ay] = routeXY[i]
+    const [bx, by] = routeXY[i + 1]
+    for (let fx = Math.floor((Math.min(ax, bx) - DECKUNG_M) / FELD); fx <= Math.floor((Math.max(ax, bx) + DECKUNG_M) / FELD); fx++)
+      for (let fy = Math.floor((Math.min(ay, by) - DECKUNG_M) / FELD); fy <= Math.floor((Math.max(ay, by) + DECKUNG_M) / FELD); fy++) {
+        const k = `${fx},${fy}`
+        const l = gitter.get(k)
+        if (l) l.push(i)
+        else gitter.set(k, [i])
+      }
+  }
+  const nah = (x: number, y: number) => {
+    for (const i of gitter.get(`${Math.floor(x / FELD)},${Math.floor(y / FELD)}`) ?? []) {
+      const [ax, ay] = routeXY[i]
+      const [bx, by] = routeXY[i + 1]
+      const dx = bx - ax
+      const dy = by - ay
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy || 1)))
+      if (Math.hypot(x - ax - t * dx, y - ay - t * dy) <= DECKUNG_M) return true
+    }
+    return false
+  }
   let alle = 0
   let gemeinsam = 0
   for (const s of stuecke) {
-    const L = g.laenge[s.a >> 1] * (s.bis - s.von)
-    alle += L
-    if (kanten.has(s.a >> 1)) gemeinsam += L
+    const linie = ausschnitt(g, s.a, s.von, s.bis)
+    for (let i = 0; i + 1 < linie.length; i++) {
+      const [ax, ay] = xy(linie[i][0], linie[i][1])
+      const [bx, by] = xy(linie[i + 1][0], linie[i + 1][1])
+      const L = Math.hypot(bx - ax, by - ay)
+      // In Schritten von höchstens 10 m, jeder Schritt zählt nach seiner Mitte.
+      const n = Math.max(1, Math.ceil(L / 10))
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n
+        alle += L / n
+        if (nah(ax + t * (bx - ax), ay + t * (by - ay))) gemeinsam += L / n
+      }
+    }
   }
   return alle > 0 ? gemeinsam / alle : 0
 }
