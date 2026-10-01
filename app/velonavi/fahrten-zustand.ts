@@ -170,7 +170,9 @@ export function useFahrten({
     // In der App gehört der Standort dazu, im Browser erst, wenn man ihn einmal freigegeben hat.
     setOrtZeigenRoh(lies(SCHLUESSEL.ortZeigen, !!t))
     alleFahrten()
-      .then((f) => setFahrten(f.slice(0, FAHRTEN_MAX)))
+      // Der Velonavi ist nur fürs Velo. Wege zu Fuss, im Tram oder Auto aus früheren Fassungen bleiben
+      // auf dem Gerät liegen, erscheinen aber nicht mehr.
+      .then((f) => setFahrten(f.filter(istVelo).slice(0, FAHRTEN_MAX)))
       .catch(() => setMeldung('Der Speicher dieses Browsers ist nicht verfügbar. Fahrten gehen beim Schliessen der Seite verloren.'))
       .finally(() => setGeladen(true))
     if (!KONTO_MOEGLICH) return
@@ -298,6 +300,13 @@ export function useFahrten({
         geplant && geplant.titel !== 'Mein Standort' && abstand(geplant.lon, geplant.lat, lon, lat) < ORT_NAH
           ? { lon: geplant.lon, lat: geplant.lat, titel: geplant.titel }
           : benenneRef.current(lon, lat)
+      // Wer per Knopf aufzeichnet, fährt Velo. Was die Erkennung aufgezeichnet hat, prüft die Seite aus
+      // Tempo und Halten: Stellt es sich als Tram, Auto oder Fussweg heraus, wird es nicht gespeichert.
+      const modus: Modus = offen.quelle === 'aufzeichnung' || (!offen.quelle && !offen.hinweis) ? 'velo' : erkenne(spur, haltestellenRef.current, offen.hinweis)
+      if (modus !== 'velo') {
+        schreib(SCHLUESSEL.laufend, null)
+        return null
+      }
       const f: Gespeichert = {
         id: id ?? crypto.randomUUID(),
         begonnen: new Date(offen.beginn + erster[2] * 1000).toISOString(),
@@ -308,8 +317,7 @@ export function useFahrten({
         spur,
         vorschlag: wieGeplant ? offen.vorschlag : null,
         quelle: offen.quelle ?? 'aufzeichnung',
-        // Wer per Knopf im Routenplaner aufzeichnet, fährt Velo. Alles andere erkennt die Seite aus dem Tempo und den Halten.
-        modus: offen.quelle === 'aufzeichnung' || (!offen.quelle && !offen.hinweis) ? 'velo' : erkenne(spur, haltestellenRef.current, offen.hinweis),
+        modus,
       }
       try {
         await speichern(f)
@@ -517,7 +525,7 @@ export function useFahrten({
         setMeldung(freigaben(fehlt))
         return
       }
-      nativStand(await nativ.auto({ aktiv: true, alle: true }))
+      nativStand(await nativ.auto({ aktiv: true, alle: false }))
     }).catch(() => setMeldung('Die automatische Erkennung liess sich nicht einschalten.'))
   }, [nativ, geladen, nativStand])
 
@@ -651,18 +659,12 @@ export function useFahrten({
     schreib(SCHLUESSEL.laufend, null)
   }, [nativ, anhalten, holeNativ, warteAufDienst])
 
-  /** Auch Gehen, Joggen, Tram und Auto von selbst aufzeichnen, nicht nur Velofahrten. */
-  const setAutoAlleWert = useCallback(
-    async (alle: boolean) => {
-      if (!nativ) return
-      try {
-        nativStand(await nativ.auto({ aktiv: autoAn, alle }))
-      } catch {
-        setMeldung('Die Einstellung liess sich nicht übernehmen.')
-      }
-    },
-    [nativ, autoAn, nativStand]
-  )
+  // Frühere Fassungen konnten auch Gehen, Joggen, Tram und Auto aufzeichnen. Der Velonavi ist nur fürs
+  // Velo: Steht die App noch so, wird sie zurückgestellt.
+  useEffect(() => {
+    if (!nativ || !autoAlle) return
+    nativ.auto({ aktiv: autoAn, alle: false }).then(nativStand, () => {})
+  }, [nativ, autoAlle, autoAn, nativStand])
 
   const setAuto = useCallback(
     async (an: boolean) => {
@@ -675,12 +677,12 @@ export function useFahrten({
         }
       }
       try {
-        nativStand(await nativ.auto({ aktiv: an, alle: autoAlle }))
+        nativStand(await nativ.auto({ aktiv: an, alle: false }))
       } catch {
         setMeldung('Die automatische Erkennung liess sich nicht umschalten.')
       }
     },
-    [nativ, nativStand, autoAlle]
+    [nativ, nativStand]
   )
 
   // Die Bildschirmsperre fällt weg, sobald die Seite in den Hintergrund geht.
@@ -764,30 +766,6 @@ export function useFahrten({
     },
     [nutzerId]
   )
-
-  /** Die Art der Fahrt von Hand korrigieren. Velo zählt fürs Lernen, alles andere nicht. */
-  const setModus = useCallback(async (id: string, modus: Modus) => {
-    const alt = fahrtenRef.current.find((f) => f.id === id)
-    if (!alt || (alt.modus ?? 'velo') === modus) return
-    const neu: Gespeichert = { ...alt, modus, geteilt: false }
-    // Ins Konto gehören nur Velofahrten: Wird eine zu Tram oder Gehen, geht sie dort weg, und umgekehrt hinein.
-    const warVelo = (alt.modus ?? 'velo') === 'velo'
-    if (warVelo && alt.gesichert) neu.gesichert = false
-    setFahrten((liste) => liste.map((f) => (f.id === id ? neu : f)))
-    await speichern(neu).catch(() => setMeldung('Die Änderung liess sich nicht speichern.'))
-    if (!nutzerIdRef.current) return
-    if (modus === 'velo') {
-      if (sichernImKonto.current) await hochladen([neu], true)
-    } else if (warVelo) {
-      try {
-        const sb = await konto()
-        const { error } = await sb.from(TABELLE).delete().eq('id', id)
-        if (error) throw error
-      } catch {
-        // Bleibt sie im Konto, holt der nächste Abgleich sie nicht als Velofahrt zurück: Sie liegt ja noch hier.
-      }
-    }
-  }, [hochladen])
 
   const abmelden = useCallback(async () => {
     const sb = await konto()
@@ -998,14 +976,13 @@ export function useFahrten({
       schreib(SCHLUESSEL.aufzeichnen, v)
     },
     /** Die Android-App, sonst null. Nur sie zeichnet im Hintergrund und von selbst auf. */
-    nativ, autoAn, setAuto, autoAlle, setAutoAlle: setAutoAlleWert, erkennung,
+    nativ, autoAn, setAuto, erkennung,
     ich, ortZeigen,
     /** Den Standort als Punkt zeigen; im Browser wird dabei zum ersten Mal nach der Freigabe gefragt. */
     setOrtZeigen: (v: boolean) => {
       setOrtZeigenRoh(v)
       schreib(SCHLUESSEL.ortZeigen, v)
     },
-    setModus,
     laufend, starten, beenden, verwerfen, linien, ansicht,
     lernen,
     setLernen: (v: boolean) => {

@@ -19,7 +19,7 @@ Die Fassung entsteht bei jeder Änderung am Android-Teil von selbst
 - **Auf Knopfdruck:** im Velonavi bei einer Route «Aufzeichnen». Die App braucht den Standort.
   Ein Dienst im Vordergrund sammelt im Sekundentakt Punkte, eine Benachrichtigung zeigt es an
   und hat einen Knopf zum Beenden.
-- **Von selbst:** im Menü «Konto und Fahrten» den Schalter «Von selbst aufzeichnen». Mit der Option «Auch Gehen, Joggen, Tram und Auto» erkennt die App jede Art der Bewegung und trennt die Wege in Abschnitte, etwa Gehen, Tram, Velo. Die Seite bestimmt die Art aus Tempo und Halten (`app/velonavi/modus.ts`), Haltestellen unterscheiden Tram und Bus vom Auto. Gelernt wird nur aus Velofahrten, die Art lässt sich in der Auswertung korrigieren. Dafür
+- **Von selbst:** im Menü «Konto und Fahrten» den Schalter «Von selbst aufzeichnen». Der Velonavi ist nur fürs Velo: Die App zeichnet auf, wenn Android eine Velofahrt meldet. Was sich danach aus Tempo und Halten doch als Tram, Auto oder Fussweg herausstellt (`app/velonavi/modus.ts`), speichert die Seite nicht. Wege zu Fuss, im Tram oder Auto aus früheren Fassungen bleiben auf dem Gerät, erscheinen aber nicht mehr. Dafür
   braucht die App den Standort «Immer zulassen» und die Bewegungserkennung («Körperliche
   Aktivität»). Die Bewegungserkennung von Android meldet, wenn man aufs Velo steigt, das kostet
   kaum Akku. Erst dann schaltet die App den Standort ein. Die Aufzeichnung endet, wenn man
@@ -29,7 +29,7 @@ Die Fassung entsteht bei jeder Änderung am Android-Teil von selbst
 - Beim ersten Start fragt die App nach Standort, Mitteilungen und Bewegungserkennung. Für den
   Hintergrundstandort führt sie ab Android 11 in die App-Einstellungen: Unter «Standort» muss
   «Immer zulassen» gewählt werden. Sind alle Freigaben erteilt, schaltet die App das automatische
-  Aufzeichnen einschliesslich Gehen, Joggen, Tram und Auto ein. Wer eine Freigabe ablehnt, kann
+  Aufzeichnen von Velofahrten ein. Wer eine Freigabe ablehnt, kann
   sie später in den Einstellungen nachholen und den Schalter im Menü einschalten.
 
 Die fertigen Fahrten liegen im privaten Ordner der App und warten dort, bis die Seite sie

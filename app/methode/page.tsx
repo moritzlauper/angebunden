@@ -436,10 +436,10 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           Aufgezeichnete Spuren werden auf deinem Gerät gespeichert, in der Datenbank des Browsers oder
           der Android-App, und dort ausgewertet, verglichen und fürs Lernen gerechnet. Was das Gerät
           darüber hinaus verlässt, steht in den beiden Absätzen unten.
-          Die Android-App zeichnet auf Wunsch im Hintergrund auf und erkennt von selbst, ob du Velo
-          fährst, gehst, joggst oder im Tram oder Auto sitzt. Dafür braucht sie den Standort «immer»
-          und die Bewegungserkennung, und eine sichtbare Benachrichtigung zeigt, wenn sie aufzeichnet.
-          Gelernt wird nur aus Velofahrten. Einzelne Fahrten oder alle zusammen löschst du
+          Die Android-App zeichnet auf Wunsch im Hintergrund auf und erkennt von selbst, wenn du Velo
+          fährst. Dafür braucht sie den Standort «immer» und die Bewegungserkennung, und eine
+          sichtbare Benachrichtigung zeigt, wenn sie aufzeichnet. Gespeichert werden nur
+          Velofahrten. Einzelne Fahrten oder alle zusammen löschst du
           im Velonavi selbst.
         </p>
         {KONTO_MOEGLICH && (

@@ -5,7 +5,6 @@ import { GEFAHREN, GRAU } from '../farben'
 import { anmeldewege, type Anbieter } from './konto'
 import { deckung, modellZeit, type Fahrt, type Ort } from './fahrten.ts'
 import { aehnliche, teilstrecken, type Teilstrecke } from './vergleich.ts'
-import { MODI, modusName } from './modus.ts'
 import type { Graph, Route } from './router'
 import type { Fahrtenstand } from './fahrten-zustand'
 import { ui, km, minuten, Hinweis, KleinKnopf, Schalter, HOEHE_MOBIL, OBEN_MOBIL } from './teile'
@@ -224,16 +223,6 @@ export function Fahrtenmenue({ f, graph, mobil, onSchliessen }: { f: Fahrtenstan
               Von selbst im Hintergrund aufzeichnen geht nur mit der Android-App.
             </p>
           )}
-          {f.nativ && f.autoAn && (
-            <div className="flex flex-col gap-2.5 border-l-2 pl-3" style={{ borderColor: ui.border }}>
-              <Schalter
-                an={f.autoAlle}
-                setAn={f.setAutoAlle}
-                titel="Auch Gehen, Joggen, Tram und Auto"
-                hilfe="Zeichnet jeden Weg auf und erkennt, womit du unterwegs warst. Gelernt wird nur aus Velofahrten, der Rest bleibt auf dem Gerät. Kostet mehr Akku"
-              />
-            </div>
-          )}
           <Schalter
             an={f.ortZeigen}
             setAn={f.setOrtZeigen}
@@ -296,7 +285,6 @@ export function Fahrtenmenue({ f, graph, mobil, onSchliessen }: { f: Fahrtenstan
                     </span>
                     <span className="block text-[11px]" style={{ color: ui.muted }}>
                       {datumText(x.begonnen)}
-                      {x.modus && x.modus !== 'velo' && ` · ${modusName(x.modus)}`}
                       {x.quelle === 'auto' && ' · von selbst'}
                       {x.quelle === 'gpx' && ' · GPX'}
                     </span>
@@ -692,8 +680,7 @@ function Auswertung({
   routen: Routen | null
 }) {
   const [frage, setFrage] = useState(false)
-  const velo = (fahrt.modus ?? 'velo') === 'velo'
-  const z = velo ? f.zuordnung(fahrt.id) : null
+  const z = f.zuordnung(fahrt.id)
   const dauer = z ? z.netto : fahrt.dauer
   const distanz = z ? z.distanz : fahrt.distanz
   // Die heutigen Vorschläge gelten nur, solange der Routenplaner noch die Strecke der Fahrt zeigt.
@@ -738,15 +725,26 @@ function Auswertung({
       hilfe: 'als das Modell, das mit 23 km/h in der Ebene rechnet',
     })
   }
+  // Alles bei deinem Tempo auf dieser Fahrt: Die Strecken rechnet dasselbe Modell, dann mal deinen Tempofaktor.
+  // So vergleicht sich jede Strecke mit der Zeit oben, und nur die Wahl der Strecke macht den Unterschied.
+  // Die Routenkarte zeigt eine andere Zahl: Sie rechnet mit dem Tempo, das der Velonavi aus allen
+  // Fahrten gelernt hat, und das ist nach wenigen Fahrten noch nahe am Modell.
   if (modell && z) {
-    zeilen.push({ titel: 'Deine Strecke bei Modelltempo', wert: dauerText(modell.meine), hilfe: 'Grundlage für den Vergleich, unabhängig von deinem Tempo' })
-    for (const [titel, m, r] of [['«Schnell» heute', modell.schnell, heute?.schnell], ['«Komfort» heute', modell.komfort, heute?.komfort]] as const)
-      if (m !== null && r && graph)
-        zeilen.push({
-          titel,
-          wert: dauerText(m),
-          hilfe: `${unterschied(modell.meine, m, ['länger', 'kürzer'])} als deine Strecke · bei deinem Tempo ${dauerText(m * z.tempo)} · folgt zu ${prozent(deckung(graph, z.stuecke, r))} deiner Strecke`,
-        })
+    const t = z.tempo
+    zeilen.push({ titel: 'Deine Strecke', wert: dauerText(modell.meine * t), hilfe: 'bei deinem Tempo, ohne Warten an Ampeln' })
+    const gleicheRoute = !!heute?.schnell && !!heute?.komfort && heute.schnell.zeit === heute.komfort.zeit && heute.schnell.distanz === heute.komfort.distanz
+    const vergleiche = gleicheRoute
+      ? ([['«Schnell» = «Komfort» heute', modell.schnell, heute?.schnell]] as const)
+      : ([['«Schnell» heute', modell.schnell, heute?.schnell], ['«Komfort» heute', modell.komfort, heute?.komfort]] as const)
+    for (const [titel, m, r] of vergleiche)
+      if (m !== null && r && graph) {
+        const teile = [
+          `${unterschied(modell.meine * t, m * t, ['länger', 'kürzer'])} als deine Strecke`,
+          `folgt zu ${prozent(deckung(graph, z.stuecke, r))} deiner Strecke`,
+        ]
+        if (Math.abs(r.zeit - m * t) >= 30) teile.push(`die Routenkarte zeigt ${minuten(r.zeit)}, sie rechnet mit dem Tempo aus all deinen Fahrten`)
+        zeilen.push({ titel, wert: dauerText(m * t), hilfe: teile.join(' · ') })
+      }
   }
 
   return (
@@ -772,30 +770,7 @@ function Auswertung({
           {km(distanz)} · {((distanz / Math.max(dauer, 1)) * 3.6).toFixed(1)} km/h
         </div>
       </div>
-      <div className="flex flex-col gap-1">
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Art der Fahrt">
-          {MODI.map((m) => {
-            const an = (fahrt.modus ?? 'velo') === m.id
-            return (
-              <button
-                key={m.id}
-                onClick={() => f.setModus(fahrt.id, m.id)}
-                aria-pressed={an}
-                className="rounded-full border px-2.5 py-0.5 text-[11px] font-medium"
-                style={{ borderColor: an ? ui.fg : ui.border, background: an ? ui.weich : 'transparent', color: an ? ui.fg : ui.muted }}
-              >
-                {m.name}
-              </button>
-            )
-          })}
-        </div>
-        {!velo && (
-          <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
-            Keine Velofahrt: Sie zählt nicht fürs Lernen und wird nicht verglichen. Stimmt die Art nicht, oben ändern.
-          </p>
-        )}
-      </div>
-      {velo && !z && (
+      {!z && (
         <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
           {graph ? 'Die Spur liess sich dem Velonetz nicht zuordnen. Sie liegt wohl ausserhalb der Stadt.' : 'Velonetz wird geladen …'}
         </p>
