@@ -44,7 +44,9 @@ Geht etwas schief, merkt sich die App die Ursache und die Seite zeigt sie beim n
 einmal an: ein Absturz der App (Art des Fehlers und Stelle im Code), ein Dienst im Vordergrund, den
 Android ablehnt, oder eine Seite, die abgestürzt ist oder die Android wegen Speicher beendet hat. In
 diesem Fall lädt die App die Seite neu, statt mit einer Fehlerseite stehenzubleiben; eine laufende
-Aufzeichnung läuft im Dienst weiter.
+Aufzeichnung läuft im Dienst weiter. Ebenso, wenn die Seite selbst nicht lädt (`Seitenwaechter.java`):
+Die App merkt sich Adresse und Fehlercode und versucht es noch zweimal, erst dann kommt die Seite
+«Keine Verbindung».
 
 Android-Hersteller mit scharfem Energiesparen (Xiaomi, Huawei, Samsung) beenden Hintergrunddienste
 gern. Hilft nichts, die App in den Einstellungen von der Akkuoptimierung ausnehmen.
@@ -59,9 +61,10 @@ Start zeigt eine Einführung die Muster zum Ausprobieren. Ist «Aufzeichnen» ei
 die Führung die Fahrt mit auf.
 
 Die Führung läuft in der Seite und braucht deshalb einen Bildschirm, der an bleibt; die Seite hält
-ihn an. Bei ausgeschaltetem Bildschirm gibt es noch keine Hinweise. Die Vibration braucht die
-Android-App (`VIBRATE` im Manifest), ein iPhone kann aus dem Browser nicht vibrieren, dort bleibt die
-Anzeige. Die Berechnung der Abbiegehinweise steht in `app/velonavi/fuehrung.ts`.
+ihn an. Bei ausgeschaltetem Bildschirm gibt es noch keine Hinweise. Geführt fahren und Aufzeichnen
+gibt es nur in der App, im Browser fehlen die Knöpfe. Die Vibration läuft über Android selbst
+(`vibrieren` im Plugin, `VIBRATE` im Manifest) und als Alarm: Das Vibrieren der Seite kam im WebView
+nicht an, und so spürt man es auch, wenn das Handy auf lautlos steht. Die Berechnung der Abbiegehinweise steht in `app/velonavi/fuehrung.ts`.
 
 ## GPX
 

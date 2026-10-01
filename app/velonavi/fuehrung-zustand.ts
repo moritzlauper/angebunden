@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Graph, Route } from './router'
 import { anweisungen, fortschritt, linieVon, MUSTER, vorlauf, type Anweisung } from './fuehrung.ts'
 import { lies, schreib } from './teile'
+import { tracker } from './native.ts'
 
 const INTRO = 'velonavi.fuehrung.intro'
 /** So weit neben der Route gilt man noch als auf ihr. */
@@ -27,8 +28,22 @@ export type Stand = {
 
 const LEER: Stand = { naechste: null, bis: 0, rest: 0, abseits: false, angekommen: false }
 
-/** Lässt das Gerät vibrieren, wenn es das kann. Liefert, ob es geklappt hat. */
-export const vibrieren = (muster: number[]) => typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function' && navigator.vibrate(muster)
+/**
+ * Lässt das Gerät vibrieren. In der App über Android selbst (`VelotrackerPlugin.vibrieren`): Das
+ * Vibrieren der Seite kam im WebView nicht an, und als Alarm spürt man es auch auf lautlos. Sonst,
+ * und in älteren Fassungen der App, über den Browser.
+ */
+export const vibrieren = (muster: number[]) => {
+  const t = tracker()
+  if (t?.vibrieren) {
+    t.vibrieren({ muster }).then(
+      (r) => !r.ok && navigator.vibrate?.(muster),
+      () => navigator.vibrate?.(muster)
+    )
+    return true
+  }
+  return typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function' && navigator.vibrate(muster)
+}
 
 /**
  * Geführtes Fahren: folgt der eigenen Position auf der Route und meldet Abbiegen per Vibration.
@@ -64,7 +79,7 @@ export function useFuehrung({
   const watchRef = useRef<number | null>(null)
   const sperreRef = useRef<WakeLockSentinel | null>(null)
 
-  useEffect(() => setKannVibrieren(typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function'), [])
+  useEffect(() => setKannVibrieren(!!tracker()?.vibrieren || (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function')), [])
 
   // Eine neue Route (zum Beispiel nach dem Neurechnen) fängt vorne an.
   useEffect(() => {

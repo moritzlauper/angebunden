@@ -186,16 +186,14 @@ export function Fahrtenmenue({ f, graph, mobil, onSchliessen }: { f: Fahrtenstan
         <Meldung f={f} />
 
         <div className="flex flex-col gap-2.5">
-          <Schalter
-            an={f.aufzeichnen}
-            setAn={f.setAufzeichnen}
-            titel="Knopf «Aufzeichnen» zeigen"
-            hilfe={
-              f.nativ
-                ? 'Bei jeder Route. Die App zeichnet auch bei ausgeschaltetem Bildschirm auf'
-                : 'Bei jeder Route. Im Browser zeichnet die Seite nur auf, solange sie offen und der Bildschirm an ist'
-            }
-          />
+          {f.nativ && (
+            <Schalter
+              an={f.aufzeichnen}
+              setAn={f.setAufzeichnen}
+              titel="Knopf «Aufzeichnen» zeigen"
+              hilfe="Bei jeder Route. Die App zeichnet auch bei ausgeschaltetem Bildschirm auf"
+            />
+          )}
           {f.nativ ? (
             <>
               <Schalter
@@ -569,7 +567,8 @@ export function Fahrtbereich({
 
 /** Der Knopf zum Losfahren, klein neben GPX und Teilen, gross ohne Route. */
 export function AufzeichnenKnopf({ f, routen, wahl, gross }: { f: Fahrtenstand; routen: Routen | null; wahl: string | null; gross?: boolean }) {
-  if (!f.aufzeichnen || f.laufend) return null
+  // Nur in der App: Im Browser endet die Aufzeichnung, sobald der Bildschirm ausgeht.
+  if (!f.nativ || !f.aufzeichnen || f.laufend) return null
   const losfahren = () =>
     f.starten(
       routen && wahl

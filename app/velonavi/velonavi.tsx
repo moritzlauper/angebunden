@@ -1592,7 +1592,8 @@ export default function Velonavi() {
           setWahl={setWahl}
           hover={hover}
           setHover={setHover}
-          fuehrung={<FuehrungKnopf f={fuehrung} routeDa />}
+          // Geführt fahren und Aufzeichnen gibt es nur in der App: Vibration und Standort im Hintergrund kann der Browser nicht.
+          fuehrung={fahrten.nativ ? <FuehrungKnopf f={fuehrung} routeDa /> : null}
           teilen={teilen}
           kopiert={kopiert}
           aktion={<AufzeichnenKnopf f={fahrten} routen={routen.routen} wahl={aktiv} />}

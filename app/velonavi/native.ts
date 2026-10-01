@@ -60,6 +60,8 @@ export type Tracker = {
   auto(o: { aktiv: boolean; alle?: boolean }): Promise<NativStatus>
   abholen(): Promise<{ fahrten: NativeFahrt[] }>
   quittieren(o: { ids: string[] }): Promise<void>
+  /** Vibriert nach einem Muster wie `navigator.vibrate`, als Alarm. Älteren Fassungen der App fehlt die Funktion. */
+  vibrieren?(o: { muster: number[] }): Promise<{ ok: boolean; fehler?: string }>
   /** Was zuletzt schiefging (Absturz, abgelehnter Dienst), einmal, danach leer. Älteren Fassungen der App fehlt die Funktion. */
   panne?(): Promise<{ text: string; zeit: number }>
   /** Öffnet das Teilen-Menü von Android mit einer GPX-Datei. Älteren Fassungen der App fehlt die Funktion. */

@@ -16,6 +16,8 @@ public class MainActivity extends BridgeActivity {
         // Das Plugin muss vor dem Start der Brücke angemeldet sein.
         registerPlugin(VelotrackerPlugin.class);
         super.onCreate(savedInstanceState);
+        // Ladefehler der Seite abfangen, statt die Fehlerseite von Android stehen zu lassen.
+        getBridge().setWebViewClient(new Seitenwaechter(getBridge(), this));
         // Ist der Prozess der Seite weg (abgestürzt oder von Android wegen Speicher beendet), riss das
         // bisher die ganze App mit oder hinterliess eine Fehlerseite. Jetzt baut die App die Seite neu
         // auf. Eine laufende Aufzeichnung läuft im Dienst weiter und ist danach wieder zu sehen.

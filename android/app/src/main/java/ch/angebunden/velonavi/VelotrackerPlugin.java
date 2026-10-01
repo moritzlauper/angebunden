@@ -171,6 +171,54 @@ public class VelotrackerPlugin extends Plugin {
         call.resolve();
     }
 
+    /**
+     * Vibriert nach einem Muster wie `navigator.vibrate`: an, aus, an, … in Millisekunden. Das
+     * Vibrieren der Seite selbst kam im WebView auf manchen Geräten nicht an. Hier läuft es als
+     * Alarm: Das spürt man auch, wenn das Handy auf lautlos steht oder die Berührungs-Vibration aus ist.
+     */
+    @PluginMethod
+    public void vibrieren(PluginCall call) {
+        JSObject o = new JSObject();
+        try {
+            JSONArray roh = call.getData().optJSONArray("muster");
+            if (roh == null || roh.length() == 0) {
+                o.put("ok", false);
+                call.resolve(o);
+                return;
+            }
+            // Android beginnt mit einer Pause, `navigator.vibrate` mit dem ersten Stoss.
+            long[] zeiten = new long[roh.length() + 1];
+            for (int i = 0; i < roh.length(); i++) zeiten[i + 1] = Math.max(0, Math.min(5000, roh.optLong(i, 0)));
+            android.os.Vibrator v;
+            if (Build.VERSION.SDK_INT >= 31) {
+                android.os.VibratorManager vm = (android.os.VibratorManager) getContext().getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
+                v = vm == null ? null : vm.getDefaultVibrator();
+            } else {
+                v = (android.os.Vibrator) getContext().getSystemService(Context.VIBRATOR_SERVICE);
+            }
+            if (v == null || !v.hasVibrator()) {
+                o.put("ok", false);
+                call.resolve(o);
+                return;
+            }
+            v.cancel();
+            if (Build.VERSION.SDK_INT >= 33) {
+                v.vibrate(android.os.VibrationEffect.createWaveform(zeiten, -1),
+                        android.os.VibrationAttributes.createForUsage(android.os.VibrationAttributes.USAGE_ALARM));
+            } else if (Build.VERSION.SDK_INT >= 26) {
+                v.vibrate(android.os.VibrationEffect.createWaveform(zeiten, -1),
+                        new android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_ALARM).build());
+            } else {
+                v.vibrate(zeiten, -1);
+            }
+            o.put("ok", true);
+        } catch (RuntimeException e) {
+            o.put("ok", false);
+            o.put("fehler", Aufnahme.kurz(e));
+        }
+        call.resolve(o);
+    }
+
     /** Was zuletzt schiefging (`Aufnahme.setPanne`), einmal: Danach ist es gelöscht. */
     @PluginMethod
     public void panne(PluginCall call) {
