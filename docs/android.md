@@ -35,7 +35,7 @@ Die Fassung entsteht bei jeder Änderung am Android-Teil von selbst
 Die fertigen Fahrten liegen im privaten Ordner der App und warten dort, bis die Seite sie
 beim nächsten Öffnen abholt. Sie landen in der Datenbank der Seite, dort werten Velonavi die
 Fahrten aus, vergleichen sie und lernen daraus. Die Spur verlässt das Gerät nur als
-gekürzte Kopie, wenn man angemeldet ist (die Sicherung im Konto ist dann an, im Menü abschaltbar).
+Kopie im eigenen Konto, wenn man angemeldet ist (die Sicherung im Konto ist dann an, im Menü abschaltbar).
 Ein Deinstallieren löscht die Fahrten auf dem Gerät; was im Konto liegt, kommt nach dem Anmelden
 zurück. Standardmässig gehen ausserdem anonyme Messwerte
 weg (Beitragen, im Menü abschaltbar).

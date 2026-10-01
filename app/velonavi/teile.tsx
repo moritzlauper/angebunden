@@ -32,6 +32,15 @@ export const ui = {
   schatten: 'var(--ab-schatten)',
 }
 
+/**
+ * Höchsthöhe eines schwebenden Felds auf dem Handy. In der App reicht die Seite unter Statusleiste
+ * und Gestenleiste: Mit nur `100% - 1.5rem` ragte ein Feld, das unter der Statusleiste beginnt, um
+ * deren Höhe unten aus dem Bildschirm, und das Letzte darin war nicht mehr zu erreichen.
+ */
+export const HOEHE_MOBIL = 'calc(100% - max(0.75rem, env(safe-area-inset-top)) - max(0.75rem, env(safe-area-inset-bottom)))'
+export const OBEN_MOBIL = 'max(0.75rem, env(safe-area-inset-top))'
+export const UNTEN_MOBIL = 'max(0.75rem, env(safe-area-inset-bottom))'
+
 /** Liest einen Wert aus dem localStorage. Ohne Speicher (privates Fenster) gilt die Vorgabe. */
 export function lies<T>(schluessel: string, vorgabe: T): T {
   try {

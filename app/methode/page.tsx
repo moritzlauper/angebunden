@@ -446,10 +446,9 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           <p className="mt-4">
             Zwei Dinge gehen darüber hinaus. Das Beitragen von Messwerten, wie oben beschrieben,
             ist standardmässig an und braucht kein Konto. Die Sicherung im Konto gibt es erst, wenn
-            du dich anmeldest; dann ist sie an und lässt sich im Menü ausschalten: Damit die Fahrten auf einem neuen Gerät wieder da
-            sind, wird deine E-Mail-Adresse gespeichert und eine gekürzte Kopie jeder Velofahrt, ohne
-            die ersten und letzten 150 Meter, ohne Adressen und mit dem Beginn auf die Stunde
-            gerundet. Beides liegt bei{' '}
+            du dich anmeldest; dann ist sie an und lässt sich im Menü ausschalten: Damit die Fahrten auf
+            einem neuen Gerät wieder da sind, wird deine E-Mail-Adresse gespeichert und eine Kopie
+            jeder Velofahrt, vollständig mit Spur, Start und Ziel und Zeit. Beides liegt bei{' '}
             <Aus href="https://supabase.com">Supabase</Aus> in einer Datenbank in Zürich. Jedes
             Konto kann nur die eigenen Fahrten lesen, die Messwerte kann niemand einzeln lesen. Die
             Anmeldung steht im Speicher des Browsers und nicht in einem Cookie. Das Konto lösche ich

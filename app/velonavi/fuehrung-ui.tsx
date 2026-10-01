@@ -3,7 +3,7 @@
 import { type ReactNode } from 'react'
 import { MUSTER, richtungText, type Richtung } from './fuehrung.ts'
 import type { Fuehrungsstand } from './fuehrung-zustand'
-import { ui, km, KleinKnopf } from './teile'
+import { ui, km, KleinKnopf, HOEHE_MOBIL, UNTEN_MOBIL } from './teile'
 
 /** Ein Pfeil, der nach links oder rechts abbiegt, oder wendet. */
 function Pfeil({ richtung, groesse = 44 }: { richtung: Richtung | 'geradeaus' | 'ziel'; groesse?: number }) {
@@ -108,8 +108,8 @@ export function FuehrungIntro({ f, mobil }: { f: Fuehrungsstand; mobil: boolean 
       <div
         role="dialog"
         aria-label="Geführt fahren"
-        className={'absolute z-50 flex flex-col gap-3.5 overflow-y-auto rounded-2xl border p-4 backdrop-blur-md ' + (mobil ? 'inset-x-3 bottom-3' : 'left-1/2 top-1/2 w-[24rem] -translate-x-1/2 -translate-y-1/2')}
-        style={{ background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten, color: ui.fg, maxHeight: 'calc(100% - 1.5rem)' }}
+        className={'absolute z-50 flex flex-col gap-3.5 overflow-y-auto rounded-2xl border p-4 backdrop-blur-md ' + (mobil ? 'inset-x-3' : 'left-1/2 top-1/2 w-[24rem] -translate-x-1/2 -translate-y-1/2')}
+        style={{ background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten, color: ui.fg, bottom: mobil ? UNTEN_MOBIL : undefined, maxHeight: mobil ? HOEHE_MOBIL : 'calc(100% - 1.5rem)' }}
       >
         <div>
           <h2 className="text-[16px] font-semibold">Geführt fahren</h2>

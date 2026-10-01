@@ -33,6 +33,8 @@ const SCHLUESSEL = {
   ortZeigen: 'velonavi.ortzeigen',
   laufend: 'velonavi.laufend',
   geloescht: 'velonavi.geloescht',
+  /** Ob die Fahrten im Konto vollständig sind. Bis Oktober 2026 gingen sie ohne die ersten und letzten 150 Meter hinein. */
+  voll: 'velonavi.sicherung.voll',
 }
 
 /**
@@ -91,7 +93,7 @@ const alsLinie = (spur: Spurpunkt[], rolle: Linie['rolle']): Linie => ({ koord: 
  * Lernen, Vergleichen und die freiwillige Sicherung im Konto.
  *
  * Alles funktioniert ohne Konto und ohne Server. Das Konto ist eine Sicherung:
- * Es holt Fahrten von anderen Geräten und nimmt gekürzte Kopien (`sicherung.ts`).
+ * Es holt Fahrten von anderen Geräten und nimmt Kopien (`sicherung.ts`).
  *
  * Der Haken sitzt im Velonavi selbst und nicht im Menü. Dieses wird je nach
  * Fensterbreite an anderer Stelle gezeichnet und neu aufgebaut; eine laufende
@@ -217,7 +219,7 @@ export function useFahrten({
     return !error
   }, [])
 
-  // --- Ablegen: erst auf dem Gerät, dann, wenn gewünscht, gekürzt im Konto
+  // --- Ablegen: erst auf dem Gerät, dann, wenn gewünscht, im Konto
   const sichernImKonto = useRef(false)
   sichernImKonto.current = !!nutzerId && sicherung
 
@@ -230,22 +232,22 @@ export function useFahrten({
   }, [])
 
   /**
-   * Lädt Fahrten gekürzt ins Konto. Scheitert ein Paket, weil die Datenbank eine Zeile ablehnt, geht
+   * Lädt Fahrten ins Konto. Scheitert ein Paket, weil die Datenbank eine Zeile ablehnt, geht
    * der Rest einzeln; fehlt das Netz, bleibt alles für den nächsten Abgleich liegen. `still` schweigt
    * zu einem fehlenden Netz, etwa beim Nachholen im Hintergrund.
    */
   const hochladen = useCallback(
-    async (liste: Gespeichert[], still = false) => {
+    async (liste: Gespeichert[], still = false): Promise<boolean> => {
       // Nur Velofahrten gehen in die Sicherung: Der Rest bleibt auf dem Gerät.
       const zeilen = liste.filter((f) => (f.modus ?? 'velo') === 'velo').map((f) => ({ f, z: fuerKonto(f) }))
       const brauchbar = zeilen.filter((x): x is { f: Gespeichert; z: Zeile } => !!x.z)
-      if (!brauchbar.length) return
+      if (!brauchbar.length) return true
       let sb: Awaited<ReturnType<typeof konto>>
       try {
         sb = await konto()
       } catch {
         if (!still) setMeldung(KEIN_NETZ)
-        return
+        return false
       }
       const ok: Gespeichert[] = []
       let abgelehnt: string | null = null
@@ -271,6 +273,7 @@ export function useFahrten({
       await alsGesichert(ok)
       if (abgelehnt) setMeldung(`${brauchbar.length - ok.length} Fahrten liessen sich nicht im Konto sichern: ${abgelehnt}`)
       else if (keinNetz && !still) setMeldung(KEIN_NETZ)
+      return ok.length === brauchbar.length
     },
     [alsGesichert]
   )
@@ -281,7 +284,7 @@ export function useFahrten({
       const distanz = spur.length ? spurDistanz(spur) : 0
       if (spur.length < 10 || distanz < 150) {
         schreib(SCHLUESSEL.laufend, null)
-        if (!still) setMeldung('Die Aufzeichnung war zu kurz und wurde nicht gespeichert.')
+        if (!still) setMeldung('Die Aufzeichnung war zu kurz (unter 150 Metern) und wurde nicht gespeichert.')
         return null
       }
       const erster = spur[0]
@@ -608,7 +611,9 @@ export function useFahrten({
         await warteAufDienst(nativ, false)
         setLaufend(null)
         const f = await holeNativ(nativ)
+        // Unter zehn Punkten oder 150 Metern legt der Dienst nichts ab. Ohne Hinweis sah das aus, als sei nichts passiert.
         if (f) zeigen(f)
+        else setMeldung('Die Aufzeichnung war zu kurz (unter 150 Metern) und wurde nicht gespeichert.')
       } catch {
         setMeldung('Die Aufzeichnung liess sich nicht beenden.')
       } finally {
@@ -789,7 +794,7 @@ export function useFahrten({
     await sb.auth.signOut()
   }, [])
 
-  // --- Sicherung: Fahrten von anderen Geräten holen, eigene gekürzt hochladen
+  // --- Sicherung: Fahrten von anderen Geräten holen, eigene hochladen
   const gleichtAb = useRef(false)
   /** Holt, was im Konto liegt und hier fehlt, und lädt hoch, was dort fehlt. `still` schweigt zu fehlendem Netz. */
   const abgleichen = useCallback(
@@ -824,9 +829,11 @@ export function useFahrten({
         // Was schon im Konto liegt, ist gesichert, auch wenn ein anderes Gerät es hochgeladen hat.
         await alsGesichert(fahrtenRef.current.filter((f) => daId.has(f.id) && !f.gesichert))
         // Was fehlt, geht hoch, wenn die Sicherung an ist.
+        // Einmal auch alles, was schon drin ist: Bis Oktober 2026 lag es dort nur gekürzt, jetzt vollständig.
         if (sichernImKonto.current) {
-          const fehlt = fahrtenRef.current.filter((f) => !daId.has(f.id))
-          if (fehlt.length) await hochladen(fehlt, still)
+          const nachholen = !lies(SCHLUESSEL.voll, false)
+          const fehlt = fahrtenRef.current.filter((f) => !daId.has(f.id) || nachholen)
+          if ((await hochladen(fehlt, still)) && nachholen) schreib(SCHLUESSEL.voll, true)
         }
       } catch (e) {
         if (!still) setMeldung(`Die Sicherung im Konto hat nicht geklappt: ${(e as Error).message}`)

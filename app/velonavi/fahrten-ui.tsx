@@ -8,7 +8,7 @@ import { aehnliche, teilstrecken, type Teilstrecke } from './vergleich.ts'
 import { MODI, modusName } from './modus.ts'
 import type { Graph, Route } from './router'
 import type { Fahrtenstand } from './fahrten-zustand'
-import { ui, km, minuten, Hinweis, KleinKnopf, Schalter } from './teile'
+import { ui, km, minuten, Hinweis, KleinKnopf, Schalter, HOEHE_MOBIL, OBEN_MOBIL } from './teile'
 
 export { useFahrten } from './fahrten-zustand'
 export type { Fahrtenstand } from './fahrten-zustand'
@@ -173,8 +173,8 @@ export function Fahrtenmenue({ f, graph, mobil, onSchliessen }: { f: Fahrtenstan
         }
         style={{
           background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten, color: ui.fg,
-          top: mobil ? 'max(0.75rem, env(safe-area-inset-top))' : undefined,
-          maxHeight: 'calc(100% - 1.5rem)',
+          top: mobil ? OBEN_MOBIL : undefined,
+          maxHeight: mobil ? HOEHE_MOBIL : 'calc(100% - 1.5rem)',
         }}
       >
         <div className="flex items-baseline justify-between">
@@ -417,7 +417,7 @@ function Konto({ f }: { f: Fahrtenstand }) {
         an={f.sicherung}
         setAn={f.setSicherung}
         titel="Fahrten im Konto sichern"
-        hilfe="Damit sie auf einem neuen Gerät wieder da sind. Es geht eine gekürzte Kopie: ohne die ersten und letzten 150 Meter, ohne Adressen, mit dem Beginn auf die Stunde gerundet"
+        hilfe="Damit sie auf einem neuen Gerät wieder da sind. Es geht eine vollständige Kopie jeder Velofahrt, nur für dich lesbar"
       />
       {f.sicherung && <SicherungsStand f={f} />}
       <p className="text-[11px] leading-snug" style={{ color: ui.muted }}>
@@ -434,7 +434,7 @@ function SicherungsStand({ f }: { f: Fahrtenstand }) {
   const teile = [
     `${gesichert} ${gesichert === 1 ? 'Velofahrt' : 'Velofahrten'} im Konto`,
     offen ? `${offen} noch nicht` : null,
-    // Nach dem Kürzen um je 150 Meter bleibt bei ganz kurzen Fahrten nichts übrig, sie bleiben auf dem Gerät.
+    // Eine Spur mit weniger als zwei Punkten taugt nicht für das Konto, sie bleibt auf dem Gerät.
     zuKurz ? `${zuKurz} zu kurz zum Sichern` : null,
   ].filter(Boolean)
   return (
@@ -483,7 +483,7 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-[12px] leading-snug" style={{ color: ui.muted }}>
-        Mit Konto liegt zusätzlich eine gekürzte Kopie deiner Velofahrten bei Supabase in Zürich, sie ist nur für dich lesbar.
+        Mit Konto liegt zusätzlich eine Kopie deiner Velofahrten bei Supabase in Zürich, sie ist nur für dich lesbar.
       </p>
       {wege === null && (
         <p className="text-[12px]" style={{ color: ui.muted }}>
