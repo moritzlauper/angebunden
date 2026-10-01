@@ -247,8 +247,9 @@ function schreibeUrl(start: Punkt | null, ziel: Punkt | null, zwischen: Punkt[],
   if (ziel) p.set('nach', `${ziel.lon.toFixed(5)},${ziel.lat.toFixed(5)}`), p.set('nn', ziel.titel)
   if (wahl !== 'komfort') p.set('wahl', wahl)
   const s = p.toString()
-  // Der Suchteil bleibt stehen: Nach einer Anmeldung steht dort kurz der Code,
-  // den `konto.ts` einlöst und danach selbst entfernt.
+  // Kommt man aus dem Anmeldelink, steht im Fragment der Zugangsschlüssel. Er bleibt, bis `konto.ts`
+  // ihn eingelöst und selbst entfernt hat.
+  if (/(^#|&)access_token=/.test(window.location.hash)) return
   window.history.replaceState(null, '', window.location.pathname + window.location.search + (s ? `#${s}` : ''))
 }
 
