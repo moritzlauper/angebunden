@@ -127,9 +127,9 @@ function Abschnitt({ titel, zusatz, offen: anfang = false, children }: { titel: 
 function Meldung({ f }: { f: Fahrtenstand }) {
   if (f.appLink)
     return (
-      <div className="flex flex-col gap-2 rounded-2xl px-3.5 py-3 text-[13px] leading-snug" style={{ background: ui.weich }}>
+      <div className="flex flex-col gap-2 rounded-2xl px-3 py-2.5 text-[12px] leading-snug" style={{ background: ui.weich }}>
         <span>Angemeldet. Hast du die Velonavi-App auf diesem Handy? Dann öffne sie mit der Anmeldung.</span>
-        <a href={f.appLink} className="rounded-full px-4 py-2.5 text-center text-[15px] font-medium" style={{ background: ui.fg, color: ui.bg }}>
+        <a href={f.appLink} className="rounded-full px-3.5 py-2 text-center text-[13px] font-medium" style={{ background: ui.fg, color: ui.bg }}>
           In der App öffnen
         </a>
       </div>
@@ -485,15 +485,15 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
     }
   }, [anbinden])
 
-  const feld = 'w-full rounded-full border px-4 py-2.5 text-[15px] outline-none'
-  const knopf = 'w-full rounded-full border px-4 py-2.5 text-[15px] font-medium disabled:opacity-50'
+  const feld = 'w-full rounded-full border px-3.5 py-2 text-[13px] outline-none'
+  const knopf = 'w-full rounded-full border px-3.5 py-2 text-[13px] font-medium disabled:opacity-50'
   return (
     <div className="flex flex-col gap-2.5">
-      <p className="text-[13px] leading-snug" style={{ color: ui.muted }}>
+      <p className="text-[12px] leading-snug" style={{ color: ui.muted }}>
         Mit Konto liegt zusätzlich eine Kopie deiner Velofahrten bei Supabase in Zürich, sie ist nur für dich lesbar.
       </p>
       {wege === null && (
-        <p className="text-[13px]" style={{ color: ui.muted }}>
+        <p className="text-[12px]" style={{ color: ui.muted }}>
           Anmeldung wird geladen …
         </p>
       )}
@@ -507,7 +507,7 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
           ))}
           {wege.mail &&
             (geschickt ? (
-              <p className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-snug" style={{ background: ui.weich }}>
+              <p className="rounded-2xl px-3 py-2 text-[12px] leading-snug" style={{ background: ui.weich }}>
                 Der Anmeldelink ist unterwegs an {mail}. Öffne ihn auf diesem Handy, dann kannst du mit einem Tipp in die App wechseln.
               </p>
             ) : (
@@ -520,7 +520,7 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
                   setWartet(false)
                 }}
               >
-                <label className="flex flex-col gap-1.5 text-[13px]">
+                <label className="flex flex-col gap-1 text-[12px]">
                   <span style={{ color: ui.muted }}>{wege.anbieter.length ? 'Oder per E-Mail, ohne Passwort' : 'E-Mail, ohne Passwort'}</span>
                   <input
                     type="email"
