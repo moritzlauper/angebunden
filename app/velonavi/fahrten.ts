@@ -83,6 +83,50 @@ export function verdichten(spur: Spurpunkt[]): Spurpunkt[] {
   return out
 }
 
+/** So lange ist das Fenster, in dem `kern` misst, wie weit man vom Fleck kommt. */
+const KERN_FENSTER = 30
+/** Ab so viel Luftlinie je Sekunde über das Fenster gilt es als Velofahren: 8 km/h. Gehen bleibt darunter. */
+const KERN_TEMPO = 2.2
+
+/**
+ * Der Teil der Spur, auf dem man Velo fuhr: Vorne und hinten fällt weg, was nicht vom Fleck kommt.
+ * Am Ziel lief eine automatische Aufzeichnung neun Minuten weiter, weil der Standort im Haus um
+ * 30 bis 60 Meter hin und her sprang. Das ergab Kritzeleien über die Häuser, «Pausen», die keine
+ * waren, und einen Vergleich mit einer Strecke, die niemand gefahren ist. Ebenso fällt das Stück zu
+ * Fuss zum Velo und vom Velo weg.
+ *
+ * Gemessen wird die Luftlinie über 30 Sekunden, nicht der zurückgelegte Weg: Zittern legt viel Weg
+ * zurück, kommt aber nicht vom Fleck. Halte mitten in der Fahrt bleiben, nur die Ränder werden
+ * gekürzt. Kommt die Spur nie auf Velotempo, bleibt sie, wie sie ist.
+ */
+export function kern(spur: Spurpunkt[]): Spurpunkt[] {
+  const n = spur.length
+  if (n < 3) return spur
+  // Geglättet über je fünf Punkte davor und danach: Ein einzelner Sprung verschiebt das Mittel kaum.
+  const glatt = spur.map((_, i) => {
+    let x = 0
+    let y = 0
+    let k = 0
+    for (let d = Math.max(0, i - 5); d <= Math.min(n - 1, i + 5); d++) (x += spur[d][0]), (y += spur[d][1]), k++
+    return [x / k, y / k]
+  })
+  const luft = (a: number, b: number) => Math.hypot((glatt[b][0] - glatt[a][0]) * mx(glatt[a][1]), (glatt[b][1] - glatt[a][1]) * MY)
+  let anfang = -1
+  let ende = -1
+  let j = 0
+  for (let i = 0; i < n; i++) {
+    if (j < i) j = i
+    while (j < n && spur[j][2] - spur[i][2] < KERN_FENSTER) j++
+    if (j >= n) break
+    const d = luft(i, j)
+    // Weniger weit, als die beiden Punkte ungenau sind, ist kein Vorankommen.
+    if (d / (spur[j][2] - spur[i][2]) < KERN_TEMPO || d < (spur[i][3] ?? 0) + (spur[j][3] ?? 0)) continue
+    if (anfang < 0) anfang = i
+    ende = j
+  }
+  return anfang < 0 ? spur : spur.slice(anfang, ende + 1)
+}
+
 /**
  * Gezählt wird erst, wenn man sich so weit vom letzten gezählten Punkt
  * entfernt hat. Im Stand springt der Empfänger um ein paar Meter hin und her,

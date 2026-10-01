@@ -294,7 +294,11 @@ public class TrackerService extends Service {
             zaehlLon = lon;
             zaehlLat = lat;
         }
-        if (meter(ruheLon, ruheLat, lon, lat) >= BEWEGT_M) {
+        // Im Haus springt der Standort 30 bis 60 Meter hin und her. Das galt als Bewegung, und die
+        // Aufzeichnung am Ziel lief weiter, statt nach dem Leerlauf zu enden. Ein Sprung zählt erst,
+        // wenn er grösser ist als die doppelte Ungenauigkeit des Punkts.
+        double schwelle = Math.max(BEWEGT_M, l.hasAccuracy() ? 2 * l.getAccuracy() : 0);
+        if (meter(ruheLon, ruheLat, lon, lat) >= schwelle) {
             ruheLon = lon;
             ruheLat = lat;
             letzteBewegung = System.currentTimeMillis();

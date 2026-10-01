@@ -6,7 +6,7 @@ import {
   anmeldeFehler, appUebergabe, konto, kontoAngefangen, KONTO_WECHSEL, rueckkehr, KONTO_MOEGLICH, TABELLE, type Anbieter,
 } from './konto'
 import {
-  lerne, spurAusGpx, spurDistanz, verdichten, zuordnen, DISTANZ_SCHRITT,
+  lerne, spurAusGpx, spurDistanz, verdichten, kern, zuordnen, DISTANZ_SCHRITT,
   type Fahrt, type Lernstand, type Ort, type Spurpunkt, type Vorschlag, type Zuordnung,
 } from './fahrten.ts'
 import type { Lauf, Teilstrecke } from './vergleich.ts'
@@ -157,6 +157,24 @@ export function useFahrten({
   nutzerIdRef.current = nutzerId
   /** Nur Velofahrten werden dem Netz zugeordnet, verglichen und fürs Lernen genutzt. */
   const istVelo = (f: { modus?: Modus }) => (f.modus ?? 'velo') === 'velo'
+  /**
+   * Ältere Fahrten ohne Fussweg und Zittern an den Rändern (`kern`), einmal beim Laden und gleich auf
+   * dem Gerät gespeichert. Sie gelten danach als nicht gesichert, der nächste Abgleich lädt sie neu hoch.
+   */
+  const geputzt = async (f: Gespeichert): Promise<Gespeichert> => {
+    const spur = kern(f.spur)
+    if (spur.length === f.spur.length || spur.length < 10) return f
+    const neu: Gespeichert = {
+      ...f,
+      spur,
+      begonnen: new Date(Date.parse(f.begonnen) + (spur[0][2] - f.spur[0][2]) * 1000).toISOString(),
+      dauer: spur[spur.length - 1][2] - spur[0][2],
+      distanz: spurDistanz(spur),
+      gesichert: false,
+    }
+    await speichern(neu).catch(() => {})
+    return neu
+  }
 
   // --- Start: Schalter, Fahrten vom Gerät, Rückkehr von der Anmeldung
   useEffect(() => {
@@ -172,7 +190,7 @@ export function useFahrten({
     alleFahrten()
       // Der Velonavi ist nur fürs Velo. Wege zu Fuss, im Tram oder Auto aus früheren Fassungen bleiben
       // auf dem Gerät liegen, erscheinen aber nicht mehr.
-      .then((f) => setFahrten(f.filter(istVelo).slice(0, FAHRTEN_MAX)))
+      .then(async (f) => setFahrten(await Promise.all(f.filter(istVelo).slice(0, FAHRTEN_MAX).map(geputzt))))
       .catch(() => setMeldung('Der Speicher dieses Browsers ist nicht verfügbar. Fahrten gehen beim Schliessen der Seite verloren.'))
       .finally(() => setGeladen(true))
     if (!KONTO_MOEGLICH) return
@@ -282,7 +300,8 @@ export function useFahrten({
 
   const ablegen = useCallback(
     async (offen: Offen, id?: string, still = false): Promise<Fahrt | null> => {
-      const spur = verdichten(offen.spur)
+      // Nur der Teil, auf dem man Velo fuhr: ohne Fussweg zum Velo und ohne Zittern am Ziel.
+      const spur = kern(verdichten(offen.spur))
       const distanz = spur.length ? spurDistanz(spur) : 0
       if (spur.length < 10 || distanz < 150) {
         schreib(SCHLUESSEL.laufend, null)
@@ -810,7 +829,7 @@ export function useFahrten({
         // Einmal auch alles, was schon drin ist: Bis Oktober 2026 lag es dort nur gekürzt, jetzt vollständig.
         if (sichernImKonto.current) {
           const nachholen = !lies(SCHLUESSEL.voll, false)
-          const fehlt = fahrtenRef.current.filter((f) => !daId.has(f.id) || nachholen)
+          const fehlt = fahrtenRef.current.filter((f) => !daId.has(f.id) || nachholen || !f.gesichert)
           if ((await hochladen(fehlt, still)) && nachholen) schreib(SCHLUESSEL.voll, true)
         }
       } catch (e) {
