@@ -472,7 +472,7 @@ export function useFahrten({
     setAutoAn(s.auto)
     setAutoAlle(!!s.alle)
     setErkennung(s)
-    setLaufend(s.laeuft ? { seit: s.beginn, distanz: s.distanz, ort: s.lon !== null && s.lat !== null ? [s.lon, s.lat] : null } : null)
+    setLaufend(s.laeuft ? { seit: s.beginn, distanz: s.distanz, ort: Number.isFinite(s.lon) && Number.isFinite(s.lat) ? [s.lon as number, s.lat as number] : null } : null)
   }, [])
 
   // Den eigenen Standort zeigen, solange die Seite sichtbar ist. Das braucht keine Aufzeichnung: Es ist

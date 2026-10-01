@@ -1143,7 +1143,8 @@ export default function Velonavi() {
     map.easeTo({ center: fuehrung.pos, zoom: Math.max(map.getZoom(), 16.5), duration: 700 })
   }, [kartenBereit, fuehrung.aktiv, fuehrung.pos])
 
-  const standortJetzt = fahrten.laufend?.ort ?? null
+  const ortLaufend = fahrten.laufend?.ort
+  const standortJetzt = ortLaufend && Number.isFinite(ortLaufend[0]) && Number.isFinite(ortLaufend[1]) ? ortLaufend : null
   useEffect(() => {
     const map = mapRef.current
     if (!kartenBereit || !map) return
