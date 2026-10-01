@@ -1,5 +1,7 @@
 package ch.angebunden.velonavi;
 
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
@@ -16,6 +18,7 @@ public class MainActivity extends BridgeActivity {
         // Das Plugin muss vor dem Start der Brücke angemeldet sein.
         registerPlugin(VelotrackerPlugin.class);
         super.onCreate(savedInstanceState);
+        anmeldungUebernehmen(getIntent());
         // Ladefehler der Seite abfangen, statt die Fehlerseite von Android stehen zu lassen.
         getBridge().setWebViewClient(new Seitenwaechter(getBridge(), this));
         // Ist der Prozess der Seite weg (abgestürzt oder von Android wegen Speicher beendet), riss das
@@ -35,5 +38,25 @@ public class MainActivity extends BridgeActivity {
                 return true;
             }
         });
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        anmeldungUebernehmen(intent);
+    }
+
+    /**
+     * Der Anmeldelink aus der E-Mail öffnet den Browser. Die Seite dort reicht die Sitzung per
+     * velonavi://anmeldung#access_token=… an die App weiter. Die App lädt dann ihre Seite mit
+     * demselben Fragment, und die Seite meldet damit an. Die Sitzung bleibt auf dem Gerät.
+     */
+    private void anmeldungUebernehmen(Intent intent) {
+        Uri u = intent == null ? null : intent.getData();
+        if (u == null || !"velonavi".equals(u.getScheme()) || !"anmeldung".equals(u.getHost())) return;
+        String fragment = u.getEncodedFragment();
+        intent.setData(null); // Nach einem Neuaufbau der Activity nicht noch einmal einlösen.
+        if (fragment == null || !fragment.contains("access_token=")) return;
+        getBridge().getWebView().loadUrl(getBridge().getAppUrl() + "/?anmeldung=1#" + fragment);
     }
 }

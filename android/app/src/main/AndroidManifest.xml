@@ -22,6 +22,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Übergabe der Anmeldung aus dem Browser: velonavi://anmeldung#access_token=… -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="velonavi" android:host="anmeldung" />
+            </intent-filter>
+
         </activity>
 
         <!-- Zeichnet im Hintergrund auf, siehe TrackerService.java -->

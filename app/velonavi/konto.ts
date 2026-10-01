@@ -40,14 +40,15 @@ export const TABELLE = 'velonavi_fahrten'
 let client: Promise<SupabaseClient> | null = null
 
 /**
- * Angemeldet wird mit PKCE: Supabase schickt den Browser mit `?code=…` zurück
- * statt mit dem Zugangsschlüssel im Fragment. Das Fragment gehört im Velonavi
- * der Route (`#von=…&nach=…`), die beiden kämen sich sonst in die Quere.
+ * Angemeldet wird mit dem Zugangsschlüssel im Fragment der Adresse (`#access_token=…`). Anders als
+ * PKCE braucht das keinen Prüfwert aus dem Browser, der den Link angefordert hat: Der Link aus der
+ * E-Mail öffnet auf dem Handy den Browser, und von dort geht die Sitzung an die App (`appUebergabe`).
+ * Beim Zurückkehren steht im Fragment nur der Schlüssel, nie eine Route (`#von=…&nach=…`).
  */
 export function konto(): Promise<SupabaseClient> {
   client ??= import('@supabase/supabase-js').then(({ createClient }) =>
     createClient(ADRESSE!, SCHLUESSEL!, {
-      auth: { flowType: 'pkce', storageKey: SPEICHER, persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+      auth: { flowType: 'implicit', storageKey: SPEICHER, persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     })
   )
   return client
@@ -61,7 +62,7 @@ export function kontoAngefangen() {
   if (!KONTO_MOEGLICH) return false
   try {
     return (
-      new URLSearchParams(window.location.search).has('code') ||
+      /(^#|&)access_token=/.test(window.location.hash) ||
       window.localStorage.getItem(SPEICHER) !== null ||
       window.localStorage.getItem(`${SPEICHER}-code-verifier`) !== null
     )
@@ -115,21 +116,12 @@ export function anmeldeFehler(): string | null {
 }
 
 /**
- * Der Anmeldelink gilt nur in dem Browser, der ihn angefordert hat: Dort liegt
- * der Prüfwert, ohne den sich der Code nicht einlösen lässt. Wer den Link auf
- * einem anderen Gerät öffnet, bliebe sonst ohne jede Rückmeldung abgemeldet.
- * Nimmt den nutzlosen Code aus der Adresse und meldet, dass es so war.
+ * Kommt man aus dem Anmeldelink auf einem Android-Handy im Browser an, öffnet das Schema der App
+ * dieselbe Sitzung dort (siehe MainActivity.java). Gibt die Adresse dafür zurück, sonst null.
  */
-export function codeOhnePruefwert() {
-  const suche = new URLSearchParams(window.location.search)
-  if (!suche.has('code')) return false
-  try {
-    if (window.localStorage.getItem(`${SPEICHER}-code-verifier`) !== null) return false
-  } catch {
-    /* ohne Speicher gibt es auch keinen Prüfwert */
-  }
-  suche.delete('code')
-  const rest = suche.toString()
-  window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : '') + window.location.hash)
-  return true
+export function appUebergabe(): string | null {
+  const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  if (!fragment.get('access_token') || !fragment.get('refresh_token')) return null
+  if (!/Android/i.test(navigator.userAgent)) return null
+  return `velonavi://anmeldung#${fragment.toString()}`
 }

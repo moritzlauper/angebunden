@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import {
-  anmeldeFehler, codeOhnePruefwert, konto, kontoAngefangen, KONTO_WECHSEL, rueckkehr, KONTO_MOEGLICH, TABELLE, type Anbieter,
+  anmeldeFehler, appUebergabe, konto, kontoAngefangen, KONTO_WECHSEL, rueckkehr, KONTO_MOEGLICH, TABELLE, type Anbieter,
 } from './konto'
 import {
   lerne, spurAusGpx, spurDistanz, verdichten, zuordnen, DISTANZ_SCHRITT,
@@ -65,8 +65,6 @@ const ABGLEICH_PAUSE = 60_000
 /** So oft gleicht die offene Seite mit dem Konto ab. */
 const ABGLEICH_TAKT = 5 * 60_000
 const KEIN_NETZ = 'Gerade keine Verbindung zum Konto. Die Fahrten gehen hinein, sobald das Netz zurück ist.'
-const FREMDER_BROWSER =
-  'Die Anmeldung hat nicht geklappt. Den Link aus der E-Mail im selben Browser öffnen, in dem du ihn angefordert hast.'
 
 const MY = 111133
 const mx = (lat: number) => 111320 * Math.cos((lat * Math.PI) / 180)
@@ -144,6 +142,8 @@ export function useFahrten({
   const [anzeige, setAnzeige] = useState<Linie[]>([])
   const [ansicht, setAnsicht] = useState(0)
   const [meldung, setMeldung] = useState<string | null>(null)
+  /** Nach dem Anmeldelink im Browser auf Android: öffnet dieselbe Anmeldung in der App. */
+  const [appLink, setAppLink] = useState<string | null>(null)
   const [nativ, setNativ] = useState<Tracker | null>(null)
   const [autoAn, setAutoAn] = useState(false)
   const [autoAlle, setAutoAlle] = useState(false)
@@ -176,7 +176,7 @@ export function useFahrten({
     if (!KONTO_MOEGLICH) return
     const fehler = anmeldeFehler()
     if (fehler) setMeldung(fehler)
-    else if (codeOhnePruefwert()) setMeldung(FREMDER_BROWSER)
+    else if (!t) setAppLink(appUebergabe())
     if (kontoAngefangen()) setAngebunden(true)
   }, [])
 
@@ -216,14 +216,6 @@ export function useFahrten({
     const sb = await konto()
     const { error } = await sb.auth.signInWithOtp({ email: mail, options: { emailRedirectTo: rueckkehr() } })
     if (error) setMeldung(`Der Anmeldelink liess sich nicht verschicken: ${error.message}`)
-    return !error
-  }, [])
-
-  /** Löst den Code aus der Anmelde-E-Mail ein. Anders als der Link braucht er keinen bestimmten Browser. */
-  const perCode = useCallback(async (mail: string, code: string) => {
-    const sb = await konto()
-    const { error } = await sb.auth.verifyOtp({ email: mail, token: code.replace(/\s/g, ''), type: 'email' })
-    if (error) setMeldung(`Der Code stimmt nicht oder ist abgelaufen: ${error.message}`)
     return !error
   }, [])
 
@@ -997,7 +989,7 @@ export function useFahrten({
   )
 
   return {
-    nutzer, anbinden, mit, perMail, perCode, abmelden, kontoMoeglich: KONTO_MOEGLICH,
+    appLink, nutzer, anbinden, mit, perMail, abmelden, kontoMoeglich: KONTO_MOEGLICH,
     fahrten, geladen, gezeigteFahrt, teilGezeigt, zeigen, zeigenMit, zeigenTeil, loeschen, importieren,
     zuordnung: (id: string) => zuRef.current.get(id) ?? null, laeufe,
     aufzeichnen,

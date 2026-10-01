@@ -125,6 +125,15 @@ function Abschnitt({ titel, zusatz, offen: anfang = false, children }: { titel: 
 }
 
 function Meldung({ f }: { f: Fahrtenstand }) {
+  if (f.appLink)
+    return (
+      <div className="flex flex-col gap-2 rounded-2xl px-3.5 py-3 text-[13px] leading-snug" style={{ background: ui.weich }}>
+        <span>Angemeldet. Hast du die Velonavi-App auf diesem Handy? Dann öffne sie mit der Anmeldung.</span>
+        <a href={f.appLink} className="rounded-full px-4 py-2.5 text-center text-[15px] font-medium" style={{ background: ui.fg, color: ui.bg }}>
+          In der App öffnen
+        </a>
+      </div>
+    )
   if (!f.meldung) return null
   return (
     <div className="flex items-start gap-2">
@@ -461,7 +470,6 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
   const [mail, setMail] = useState('')
   const [geschickt, setGeschickt] = useState(false)
   const [wartet, setWartet] = useState(false)
-  const [code, setCode] = useState('')
 
   // Erst mit dem Öffnen des Abschnitts wird Supabase geladen und gefragt, welche Anmeldewege es gibt.
   const { anbinden } = f
@@ -499,32 +507,9 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
           ))}
           {wege.mail &&
             (geschickt ? (
-              <form
-                className="flex flex-col gap-2.5"
-                onSubmit={async (e) => {
-                  e.preventDefault()
-                  setWartet(true)
-                  await f.perCode(mail.trim(), code)
-                  setWartet(false)
-                }}
-              >
-                <p className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-snug" style={{ background: ui.weich }}>
-                  Die E-Mail ist unterwegs an {mail}. Gib hier den Code daraus ein. Der Link in der E-Mail öffnet den Browser und nicht die App.
-                </p>
-                <input
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  required
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="Code aus der E-Mail"
-                  className={`${feld} text-center tracking-[0.25em]`}
-                  style={{ background: ui.bg, borderColor: ui.border, color: ui.fg }}
-                />
-                <button type="submit" disabled={wartet || code.trim().length < 6} className={knopf} style={{ background: ui.fg, borderColor: ui.fg, color: ui.bg }}>
-                  {wartet ? 'Wird geprüft …' : 'Anmelden'}
-                </button>
-              </form>
+              <p className="rounded-2xl px-3.5 py-2.5 text-[13px] leading-snug" style={{ background: ui.weich }}>
+                Der Anmeldelink ist unterwegs an {mail}. Öffne ihn auf diesem Handy, dann kannst du mit einem Tipp in die App wechseln.
+              </p>
             ) : (
               <form
                 className="flex flex-col gap-2.5"
@@ -549,7 +534,7 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
                   />
                 </label>
                 <button type="submit" disabled={wartet} className={knopf} style={{ background: ui.fg, borderColor: ui.fg, color: ui.bg }}>
-                  {wartet ? 'Wird verschickt …' : 'Code per E-Mail schicken'}
+                  {wartet ? 'Wird verschickt …' : 'Anmeldelink schicken'}
                 </button>
               </form>
             ))}
