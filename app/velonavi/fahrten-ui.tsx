@@ -477,15 +477,15 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
     }
   }, [anbinden])
 
-  const feld = 'w-full rounded-full border px-3.5 py-2 text-[13px] outline-none'
-  const knopf = 'w-full rounded-full border px-3.5 py-2 text-[13px] font-medium disabled:opacity-50'
+  const feld = 'w-full rounded-full border px-5 py-3.5 text-[17px] outline-none'
+  const knopf = 'w-full rounded-full border px-5 py-3.5 text-[17px] font-medium disabled:opacity-50'
   return (
-    <div className="flex flex-col gap-2.5">
-      <p className="text-[12px] leading-snug" style={{ color: ui.muted }}>
+    <div className="flex flex-col gap-3.5">
+      <p className="text-[14px] leading-snug" style={{ color: ui.muted }}>
         Mit Konto liegt zusätzlich eine Kopie deiner Velofahrten bei Supabase in Zürich, sie ist nur für dich lesbar.
       </p>
       {wege === null && (
-        <p className="text-[12px]" style={{ color: ui.muted }}>
+        <p className="text-[14px]" style={{ color: ui.muted }}>
           Anmeldung wird geladen …
         </p>
       )}
@@ -500,7 +500,7 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
           {wege.mail &&
             (geschickt ? (
               <form
-                className="flex flex-col gap-2"
+                className="flex flex-col gap-3"
                 onSubmit={async (e) => {
                   e.preventDefault()
                   setWartet(true)
@@ -508,7 +508,7 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
                   setWartet(false)
                 }}
               >
-                <p className="rounded-2xl px-3 py-2 text-[12px] leading-snug" style={{ background: ui.weich }}>
+                <p className="rounded-2xl px-4 py-3 text-[14px] leading-snug" style={{ background: ui.weich }}>
                   Die E-Mail ist unterwegs an {mail}. Gib hier den Code daraus ein. Der Link in der E-Mail öffnet den Browser und nicht die App.
                 </p>
                 <input
@@ -518,7 +518,7 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="Code aus der E-Mail"
-                  className={feld}
+                  className={`${feld} text-center tracking-[0.25em]`}
                   style={{ background: ui.bg, borderColor: ui.border, color: ui.fg }}
                 />
                 <button type="submit" disabled={wartet || code.trim().length < 6} className={knopf} style={{ background: ui.fg, borderColor: ui.fg, color: ui.bg }}>
@@ -527,7 +527,7 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
               </form>
             ) : (
               <form
-                className="flex flex-col gap-2"
+                className="flex flex-col gap-3"
                 onSubmit={async (e) => {
                   e.preventDefault()
                   setWartet(true)
@@ -535,7 +535,7 @@ function Anmeldung({ f }: { f: Fahrtenstand }) {
                   setWartet(false)
                 }}
               >
-                <label className="flex flex-col gap-1 text-[12px]">
+                <label className="flex flex-col gap-1.5 text-[14px]">
                   <span style={{ color: ui.muted }}>{wege.anbieter.length ? 'Oder per E-Mail, ohne Passwort' : 'E-Mail, ohne Passwort'}</span>
                   <input
                     type="email"
