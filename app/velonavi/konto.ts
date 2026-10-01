@@ -63,8 +63,7 @@ export function kontoAngefangen() {
   try {
     return (
       /(^#|&)access_token=/.test(window.location.hash) ||
-      window.localStorage.getItem(SPEICHER) !== null ||
-      window.localStorage.getItem(`${SPEICHER}-code-verifier`) !== null
+      window.localStorage.getItem(SPEICHER) !== null
     )
   } catch {
     return false

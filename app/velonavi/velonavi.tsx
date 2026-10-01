@@ -1744,6 +1744,12 @@ export default function Velonavi() {
             style={{ background: ui.panel, borderColor: ui.border, boxShadow: ui.schatten }}
           >
             <div className="px-4 pb-3 pt-4">
+              {/* Der Wechsel zur Erreichbarkeitskarte wie auf dem Handy: nur am Anfang und nie mit Konto. */}
+              {anfang && !kontoDa && (
+                <div className="ohne-konto mb-3 flex justify-center">
+                  <Seitenwahl ui={ui} aktiv="velonavi" />
+                </div>
+              )}
               <div className="mb-3 flex items-baseline justify-between">
                 {/* Die <h1> der Seite steht in seo-inhalt.tsx, hier deshalb <h2>. */}
                 <h2 className="flex items-baseline gap-2 text-[15px] font-semibold">
@@ -1751,15 +1757,6 @@ export default function Velonavi() {
                     <Wortmarke size={15} />
                   </Link>
                   <span style={{ color: ui.muted }}>Velonavi Zürich</span>
-                  {/* Klein und leise: Die ÖV-Karte ist der zweite Teil von angebunden, aber nicht der erste Handgriff. */}
-                  {anfang && !kontoDa && <Link
-                    href="/erreichbarkeitskarte"
-                    title="Erreichbarkeitskarte: wie gut jedes Haus an den ÖV angebunden ist"
-                    className="ohne-konto text-[11px] font-normal underline-offset-2 hover:underline"
-                    style={{ color: ui.muted, opacity: 0.75 }}
-                  >
-                    Erreichbarkeit
-                  </Link>}
                 </h2>
                 {/* Die Rechenzeit steht nur noch als Tooltip: Im Kopf war sie Unruhe, und «2 Routen» stimmte nicht, wenn beide Varianten zusammenfielen. */}
                 <span className="flex items-center gap-2 self-center" title={routen ? `Gerechnet in ${Math.round(routen.ms)} ms` : undefined}>
