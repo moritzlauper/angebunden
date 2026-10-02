@@ -14,6 +14,13 @@ on:
   schedule:
     - cron: '23 5-21/2 * * *' # tagsüber alle zwei Stunden (UTC)
   workflow_dispatch:
+  # Auch wenn sich der Sammler ändert, auf jedem Branch: So zeigt sich gleich,
+  # ob er mit den echten Portalen zurechtkommt, und die Seite hat Daten, ohne
+  # dass zuerst gemergt werden muss.
+  push:
+    paths:
+      - 'pipeline/20-wohnungen.ts'
+      - '.github/workflows/wohnungen.yml'
 
 concurrency:
   group: wohnungen
