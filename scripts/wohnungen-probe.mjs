@@ -8,8 +8,9 @@ const H = {
 }
 const ZIELE = {
   'stadt-portal': 'https://www.vermietungen.stadt-zuerich.ch/publication/apartment/',
-  'stadt-portal-api': 'https://www.vermietungen.stadt-zuerich.ch/api/publication/apartment/',
-  'abz-wohnung': 'https://www.abz.ch/wp-json/wp/v2/wohnung?per_page=50',
+  'stadt-portal-ohne': 'https://vermietungen.stadt-zuerich.ch/publication/apartment/',
+  'stadt-portal-http': 'http://www.vermietungen.stadt-zuerich.ch/publication/apartment/',
+  'abz-wohnung-alle': 'https://www.abz.ch/wp-json/wp/v2/wohnung?per_page=50&status=publish&_fields=id,link,title',
 }
 mkdirSync('probe', { recursive: true })
 const zeilen = []
@@ -23,7 +24,7 @@ for (const [name, url] of Object.entries(ZIELE)) {
     writeFileSync(`probe/${name}.links`, links.join('\n'))
     zeilen.push(`${name}\t${res.status}\t${text.length}\t${res.url}`)
   } catch (e) {
-    zeilen.push(`${name}\tFEHLER\t${e}`)
+    zeilen.push(`${name}\tFEHLER\t${e} ${e?.cause ?? ''} ${e?.cause?.code ?? ''}`)
   }
 }
 
