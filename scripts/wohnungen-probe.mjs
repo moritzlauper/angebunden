@@ -7,12 +7,9 @@ const H = {
   Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
 }
 const ZIELE = {
-  'ronorp-manifest': 'https://ronorp.net/_next/static/CZz8x1ThVUKb7gsYsgtRb/_buildManifest.js',
-  'ronorp-g1': 'https://ronorp.net/zurich/market/housing/sonnige-2-zimmer-oase-mit-sudbalkon-und-blick-ins-grune-im-kreis-7',
-  'ronorp-g2': 'https://ronorp.net/zurich/market/housing/sonnige-2-zimmer-oase-mit-sudbalkon-und-blick-ins-grune-im-kreis-7-3736770',
-  'ronorp-g3': 'https://ronorp.net/zurich/market/housing/3736770',
-  'ronorp-g4': 'https://ronorp.net/zurich/market/housing/wohnen/sonnige-2-zimmer-oase-mit-sudbalkon-und-blick-ins-grune-im-kreis-7',
-  'stadt-de-sitemap': 'https://www.stadt-zuerich.ch/de.sitemap.xml',
+  'stadt-frei': 'https://www.stadt-zuerich.ch/de/lebenslagen/wohnen/freie-wohnungen.html',
+  'abz-types': 'https://www.abz.ch/wp-json/wp/v2/types',
+  'abz-grid': 'https://www.abz.ch/wp-json/',
 }
 mkdirSync('probe', { recursive: true })
 const zeilen = []
@@ -22,7 +19,7 @@ for (const [name, url] of Object.entries(ZIELE)) {
     const text = await res.text()
     writeFileSync(`probe/${name}.txt`, `${res.status} ${res.url}\n${[...res.headers].map(([k, v]) => `${k}: ${v}`).join('\n')}\n\n${text}`)
     // Links, die nach Wohnungen aussehen
-    const links = [...new Set([...text.matchAll(/(?:href="|<loc>|Sitemap: )([^"<\s]+)/g)].map((m) => m[1]).filter((h) => /wohn|vermiet|liegensch|housing|sitemap|\/market\//i.test(h)))].slice(0, 300)
+    const links = [...new Set([...text.matchAll(/(?:href="|<loc>|Sitemap: )([^"<\s]+)/g)].map((m) => m[1]).filter((h) => /wohn|vermiet|liegensch|objekt|inserat|flatfox|homegate|melon|api|iframe/i.test(h)))].slice(0, 300)
     writeFileSync(`probe/${name}.links`, links.join('\n'))
     zeilen.push(`${name}\t${res.status}\t${text.length}\t${res.url}`)
   } catch (e) {
