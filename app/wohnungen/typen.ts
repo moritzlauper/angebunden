@@ -41,6 +41,11 @@ export type Inserat = {
    * wurde, bleibt bis zu diesem Tag stehen.
    */
   bis?: string | null
+  /**
+   * Befristet vermietet: aus dem Feld der Quelle, sonst aus Titel und Text
+   * erkannt («Untermiete», «December only», «bis Ende März»).
+   */
+  befristet?: boolean
   /** Von Homegate oder ImmoScout24 an Flatfox weitergereicht. */
   smg?: boolean
   /**

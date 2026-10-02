@@ -4,6 +4,7 @@ import type { MetadataRoute } from 'next'
 import { ladeMeta } from './meta'
 import { STADT_LISTE } from './staedte'
 import { SITE_URL } from './site'
+import { KREISE } from './wohnungen/kreise'
 
 // Ohne das kann `pnpm export` (output: 'export') die Route nicht vorrendern.
 export const dynamic = 'force-static'
@@ -45,9 +46,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     {
       url: `${SITE_URL}/wohnungen`,
       lastModified: new Date(),
-      changeFrequency: 'hourly',
-      priority: 0.8,
+      changeFrequency: 'hourly' as const,
+      priority: 0.9,
     },
+    ...KREISE.map((k) => ({
+      url: `${SITE_URL}/wohnungen/${k.slug}`,
+      lastModified: new Date(),
+      changeFrequency: 'hourly' as const,
+      priority: 0.7,
+    })),
     {
       url: `${SITE_URL}/methode`,
       lastModified: new Date(),

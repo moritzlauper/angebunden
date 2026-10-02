@@ -34,6 +34,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { pointInRings } from './lib/geo.ts'
+import { istBefristet, istWgZimmer } from './lib/inserat-text.ts'
 import type { Art, Inserat, QuellenId, QuellenStand, Wohnungen } from '../app/wohnungen/typen.ts'
 
 const DATEN = 'public/data/zuerich'
@@ -71,6 +72,22 @@ type Roh = Omit<Inserat, 'id' | 'links' | 'erstGesehen' | 'oev' | 'oevRang' | 'k
   quelle: QuellenId
   quellId: string
   url: string
+  /** Titel und Beschreibung, nur für die Erkennung unten; landet nicht in der Datei. */
+  text?: string
+}
+
+/**
+ * Was die Felder nicht sagen, aus dem Text: befristet oder nicht, und ob eine
+ * «Wohnung» in Wahrheit ein WG-Zimmer ist. Ein ausdrückliches Feld der Quelle
+ * (`befristet` schon gesetzt) geht vor.
+ */
+function deuten(r: Roh): Roh {
+  const t = `${r.titel}\n${r.text ?? ''}`
+  if (r.befristet == null) r.befristet = istBefristet(t)
+  else r.befristet ||= istBefristet(r.titel)
+  if (r.art !== 'wg' && r.art !== 'haus' && istWgZimmer(t)) r.art = 'wg'
+  delete r.text
+  return r
 }
 
 const warte = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -164,7 +181,7 @@ function flatfoxArt(l: FlatfoxListing): Art | null {
   if (kat === 'SHARED') return 'wg'
   if (kat === 'HOUSE') return 'haus'
   if (kat !== 'APARTMENT') return null
-  if (l.is_furnished === true || l.is_temporary === true) return 'moebliert'
+  if (l.is_furnished === true) return 'moebliert'
   if (/STUDIO|SINGLE_ROOM/.test(typ)) return 'studio'
   return 'wohnung'
 }
@@ -240,6 +257,8 @@ async function flatfox(): Promise<Roh[]> {
         bezugTyp === 'imm' ? 'sofort' : bezugTyp === 'agr' ? 'nach Vereinbarung' : bezugsdatum(l.moving_date),
       bild: flatfoxBild(l),
       smg: Boolean(text(l.smg_id)),
+      befristet: l.is_temporary === true ? true : undefined,
+      text: [l.short_title, l.public_title, l.pitch_title, l.description].filter((x) => typeof x === 'string').join('\n'),
     })
   }
   return funde
@@ -307,6 +326,8 @@ async function ronorp(): Promise<Roh[]> {
       bezug: bezugsdatum(h.ready_to_move),
       bild: text(p.image?.[0]?.path),
       bis: text(p.publication_end_date),
+      befristet: h.contract === 'temporary' ? true : h.contract === 'permanent' ? false : undefined,
+      text: (p as { description?: string }).description ?? '',
     })
   }
   return funde
@@ -382,6 +403,7 @@ async function pwg(): Promise<Roh[]> {
       miete: zahl(b.match(/Bruttomiete:<\/th>\s*<td>\s*([\d'’.]+)/)?.[1]) ?? zahl(klasse(b, 'prize')?.match(/[\d'’]+/)?.[0]),
       bezug: bezugsdatum(klasse(b, 'move_in_date')),
       bild: bild ? new URL(bild, basis).href : null,
+      text: klartext(b.match(/<div class="col1">\s*<p>([\s\S]*?)<\/div>/)?.[1] ?? ''),
     })
   }
   return funde
@@ -559,7 +581,7 @@ async function main() {
       const funde = await abruf()
       let drin = 0
       const neueUrls = new Set<string>()
-      for (const r of funde) {
+      for (const r of funde.map(deuten)) {
         // Ohne Koordinaten über die Adresse zum Haus der Karte.
         if (r.lon == null || r.lat == null) {
           const h = finde(r.strasse)
