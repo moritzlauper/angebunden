@@ -7,10 +7,12 @@ const H = {
   Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
 }
 const ZIELE = {
-  'ronorp-p2': 'https://ronorp.net/zurich/market/housing?page=2',
-  'ronorp-wohnung': 'https://ronorp.net/zurich/market/housing/wohnen',
-  'stadt-sitemap': 'https://www.stadt-zuerich.ch/sitemap.xml',
-  'stadt-robots': 'https://www.stadt-zuerich.ch/robots.txt',
+  'ronorp-manifest': 'https://ronorp.net/_next/static/CZz8x1ThVUKb7gsYsgtRb/_buildManifest.js',
+  'ronorp-g1': 'https://ronorp.net/zurich/market/housing/sonnige-2-zimmer-oase-mit-sudbalkon-und-blick-ins-grune-im-kreis-7',
+  'ronorp-g2': 'https://ronorp.net/zurich/market/housing/sonnige-2-zimmer-oase-mit-sudbalkon-und-blick-ins-grune-im-kreis-7-3736770',
+  'ronorp-g3': 'https://ronorp.net/zurich/market/housing/3736770',
+  'ronorp-g4': 'https://ronorp.net/zurich/market/housing/wohnen/sonnige-2-zimmer-oase-mit-sudbalkon-und-blick-ins-grune-im-kreis-7',
+  'stadt-de-sitemap': 'https://www.stadt-zuerich.ch/de.sitemap.xml',
 }
 mkdirSync('probe', { recursive: true })
 const zeilen = []
