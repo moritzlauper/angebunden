@@ -935,7 +935,7 @@ function Filterfeld({
   )
   const kippe = <T,>(liste: T[], x: T) => (liste.includes(x) ? liste.filter((y) => y !== x) : [...liste, x])
   const anzahl = aktiveFilter(f)
-  const mehrAktiv = [f.quellenAus.length > 0, f.oevMax != null, f.nurNeu, f.nurGemerkt].filter(Boolean).length
+  const mehrAktiv = [f.oevMax != null, f.nurNeu, f.nurGemerkt].filter(Boolean).length
 
   return (
     <section className="mx-3 rounded-[20px] border border-[var(--ab-linie)] bg-[var(--ab-blatt)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:mx-4">
@@ -1001,6 +1001,25 @@ function Filterfeld({
             ] as const}
           />
 
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[10.5px] font-medium tracking-wide text-[var(--ab-leise)] uppercase">Quellen</span>
+              {f.quellenAus.length > 0 && (
+                <button type="button" onClick={() => aendern({ quellenAus: [] })} className="text-[11.5px] text-[var(--ab-leise)] underline underline-offset-2">
+                  alle
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {zaehlen.map((q) => (
+                <Chip key={q.id} an={!f.quellenAus.includes(q.id)} onClick={() => aendern({ quellenAus: kippe(f.quellenAus, q.id) })}>
+                  {q.name}
+                  <span className="ml-1 opacity-60 tabular-nums">{nf(q.anzahl)}</span>
+                </Chip>
+              ))}
+            </div>
+          </div>
+
           {f.gebiete.length > 0 && (
             <div className="flex items-center justify-between rounded-xl bg-[var(--ab-weich)] px-3 py-2">
               <span>
@@ -1014,15 +1033,6 @@ function Filterfeld({
 
           {mehr && (
             <div className="flex flex-col gap-2.5 border-t border-[var(--ab-linie)] pt-3">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="mr-1 text-[12px] text-[var(--ab-leise)]">Quellen</span>
-                {zaehlen.map((q) => (
-                  <Chip key={q.id} an={!f.quellenAus.includes(q.id)} onClick={() => aendern({ quellenAus: kippe(f.quellenAus, q.id) })}>
-                    {q.name}
-                    <span className="ml-1 opacity-60 tabular-nums">{nf(q.anzahl)}</span>
-                  </Chip>
-                ))}
-              </div>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
                 <label className="flex cursor-pointer items-center gap-1.5">
                   <input type="checkbox" checked={f.nurNeu} onChange={(e) => aendern({ nurNeu: e.target.checked })} />
