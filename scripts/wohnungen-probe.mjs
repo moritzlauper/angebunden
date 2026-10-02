@@ -7,30 +7,19 @@ const H = {
   Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
 }
 const ZIELE = {
-  'flatfox-pin': 'https://flatfox.ch/api/v1/pin/?east=8.63&west=8.44&north=47.44&south=47.32&max_count=400',
-  'flatfox-pin-ohne': 'https://flatfox.ch/api/v1/pin/?east=8.63&west=8.44&north=47.44&south=47.32',
-  'flatfox-listing': 'https://flatfox.ch/api/v1/public-listing/?limit=3',
-  'flatfox-listing-ort': 'https://flatfox.ch/api/v1/public-listing/?limit=3&offer_type=RENT&city=Z%C3%BCrich',
-  'flatfox-suche': 'https://flatfox.ch/de/search/?east=8.63&west=8.44&north=47.44&south=47.32',
-  'homegate': 'https://www.homegate.ch/mieten/immobilien/ort-zuerich/trefferliste',
-  'homegate-api': 'https://api.homegate.ch/search/listings',
-  'immoscout': 'https://www.immoscout24.ch/de/immobilien/mieten/ort-zuerich',
-  'immoscout-rest': 'https://rest-api.immoscout24.ch/v4/de/properties?l=3000&s=1&t=1&pn=1',
-  'newhome': 'https://www.newhome.ch/de/mieten/suchen/wohnung/ort-zuerich/liste',
-  'comparis': 'https://www.comparis.ch/immobilien/marktplatz/zuerich/mieten',
-  'tutti': 'https://www.tutti.ch/de/li/zuerich/immobilien',
-  'anibis': 'https://www.anibis.ch/de/c/immobilien',
-  'ronorp': 'https://www.ronorp.net/zuerich/marktplatz/wohnen',
-  'wgzimmer': 'https://www.wgzimmer.ch/wgzimmer/search/mate.html',
-  'wgzimmer-zh': 'https://www.wgzimmer.ch/de/wgzimmer/search/mate/ch/zurich-stadt.html',
-  'woko': 'https://www.woko.ch/de/zimmer-in-zuerich',
-  'students': 'https://www.students.ch/wohnen',
-  'marktplatz-uzh': 'https://marktplatz.uzh.ch/de/wohnen',
-  'stadt': 'https://www.stadt-zuerich.ch/de/stadtleben/wohnen/wohnungssuche.html',
-  'stadt-alt': 'https://www.stadt-zuerich.ch/fd/de/index/liegenschaften/wohnungen.html',
-  'wbg': 'https://www.wbg-zh.ch/wohnungssuche/',
-  'abz': 'https://www.abz.ch/wohnen/freie-wohnungen/',
-  'pwg': 'https://www.pwg.ch/vermietung/',
+  'flatfox-multi': 'https://flatfox.ch/api/v1/public-listing/?pk=86415856&pk=86415377&expand=cover_image',
+  'flatfox-eins': 'https://flatfox.ch/api/v1/public-listing/86415377/?expand=cover_image',
+  'flatfox-pin-klein': 'https://flatfox.ch/api/v1/pin/?east=8.55&west=8.50&north=47.39&south=47.36&max_count=400',
+  'flatfox-pin-1000': 'https://flatfox.ch/api/v1/pin/?east=8.55&west=8.50&north=47.39&south=47.36&max_count=1000',
+  'woko-start': 'https://www.woko.ch/',
+  'ronorp-start': 'https://www.ronorp.net/',
+  'stadt-start': 'https://www.stadt-zuerich.ch/de/stadtleben/wohnen.html',
+  'stadt-lsz': 'https://www.stadt-zuerich.ch/de/stadtverwaltung/finanzdepartement/liegenschaften-stadt-zuerich.html',
+  'wbg-start': 'https://www.wbg-zh.ch/',
+  'abz-start': 'https://www.abz.ch/',
+  'pwg-start': 'https://www.pwg.ch/',
+  'students-api': 'https://www.students.ch/api/rooms',
+  'marktplatz-uzh': 'https://www.marktplatz.uzh.ch/',
 }
 mkdirSync('probe', { recursive: true })
 const zeilen = []
@@ -39,11 +28,44 @@ for (const [name, url] of Object.entries(ZIELE)) {
     const res = await fetch(url, { headers: H, redirect: 'follow', signal: AbortSignal.timeout(30000) })
     const text = await res.text()
     writeFileSync(`probe/${name}.txt`, `${res.status} ${res.url}\n${[...res.headers].map(([k, v]) => `${k}: ${v}`).join('\n')}\n\n${text}`)
-    const merk = ['__NEXT_DATA__', '__INITIAL_STATE__', '__NUXT__', 'ld+json', 'datadome', 'cloudflare', 'captcha'].filter((m) => text.includes(m))
-    zeilen.push(`${name}\t${res.status}\t${text.length}\t${res.url}\t${merk.join(',')}`)
+    // Links, die nach Wohnungen aussehen
+    const links = [...new Set([...text.matchAll(/href="([^"]+)"/g)].map((m) => m[1]).filter((h) => /wohn|vermiet|zimmer|frei|miet|room|housing|immobil|marktplatz/i.test(h)))].slice(0, 60)
+    writeFileSync(`probe/${name}.links`, links.join('\n'))
+    zeilen.push(`${name}\t${res.status}\t${text.length}\t${res.url}`)
   } catch (e) {
     zeilen.push(`${name}\tFEHLER\t${e}`)
   }
+}
+
+// Mit echtem Browser: kommen die gesperrten Portale so durch?
+try {
+  const { chromium } = await import('playwright')
+  const b = await chromium.launch({ headless: true, args: ['--disable-blink-features=AutomationControlled'] })
+  const ctx = await b.newContext({ userAgent: H['User-Agent'], locale: 'de-CH', viewport: { width: 1280, height: 900 } })
+  for (const [name, url] of Object.entries({
+    'pw-homegate': 'https://www.homegate.ch/mieten/immobilien/ort-zuerich/trefferliste',
+    'pw-immoscout': 'https://www.immoscout24.ch/de/immobilien/mieten/ort-zuerich',
+    'pw-newhome': 'https://www.newhome.ch/de/mieten/suchen/wohnung/ort-zuerich/liste',
+    'pw-comparis': 'https://www.comparis.ch/immobilien/marktplatz/zuerich/mieten',
+    'pw-tutti': 'https://www.tutti.ch/de/li/zuerich/immobilien',
+    'pw-anibis': 'https://www.anibis.ch/de/c/immobilien',
+    'pw-students': 'https://www.students.ch/wohnen',
+  })) {
+    const p = await ctx.newPage()
+    try {
+      const res = await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 })
+      await p.waitForTimeout(12000)
+      const html = await p.content()
+      writeFileSync(`probe/${name}.txt`, `${res?.status()} ${p.url()}\n\n${html}`)
+      zeilen.push(`${name}\t${res?.status()}\t${html.length}\t${await p.title()}`)
+    } catch (e) {
+      zeilen.push(`${name}\tFEHLER\t${e}`)
+    }
+    await p.close()
+  }
+  await b.close()
+} catch (e) {
+  zeilen.push(`playwright\tFEHLER\t${e}`)
 }
 writeFileSync('probe/uebersicht.tsv', zeilen.join('\n') + '\n')
 console.log(zeilen.join('\n'))
