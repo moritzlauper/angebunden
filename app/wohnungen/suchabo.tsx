@@ -59,7 +59,7 @@ export function SuchaboDialog({
           </button>
         </div>
         <p className="mt-1 leading-relaxed text-[var(--ab-leise)]">
-          Sobald eine neue Wohnung zu deiner Suche passt, bekommst du eine Mail. Der Sammler schaut alle zehn Minuten
+          Sobald eine neue Wohnung zu deiner Suche passt, bekommst du eine Mail. Der Sammler schaut alle fünf Minuten
           nach. Gute Wohnungen sind oft nach einer Stunde weg.
         </p>
 

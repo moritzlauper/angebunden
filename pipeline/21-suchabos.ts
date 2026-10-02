@@ -89,7 +89,7 @@ function mail(abo: Abo, inserate: Inserat[], bestaetigung: boolean): { betreff: 
     ? `Dein Suchabo «${abo.name}» ist aktiv`
     : `${inserate.length} neue ${inserate.length === 1 ? 'Wohnung' : 'Wohnungen'}: ${abo.name}`
   const text = bestaetigung
-    ? `Ab jetzt bekommst du eine Mail, sobald eine neue Wohnung zu deiner Suche passt. Der Sammler schaut alle zehn Minuten nach.${
+    ? `Ab jetzt bekommst du eine Mail, sobald eine neue Wohnung zu deiner Suche passt. Der Sammler schaut alle fünf Minuten nach.${
         inserate.length ? ` Heute passen schon ${inserate.length}, hier die neuesten fünf:` : ''
       }`
     : 'Diese Wohnungen sind seit der letzten Mail neu dazugekommen:'
