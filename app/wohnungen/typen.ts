@@ -4,7 +4,12 @@
  * Code: die Datei landet in beiden Welten.
  */
 
-export type QuellenId = 'flatfox' | 'homegate' | 'immoscout24'
+/**
+ * Die Quellen, die der Sammler selbst abfragt. Homegate und ImmoScout24 stehen
+ * nur über Flatfox drin: Flatfox gehört zur SMG und führt einen Teil ihrer
+ * Inserate mit. Direkt sperren beide automatische Abrufe.
+ */
+export type QuellenId = 'flatfox' | 'ronorp' | 'woko' | 'pwg' | 'abz'
 
 export type Art = 'wohnung' | 'wg' | 'studio' | 'haus' | 'moebliert'
 
@@ -30,6 +35,14 @@ export type Inserat = {
   bild: string | null
   /** Wann der Sammler das Inserat zum ersten Mal gesehen hat (ISO). */
   erstGesehen: string
+  /**
+   * Bis wann das Inserat ausgeschrieben ist (JJJJ-MM-TT), falls die Quelle das
+   * sagt. Ron Orp zeigt jeweils nur die neuesten Inserate; was früher gesammelt
+   * wurde, bleibt bis zu diesem Tag stehen.
+   */
+  bis?: string | null
+  /** Von Homegate oder ImmoScout24 an Flatfox weitergereicht. */
+  smg?: boolean
   /**
    * Kennzahlen des nächsten Hauses der Erreichbarkeitskarte, sofern eines
    * höchstens 120 m entfernt liegt: mittlere ÖV-Reisezeit in Minuten, ihr

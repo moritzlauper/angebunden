@@ -273,32 +273,40 @@ pnpm korrekturen:pruefen   # velo-korrekturen.json prüfen, ohne die Pipeline
 `/wohnungen` sammelt die Mietinserate der Stadt Zürich an einem Ort. Der Sammler
 `pipeline/20-wohnungen.ts` fragt ab:
 
-| Portal | Wie |
+| Quelle | Wie |
 | --- | --- |
-| Flatfox | Öffentliche API (`/api/v1/pin/` für alle Inserate im Stadtgebiet, dann `/api/v1/public-listing/`) |
-| Homegate | Trefferliste, Daten aus `window.__INITIAL_STATE__` im HTML |
-| ImmoScout24 | wie Homegate, beide gehören zur SMG und teilen das Datenmodell |
+| Flatfox | Öffentliche API: `/api/v1/pin/` in Kacheln (höchstens 1000 Punkte je Abfrage), dann `/api/v1/public-listing/?pk=…` gebündelt. Flatfox gehört zur SMG und führt einen Teil der Homegate- und ImmoScout24-Inserate mit. |
+| Ron Orp | `__NEXT_DATA__` der Marktseite, die neuesten rund zehn Inserate mit Koordinaten. Früher Gesammeltes bleibt bis zum Ablaufdatum stehen. |
+| WOKO | HTML der Liste freier Objekte, nur Zimmer |
+| Stiftung PWG | HTML der Liste «zu vermieten», nur Wohnungen |
+| ABZ | WordPress-Schnittstelle, Beitragstyp `wohnung` |
 
-Homegate und ImmoScout24 haben keine offene Schnittstelle und sperren automatische Abrufe
-teilweise. Fällt eine Quelle aus, bleiben ihre Inserate vom letzten erfolgreichen Lauf bis zu drei
-Tage stehen, und die Seite sagt, welches Portal nicht geantwortet hat. Bei einer Änderung des
-Seitenformats ist `smgListings()` die Stelle: Sie sucht im Zustand jedes Objekt mit `id`,
-`address` und `prices`, statt sich auf einen festen Pfad zu verlassen.
+Nicht dabei sind Homegate und ImmoScout24 direkt, Newhome, Comparis, Tutti, Anibis und
+students.ch: Sie sperren Abrufe von GitHub aus mit Cloudflare, auch wenn ein echter Browser
+(Playwright) fragt. wgzimmer.ch verlangt ein reCaptcha, das Vermietungsportal der Stadt eine
+Anmeldung. Die Seite verlinkt sie unter «Weitere Quellen», bei Homegate und ImmoScout24 mit
+denselben Filtern.
 
-Danach passiert dreierlei:
+Fällt eine Quelle aus, bleiben ihre Inserate vom letzten erfolgreichen Lauf bis zu drei Tage
+stehen, und die Seite sagt, welche Quelle nicht geantwortet hat.
 
+Danach passiert viererlei:
+
+* **Verorten**: Wo eine Quelle keine Koordinaten liefert (WOKO, PWG), sucht der Sammler die
+  Adresse unter den Häusern der Erreichbarkeitskarte.
 * **Zuschneiden** auf die Stadtgrenze (`city.geojson`), ohne Koordinaten über die Postleitzahl.
-* **Zusammenlegen**: Dieselbe Wohnung steht oft auf zwei, drei Portalen. Als gleich gilt, was
-  höchstens 40 m auseinander liegt, gleich viele Zimmer hat und bei Miete (±3 %) und Fläche
-  (±3 m²) übereinstimmt. Die Karte zeigt dann einen Eintrag mit allen Links.
+* **Zusammenlegen**: Als gleich gilt, was höchstens 40 m auseinander liegt, gleich viele Zimmer
+  hat und bei Miete (±3 %) und Fläche (±3 m²) übereinstimmt. Die Liste zeigt dann einen Eintrag
+  mit allen Links.
 * **Einordnen**: Jedes Inserat bekommt die Werte des nächsten Hauses der Erreichbarkeitskarte
   (höchstens 120 m entfernt): mittlere ÖV-Reisezeit, Anzahl Kulturorte und beider Rang.
 
-Der Workflow `.github/workflows/wohnungen.yml` lässt den Sammler tagsüber alle zwei Stunden laufen
-und legt `wohnungen.json` auf den Zweig `wohnungen`, jedes Mal als einzigen Commit. Die Seite
-lädt die Datei über `raw.githubusercontent.com`, main und das Deployment bleiben unberührt. Wer
-selbst betreibt, setzt `NEXT_PUBLIC_WOHNUNGEN_URL` (siehe `.env.example`). Ohne erreichbare
-Datei greift die Seite auf `public/data/zuerich/wohnungen.json` zurück, so läuft es lokal:
+Der Workflow `.github/workflows/wohnungen.yml` lässt den Sammler alle zehn Minuten laufen und
+ausserdem bei jedem Push, der ihn ändert. Er legt `wohnungen.json` auf den Zweig `wohnungen`,
+jedes Mal als einzigen Commit. Die Seite lädt die Datei über `raw.githubusercontent.com` und
+schaut alle fünf Minuten nach Neuem; main und das Deployment bleiben unberührt. Wer selbst
+betreibt, setzt `NEXT_PUBLIC_WOHNUNGEN_URL` (siehe `.env.example`). Ohne erreichbare Datei greift
+die Seite auf `public/data/zuerich/wohnungen.json` zurück, so läuft es lokal:
 
 ```bash
 node pipeline/20-wohnungen.ts   # schreibt public/data/zuerich/wohnungen.json
@@ -306,9 +314,7 @@ pnpm dev                         # http://localhost:3000/wohnungen
 ```
 
 Gemerkte und ausgeblendete Inserate, die Filter und der letzte Besuch (für «neu seit deinem
-letzten Besuch») bleiben im Browser, es braucht kein Konto. Unter der Liste stehen die Portale
-mit derselben Suche und die Quellen, die der Sammler nicht abfragt: Newhome, Comparis,
-Kleinanzeigen, WG-Börsen, die Stadt und die Genossenschaften (`app/wohnungen/quellen.ts`).
+letzten Besuch») bleiben im Browser, es braucht kein Konto.
 
 ## Aufbau
 

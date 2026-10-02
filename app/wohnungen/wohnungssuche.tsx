@@ -44,7 +44,8 @@ type Sorte = keyof typeof SORTEN
 
 type Filter = Suche & {
   arten: Art[]
-  quellen: QuellenId[]
+  /** Abgewählte Quellen. Als Ausschlussliste, damit neue Quellen von selbst dazukommen. */
+  quellenAus: QuellenId[]
   /** Höchstens so viele Minuten mittlere ÖV-Reisezeit. */
   oevMax: number | null
   text: string
@@ -59,8 +60,8 @@ const FILTER_LEER: Filter = {
   zimmerMin: null,
   zimmerMax: null,
   flaecheMin: null,
-  arten: ['wohnung', 'studio', 'moebliert', 'haus'],
-  quellen: ['flatfox', 'homegate', 'immoscout24'],
+  arten: ['wohnung', 'wg', 'studio', 'moebliert', 'haus'],
+  quellenAus: [],
   oevMax: null,
   text: '',
   nurNeu: false,
@@ -70,7 +71,7 @@ const FILTER_LEER: Filter = {
 }
 
 const SPEICHER = {
-  filter: 'wohnungen.filter',
+  filter: 'wohnungen.filter2',
   gemerkt: 'wohnungen.gemerkt',
   weg: 'wohnungen.ausgeblendet',
   besuch: 'wohnungen.besuch',
@@ -134,7 +135,7 @@ function farbe(rang: number | null, haeuser: number) {
 function passt(i: Inserat, f: Filter, gemerkt: Set<string>, jetzt: number, ausschnitt: [number, number, number, number] | null) {
   if (f.nurGemerkt && !gemerkt.has(i.id)) return false
   if (!f.arten.includes(i.art)) return false
-  if (!i.links.some((l) => f.quellen.includes(l.quelle))) return false
+  if (i.links.every((l) => f.quellenAus.includes(l.quelle))) return false
   if (f.mieteMax != null && (i.miete == null || i.miete > f.mieteMax)) return false
   if (f.zimmerMin != null && (i.zimmer == null || i.zimmer < f.zimmerMin)) return false
   if (f.zimmerMax != null && (i.zimmer == null || i.zimmer > f.zimmerMax)) return false
@@ -249,7 +250,7 @@ export default function Wohnungssuche() {
     }
     laden()
     // Der Sammler läuft mehrmals am Tag; wer die Seite offen lässt, bekommt neue Inserate ohne Neuladen.
-    const t = setInterval(laden, 20 * 60_000)
+    const t = setInterval(laden, 5 * 60_000)
     return () => {
       weg = true
       clearInterval(t)
@@ -461,15 +462,12 @@ export default function Wohnungssuche() {
         </Link>
         <h1 className="truncate text-[15px] font-semibold tracking-tight">Wohnungen in Zürich</h1>
       </div>
-      <Link href="/erreichbarkeitskarte" className="hidden shrink-0 text-[12px] sm:inline text-[var(--ab-leise)] underline underline-offset-2 hover:text-[var(--ab-tinte)]">
-        Erreichbarkeit
-      </Link>
     </header>
   )
 
   const stand = daten && (
     <div className="px-4 pb-2 text-[12px] leading-relaxed text-[var(--ab-leise)] sm:px-5">
-      {nf(daten.inserate.length)} Inserate aus {daten.quellen.filter((q) => q.anzahl > 0).length} Portalen, zuletzt
+      {nf(daten.inserate.length)} Inserate aus {daten.quellen.filter((q) => q.anzahl > 0).length} Quellen, zuletzt
       gesammelt {vor(daten.erstellt, jetzt)}
       {/* «vor 5 Min.» endet schon auf einen Punkt. */}
       {vor(daten.erstellt, jetzt).endsWith('.') ? ' ' : '. '}
@@ -600,9 +598,6 @@ export default function Wohnungssuche() {
               {a === 'liste' ? 'Liste' : 'Karte'}
             </button>
           ))}
-          <Link href="/erreichbarkeitskarte" className="ml-auto self-center text-[12px] text-[var(--ab-leise)] underline underline-offset-2">
-            Erreichbarkeit
-          </Link>
         </div>
       </div>
       {ansicht === 'liste' ? (
@@ -812,7 +807,7 @@ function Filterfeld({
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {zaehlen.map((q) => (
-              <Chip key={q.id} an={f.quellen.includes(q.id)} onClick={() => aendern({ quellen: kippe(f.quellen, q.id) })}>
+              <Chip key={q.id} an={!f.quellenAus.includes(q.id)} onClick={() => aendern({ quellenAus: kippe(f.quellenAus, q.id) })}>
                 {q.name}
                 <span className="ml-1 opacity-60 tabular-nums">{q.anzahl}</span>
               </Chip>
@@ -948,9 +943,10 @@ function Karteikarte({
               rel="noopener noreferrer"
               className="rounded-full border border-[var(--ab-linie)] px-2 py-0.5 font-medium text-[var(--ab-tinte)] hover:bg-[var(--ab-weich)]"
             >
-              {GESAMMELT[l.quelle].name} ↗
+              {GESAMMELT[l.quelle]?.name ?? l.quelle} ↗
             </a>
           ))}
+          {i.smg && <span title="Von Homegate oder ImmoScout24 an Flatfox weitergereicht">auch Homegate/ImmoScout24</span>}
           {zeigen && i.lon != null && (
             <button type="button" onClick={zeigen} className="underline underline-offset-2 hover:text-[var(--ab-tinte)]">
               Karte
@@ -974,25 +970,13 @@ function Karteikarte({
 function Portale({ filter }: { filter: Filter }) {
   return (
     <section className="mt-8 px-1">
-      <h2 className="text-[13px] font-semibold">Direkt bei den Portalen suchen</h2>
+      <h2 className="text-[13px] font-semibold">Weitere Quellen</h2>
       <p className="mt-1 text-[12px] leading-relaxed text-[var(--ab-leise)]">
-        Flatfox, Homegate und ImmoScout24 sind oben eingesammelt. Die Links öffnen dieselbe Suche dort,
-        mit Miete, Zimmern und Fläche aus den Filtern. Die übrigen fragt der Sammler nicht ab, gerade
-        Genossenschaften und WG-Börsen lohnen sich aber.
+        Oben stehen Flatfox (mit einem Teil der Homegate- und ImmoScout24-Inserate), Ron Orp, WOKO,
+        die Stiftung PWG und die ABZ. Die Seiten hier sperren automatische Abrufe oder verlangen eine
+        Anmeldung, ihre Inserate lassen sich nicht einsammeln. Bei Homegate und ImmoScout24 öffnet der
+        Link dieselbe Suche mit Miete, Zimmern und Fläche aus den Filtern.
       </p>
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {(Object.keys(GESAMMELT) as QuellenId[]).map((q) => (
-          <a
-            key={q}
-            href={GESAMMELT[q].suche(filter)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-full border border-[var(--ab-linie)] px-2.5 py-1 text-[12px] font-medium hover:bg-[var(--ab-weich)]"
-          >
-            {GESAMMELT[q].name} ↗
-          </a>
-        ))}
-      </div>
       {WEITERE.map((g) => (
         <div key={g.gruppe} className="mt-4">
           <h3 className="text-[12px] font-medium text-[var(--ab-leise)]">{g.gruppe}</h3>
@@ -1000,7 +984,7 @@ function Portale({ filter }: { filter: Filter }) {
             {g.quellen.map((q) => (
               <li key={q.name}>
                 <a
-                  href={q.url}
+                  href={q.url(filter)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block rounded-xl border border-[var(--ab-linie)] px-3 py-2 hover:bg-[var(--ab-weich)]"

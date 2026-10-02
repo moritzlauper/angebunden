@@ -1,6 +1,6 @@
 name: Wohnungen
 
-# Sammelt alle zwei Stunden die Mietinserate für /wohnungen
+# Sammelt alle zehn Minuten die Mietinserate für /wohnungen
 # (pipeline/20-wohnungen.ts) und legt sie als wohnungen.json auf den Zweig
 # «wohnungen». Die Seite lädt die Datei von dort über raw.githubusercontent.com,
 # main und das Deployment bleiben unberührt.
@@ -12,7 +12,12 @@ name: Wohnungen
 
 on:
   schedule:
-    - cron: '23 5-21/2 * * *' # tagsüber alle zwei Stunden (UTC)
+    # Alle zehn Minuten, rund um die Uhr. Günstige Wohnungen sind oft nach
+    # einer Stunde wieder weg, und Ron Orp zeigt nur die neuesten zehn Inserate.
+    # Kürzer als fünf Minuten lässt GitHub nicht zu, und geplante Läufe starten
+    # bei viel Betrieb ohnehin einige Minuten später. Achtung: In öffentlichen
+    # Repositorys schaltet GitHub Zeitpläne nach 60 Tagen ohne Commit ab.
+    - cron: '*/10 * * * *'
   workflow_dispatch:
   # Auch wenn sich der Sammler ändert, auf jedem Branch: So zeigt sich gleich,
   # ob er mit den echten Portalen zurechtkommt, und die Seite hat Daten, ohne
