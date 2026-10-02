@@ -637,17 +637,35 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
 
   const liste = (
     <div className="px-3 pb-6 sm:px-4">
-      <div className="flex items-baseline justify-between gap-3 px-1 pt-3 pb-2">
-        <div className="text-[13px] font-medium">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1 pt-4 pb-2.5">
+        <div className="text-[15px] font-semibold tracking-tight">
           {daten ? `${nf(treffer.length)} ${treffer.length === 1 ? 'Wohnung' : 'Wohnungen'}` : ladefehler ? '' : 'Lade Inserate …'}
-          {neuSeitBesuch > 0 && <span className="ml-2 text-[var(--ab-karmin)]">{neuSeitBesuch} neu seit deinem letzten Besuch</span>}
+          {neuSeitBesuch > 0 && (
+            <span className="ml-2 rounded-full bg-[var(--ab-karmin)] px-2 py-0.5 align-middle text-[11px] font-semibold text-white">
+              {neuSeitBesuch} neu
+            </span>
+          )}
         </div>
-        {breit && (
-          <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-[12px] text-[var(--ab-leise)]">
-            <input type="checkbox" checked={filter.nurAusschnitt} onChange={(e) => aendern({ nurAusschnitt: e.target.checked })} />
-            Nur Kartenausschnitt
-          </label>
-        )}
+        <div className="flex items-center gap-3 text-[12px] text-[var(--ab-leise)]">
+          {breit && (
+            <label className="flex shrink-0 cursor-pointer items-center gap-1.5">
+              <input type="checkbox" checked={filter.nurAusschnitt} onChange={(e) => aendern({ nurAusschnitt: e.target.checked })} />
+              Nur Kartenausschnitt
+            </label>
+          )}
+          <select
+            value={filter.sorte}
+            onChange={(e) => aendern({ sorte: e.target.value as Sorte })}
+            className="rounded-full border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-2.5 py-1 text-[12px] font-medium text-[var(--ab-tinte)]"
+            aria-label="Sortierung"
+          >
+            {Object.entries(SORTEN).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {ladefehler && !daten && (
@@ -686,9 +704,19 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
       )}
 
       {daten && treffer.length === 0 && (
-        <p className="mx-1 py-6 text-[13px] text-[var(--ab-leise)]">
-          Nichts gefunden. Lockere die Filter oder schau bei den Portalen unten nach.
-        </p>
+        <div className="mx-1 rounded-2xl border border-dashed border-[var(--ab-linie)] px-4 py-8 text-center">
+          <p className="text-[14px] font-medium">Keine Wohnung passt</p>
+          <p className="mt-1 text-[12.5px] text-[var(--ab-leise)]">
+            Lockere die Filter, oder lass dich mit einem Suchabo benachrichtigen, sobald eine kommt.
+          </p>
+          <button
+            type="button"
+            onClick={() => aendern({ ...FILTER_LEER, sorte: filter.sorte, gebiete: filter.gebiete })}
+            className="mt-3 rounded-full border border-[var(--ab-linie)] px-3.5 py-1.5 text-[12.5px] font-medium hover:bg-[var(--ab-weich)]"
+          >
+            Filter zurücksetzen
+          </button>
+        </div>
       )}
 
       {weg.size > 0 && (
@@ -848,30 +876,80 @@ function Chip({ an, onClick, children }: { an: boolean; onClick: () => void; chi
   )
 }
 
+/** Ein Feld mit kleiner Überschrift, wie bei den Portalen: Miete, Fläche, Zimmer. */
+function Feld({ titel, children }: { titel: string; children: ReactNode }) {
+  return (
+    <label className="flex min-w-0 flex-col rounded-xl border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-3 pt-1.5 pb-1 focus-within:border-[var(--ab-leise)]">
+      <span className="text-[10.5px] font-medium tracking-wide text-[var(--ab-leise)] uppercase">{titel}</span>
+      {children}
+    </label>
+  )
+}
+
 function Zahlfeld({
-  wert, setzen, platzhalter, schritt, breite = 'w-24',
+  wert, setzen, platzhalter, schritt, einheit,
 }: {
   wert: number | null
   setzen: (n: number | null) => void
   platzhalter: string
   schritt?: number
-  breite?: string
+  einheit: string
 }) {
   return (
-    <input
-      type="number"
-      inputMode="numeric"
-      min={0}
-      step={schritt}
-      value={wert ?? ''}
-      placeholder={platzhalter}
-      onChange={(e) => setzen(e.target.value === '' ? null : Number(e.target.value))}
-      className={`${breite} rounded-lg border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-2.5 py-1.5 text-[13px] outline-none focus:border-[var(--ab-leise)]`}
-    />
+    <span className="flex items-baseline gap-1">
+      <input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        step={schritt}
+        value={wert ?? ''}
+        placeholder={platzhalter}
+        onChange={(e) => setzen(e.target.value === '' ? null : Number(e.target.value))}
+        className="w-full min-w-0 bg-transparent text-[14px] font-medium tabular-nums outline-none placeholder:font-normal placeholder:text-[var(--ab-leise)]"
+      />
+      <span className="text-[12px] text-[var(--ab-leise)]">{einheit}</span>
+    </span>
+  )
+}
+
+/** Ein Segment wie der Umschalter oben: genau eine Wahl. */
+function Segment<T extends string>({ wahl, setzen, optionen }: { wahl: T; setzen: (w: T) => void; optionen: readonly (readonly [T, string])[] }) {
+  return (
+    <div className="flex rounded-full border border-[var(--ab-linie)] bg-[var(--ab-weich)] p-0.5">
+      {optionen.map(([w, name]) => (
+        <button
+          key={w}
+          type="button"
+          onClick={() => setzen(w)}
+          aria-pressed={wahl === w}
+          className="flex-1 rounded-full px-3 py-1 text-[12px] font-medium whitespace-nowrap transition-colors"
+          style={wahl === w ? { background: 'var(--ab-aktiv)', color: 'var(--ab-tinte)', boxShadow: '0 1px 2px rgba(0,0,0,0.08)' } : { color: 'var(--ab-leise)' }}
+        >
+          {name}
+        </button>
+      ))}
+    </div>
   )
 }
 
 const ZIMMER = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6]
+
+/** Wie viele Filter von der Grundeinstellung abweichen, für «Filter (3)» und «Zurücksetzen». */
+function aktiveFilter(f: Filter) {
+  return [
+    f.mieteMax != null,
+    f.flaecheMin != null,
+    f.zimmerMin != null || f.zimmerMax != null,
+    f.arten.length !== FILTER_LEER.arten.length,
+    f.dauer !== 'alle',
+    f.quellenAus.length > 0,
+    f.oevMax != null,
+    f.nurNeu,
+    f.nurGemerkt,
+    f.gebiete.length > 0,
+    f.text.trim() !== '',
+  ].filter(Boolean).length
+}
 
 function Filterfeld({
   filter: f, aendern, offen, umklappen, zaehlen,
@@ -882,11 +960,12 @@ function Filterfeld({
   umklappen: (() => void) | null
   zaehlen: Wohnungen['quellen']
 }) {
-  const auswahl = (wert: number | null, setzen: (n: number | null) => void, leer: string) => (
+  const [mehr, setMehr] = useState(false)
+  const zimmer = (wert: number | null, setzen: (n: number | null) => void, leer: string) => (
     <select
       value={wert ?? ''}
       onChange={(e) => setzen(e.target.value === '' ? null : Number(e.target.value))}
-      className="rounded-lg border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-2 py-1.5 text-[13px]"
+      className="min-w-0 appearance-none bg-transparent text-[14px] font-medium outline-none"
     >
       <option value="">{leer}</option>
       {ZIMMER.map((z) => (
@@ -897,54 +976,55 @@ function Filterfeld({
     </select>
   )
   const kippe = <T,>(liste: T[], x: T) => (liste.includes(x) ? liste.filter((y) => y !== x) : [...liste, x])
+  const anzahl = aktiveFilter(f)
+  const mehrAktiv = [f.quellenAus.length > 0, f.oevMax != null, f.nurNeu, f.nurGemerkt].filter(Boolean).length
 
   return (
-    <section className="mx-3 rounded-2xl border border-[var(--ab-linie)] bg-[var(--ab-blatt)] p-3.5 sm:mx-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="search"
-          value={f.text}
-          onChange={(e) => aendern({ text: e.target.value })}
-          placeholder="Strasse, PLZ oder Stichwort"
-          className="min-w-[13rem] flex-1 rounded-lg border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-3 py-1.5 text-[13px] outline-none focus:border-[var(--ab-leise)]"
-        />
-        <select
-          value={f.sorte}
-          onChange={(e) => aendern({ sorte: e.target.value as Sorte })}
-          className="rounded-lg border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-2 py-1.5 text-[13px]"
-          aria-label="Sortierung"
-        >
-          {Object.entries(SORTEN).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
-        </select>
+    <section className="mx-3 rounded-[20px] border border-[var(--ab-linie)] bg-[var(--ab-blatt)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:mx-4">
+      <div className="flex items-center gap-2">
+        <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-3.5 py-2 focus-within:border-[var(--ab-leise)]">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 text-[var(--ab-leise)]">
+            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+            <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <input
+            type="search"
+            value={f.text}
+            onChange={(e) => aendern({ text: e.target.value })}
+            placeholder="Strasse, Quartier, PLZ oder Stichwort"
+            className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[var(--ab-leise)]"
+          />
+        </label>
         {umklappen && (
-          <button type="button" onClick={umklappen} className="shrink-0 text-[12px] font-medium underline underline-offset-2">
-            {offen ? 'Weniger' : 'Filter'}
+          <button
+            type="button"
+            onClick={umklappen}
+            className="shrink-0 rounded-full border border-[var(--ab-linie)] px-3.5 py-2 text-[13px] font-medium"
+            style={anzahl ? { background: 'var(--ab-tinte)', color: 'var(--ab-papier)', borderColor: 'var(--ab-tinte)' } : undefined}
+          >
+            {offen ? 'Fertig' : anzahl ? `Filter · ${anzahl}` : 'Filter'}
           </button>
         )}
       </div>
 
       {offen && (
         <div className="mt-3 flex flex-col gap-3 text-[13px]">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <label className="flex items-center gap-2">
-              <span className="text-[var(--ab-leise)]">Miete bis</span>
-              <Zahlfeld wert={f.mieteMax} setzen={(n) => aendern({ mieteMax: n })} platzhalter="CHF" schritt={100} />
-            </label>
-            <label className="flex items-center gap-2">
-              <span className="text-[var(--ab-leise)]">ab</span>
-              <Zahlfeld wert={f.flaecheMin} setzen={(n) => aendern({ flaecheMin: n })} platzhalter="m²" schritt={5} breite="w-20" />
-            </label>
+          <div className="grid grid-cols-3 gap-2">
+            <Feld titel="Miete bis">
+              <Zahlfeld wert={f.mieteMax} setzen={(n) => aendern({ mieteMax: n })} platzhalter="egal" schritt={100} einheit="CHF" />
+            </Feld>
+            <Feld titel="Fläche ab">
+              <Zahlfeld wert={f.flaecheMin} setzen={(n) => aendern({ flaecheMin: n })} platzhalter="egal" schritt={5} einheit="m²" />
+            </Feld>
+            <Feld titel="Zimmer">
+              <span className="flex items-baseline gap-1">
+                {zimmer(f.zimmerMin, (n) => aendern({ zimmerMin: n }), 'ab')}
+                <span className="text-[var(--ab-leise)]">–</span>
+                {zimmer(f.zimmerMax, (n) => aendern({ zimmerMax: n }), 'bis')}
+              </span>
+            </Feld>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[var(--ab-leise)]">Zimmer</span>
-            {auswahl(f.zimmerMin, (n) => aendern({ zimmerMin: n }), 'von')}
-            <span className="text-[var(--ab-leise)]">bis</span>
-            {auswahl(f.zimmerMax, (n) => aendern({ zimmerMax: n }), 'bis')}
-          </div>
+
           <div className="flex flex-wrap gap-1.5">
             {ARTEN.map((a) => (
               <Chip key={a.id} an={f.arten.includes(a.id)} onClick={() => aendern({ arten: kippe(f.arten, a.id) })}>
@@ -952,23 +1032,20 @@ function Filterfeld({
               </Chip>
             ))}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[var(--ab-leise)]">Dauer</span>
-            {(
-              [
-                ['alle', 'Alle'],
-                ['unbefristet', 'Unbefristet'],
-                ['befristet', 'Befristet'],
-              ] as const
-            ).map(([d, name]) => (
-              <Chip key={d} an={f.dauer === d} onClick={() => aendern({ dauer: d })}>
-                {name}
-              </Chip>
-            ))}
-          </div>
+
+          <Segment
+            wahl={f.dauer}
+            setzen={(dauer) => aendern({ dauer })}
+            optionen={[
+              ['alle', 'Alle'],
+              ['unbefristet', 'Unbefristet'],
+              ['befristet', 'Befristet / Untermiete'],
+            ] as const}
+          />
+
           {f.gebiete.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="text-[var(--ab-leise)]">
+            <div className="flex items-center justify-between rounded-xl bg-[var(--ab-weich)] px-3 py-2">
+              <span>
                 Nur in {f.gebiete.length === 1 ? 'dem gezeichneten Gebiet' : `${f.gebiete.length} gezeichneten Gebieten`}
               </span>
               <button type="button" onClick={() => aendern({ gebiete: [] })} className="text-[12px] underline underline-offset-2">
@@ -976,45 +1053,62 @@ function Filterfeld({
               </button>
             </div>
           )}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {zaehlen.map((q) => (
-              <Chip key={q.id} an={!f.quellenAus.includes(q.id)} onClick={() => aendern({ quellenAus: kippe(f.quellenAus, q.id) })}>
-                {q.name}
-                <span className="ml-1 opacity-60 tabular-nums">{q.anzahl}</span>
-              </Chip>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-            <label className="flex cursor-pointer items-center gap-1.5">
-              <input type="checkbox" checked={f.nurNeu} onChange={(e) => aendern({ nurNeu: e.target.checked })} />
-              Nur letzte 24 Std.
-            </label>
-            <label className="flex cursor-pointer items-center gap-1.5">
-              <input type="checkbox" checked={f.nurGemerkt} onChange={(e) => aendern({ nurGemerkt: e.target.checked })} />
-              Nur gemerkte
-            </label>
-            <label className="flex items-center gap-1.5 text-[var(--ab-leise)]" title="Mittlere Reisezeit mit Tram, Bus und S-Bahn zu einer beliebigen Adresse der Stadt, Median 31 Min.">
-              ÖV
-              <select
-                value={f.oevMax ?? ''}
-                onChange={(e) => aendern({ oevMax: e.target.value === '' ? null : Number(e.target.value) })}
-                className="rounded-md border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-1 py-0.5 text-[12px] text-[var(--ab-tinte)]"
-              >
-                <option value="">egal</option>
-                {[26, 28, 31, 35].map((m) => (
-                  <option key={m} value={m}>
-                    bis {m} Min.
-                  </option>
+
+          {mehr && (
+            <div className="flex flex-col gap-2.5 border-t border-[var(--ab-linie)] pt-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="mr-1 text-[12px] text-[var(--ab-leise)]">Quellen</span>
+                {zaehlen.map((q) => (
+                  <Chip key={q.id} an={!f.quellenAus.includes(q.id)} onClick={() => aendern({ quellenAus: kippe(f.quellenAus, q.id) })}>
+                    {q.name}
+                    <span className="ml-1 opacity-60 tabular-nums">{nf(q.anzahl)}</span>
+                  </Chip>
                 ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              onClick={() => aendern({ ...FILTER_LEER, sorte: f.sorte })}
-              className="ml-auto text-[12px] text-[var(--ab-leise)] underline underline-offset-2"
-            >
-              Zurücksetzen
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                <label className="flex cursor-pointer items-center gap-1.5">
+                  <input type="checkbox" checked={f.nurNeu} onChange={(e) => aendern({ nurNeu: e.target.checked })} />
+                  Nur letzte 24 Std.
+                </label>
+                <label className="flex cursor-pointer items-center gap-1.5">
+                  <input type="checkbox" checked={f.nurGemerkt} onChange={(e) => aendern({ nurGemerkt: e.target.checked })} />
+                  Nur gemerkte
+                </label>
+                <label
+                  className="flex items-center gap-1.5 text-[var(--ab-leise)]"
+                  title="Mittlere Reisezeit mit Tram, Bus und S-Bahn zu einer beliebigen Adresse der Stadt, Median 31 Min."
+                >
+                  ÖV
+                  <select
+                    value={f.oevMax ?? ''}
+                    onChange={(e) => aendern({ oevMax: e.target.value === '' ? null : Number(e.target.value) })}
+                    className="rounded-md border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-1 py-0.5 text-[12px] text-[var(--ab-tinte)]"
+                  >
+                    <option value="">egal</option>
+                    {[26, 28, 31, 35].map((m) => (
+                      <option key={m} value={m}>
+                        bis {m} Min.
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between text-[12px]">
+            <button type="button" onClick={() => setMehr((m) => !m)} className="font-medium text-[var(--ab-leise)] hover:text-[var(--ab-tinte)]">
+              {mehr ? 'Weniger Filter ▴' : `Mehr Filter${mehrAktiv ? ` · ${mehrAktiv}` : ''} ▾`}
             </button>
+            {anzahl > 0 && (
+              <button
+                type="button"
+                onClick={() => aendern({ ...FILTER_LEER, sorte: f.sorte })}
+                className="text-[var(--ab-leise)] underline underline-offset-2 hover:text-[var(--ab-tinte)]"
+              >
+                Alle Filter zurücksetzen
+              </button>
+            )}
           </div>
         </div>
       )}
