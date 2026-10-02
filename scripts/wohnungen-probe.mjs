@@ -7,14 +7,10 @@ const H = {
   Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
 }
 const ZIELE = {
-  'woko-frei': 'https://www.woko.ch/unser-angebot/freie-objekte',
-  'abz-mieten': 'https://www.abz.ch/wohnen/mieten/',
-  'pwg-frei': 'https://www.pwg.ch/liegenschaften/zu-vermieten',
-  'wbg-plattform': 'https://www.wbg-zh.ch/plattform-wohnungssuche',
-  'ronorp-housing': 'https://ronorp.net/zurich/market/housing',
-  'stadt-home': 'https://www.stadt-zuerich.ch/de.html',
-  'stadt-suche': 'https://www.stadt-zuerich.ch/de/suche.html?q=freie%20wohnungen',
-  'stadt-lsz2': 'https://www.stadt-zuerich.ch/de/planen-und-bauen/liegenschaften.html',
+  'ronorp-p2': 'https://ronorp.net/zurich/market/housing?page=2',
+  'ronorp-wohnung': 'https://ronorp.net/zurich/market/housing/wohnen',
+  'stadt-sitemap': 'https://www.stadt-zuerich.ch/sitemap.xml',
+  'stadt-robots': 'https://www.stadt-zuerich.ch/robots.txt',
 }
 mkdirSync('probe', { recursive: true })
 const zeilen = []
@@ -24,7 +20,7 @@ for (const [name, url] of Object.entries(ZIELE)) {
     const text = await res.text()
     writeFileSync(`probe/${name}.txt`, `${res.status} ${res.url}\n${[...res.headers].map(([k, v]) => `${k}: ${v}`).join('\n')}\n\n${text}`)
     // Links, die nach Wohnungen aussehen
-    const links = [...new Set([...text.matchAll(/href="([^"]+)"/g)].map((m) => m[1]).filter((h) => /wohn|vermiet|zimmer|frei|miet|room|housing|immobil|marktplatz|liegensch|objekt|inserat|listing|api/i.test(h)))].slice(0, 120)
+    const links = [...new Set([...text.matchAll(/(?:href="|<loc>|Sitemap: )([^"<\s]+)/g)].map((m) => m[1]).filter((h) => /wohn|vermiet|liegensch|housing|sitemap|\/market\//i.test(h)))].slice(0, 300)
     writeFileSync(`probe/${name}.links`, links.join('\n'))
     zeilen.push(`${name}\t${res.status}\t${text.length}\t${res.url}`)
   } catch (e) {
