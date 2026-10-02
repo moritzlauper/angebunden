@@ -1,6 +1,6 @@
 name: Wohnungen
 
-# Sammelt alle zwei Stunden die Mietinserate für /wohnungen
+# Sammelt alle zehn Minuten die Mietinserate für /wohnungen
 # (pipeline/20-wohnungen.ts) und legt sie als wohnungen.json auf den Zweig
 # «wohnungen». Die Seite lädt die Datei von dort über raw.githubusercontent.com,
 # main und das Deployment bleiben unberührt.
@@ -12,8 +12,20 @@ name: Wohnungen
 
 on:
   schedule:
-    - cron: '23 5-21/2 * * *' # tagsüber alle zwei Stunden (UTC)
+    # Alle zehn Minuten, rund um die Uhr. Günstige Wohnungen sind oft nach
+    # einer Stunde wieder weg, und Ron Orp zeigt nur die neuesten zehn Inserate.
+    # Kürzer als fünf Minuten lässt GitHub nicht zu, und geplante Läufe starten
+    # bei viel Betrieb ohnehin einige Minuten später. Achtung: In öffentlichen
+    # Repositorys schaltet GitHub Zeitpläne nach 60 Tagen ohne Commit ab.
+    - cron: '*/10 * * * *'
   workflow_dispatch:
+  # Auch wenn sich der Sammler ändert, auf jedem Branch: So zeigt sich gleich,
+  # ob er mit den echten Portalen zurechtkommt, und die Seite hat Daten, ohne
+  # dass zuerst gemergt werden muss.
+  push:
+    paths:
+      - 'pipeline/20-wohnungen.ts'
+      - '.github/workflows/wohnungen.yml'
 
 concurrency:
   group: wohnungen
@@ -55,7 +67,9 @@ jobs:
           git init -q -b "${ZWEIG}"
           git config user.name  "wohnungen-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add wohnungen.json
+          # Der Zweig trägt nur Daten. Ohne das baut Vercel jeden Commit als Website und scheitert.
+          echo '{"git":{"deploymentEnabled":false}}' > vercel.json
+          git add wohnungen.json vercel.json
           ZAHLEN=$(node -e '
             const w = require("./wohnungen.json")
             console.log(`${w.inserate.length} Inserate (` + w.quellen.map(q => `${q.name} ${q.ok ? q.anzahl : "ausgefallen"}`).join(", ") + ")")
