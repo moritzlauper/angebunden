@@ -167,6 +167,32 @@ export async function stadtBild(stadtName: string, datei: string) {
   )
 }
 
+/** Vorschaubild der Wohnungssuche, für die ganze Stadt oder einen Kreis. */
+export async function wohnungenBild(ort = 'Zürich') {
+  return new ImageResponse(
+    (
+      <Rahmen bild={await karte('karte-zuerich.svg')} grund={OG.grund}>
+        <div style={{ display: 'flex' }}>
+          <Pille farbe={OG.rampe[0]}>{ort}</Pille>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <Wortmarke groesse={104} />
+          <div style={{ display: 'flex', fontSize: 44, lineHeight: 1.2, color: OG.text, marginTop: 28, maxWidth: 600 }}>
+            {`Alle Mietwohnungen in ${ort} auf einer Karte`}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <div style={{ display: 'flex', fontSize: 22, color: OG.leise, maxWidth: 560 }}>
+            Flatfox, Ron Orp, WOKO · alle 10 Min. neu
+          </div>
+          <Domain />
+        </div>
+      </Rahmen>
+    ),
+    schriften
+  )
+}
+
 /** Titel einer Hälfte im Startbild, unten über dem Verlauf. */
 function Haelfte({ farbe, titel, zeile }: { farbe: string; titel: string; zeile: string }) {
   return (

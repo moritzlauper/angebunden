@@ -77,7 +77,9 @@ erscheint im Velonavi kein Kontobereich.
    Namen (`NEXT_PUBLIC_SUPABASE_ANON_KEY`, mit oder ohne Präfix `STORAGE`).
 4. Im Dashboard unter Authentication, URL Configuration die eigene Adresse eintragen: als
    Site URL `https://deine-domain`, als Redirect URLs dieselbe Adresse und für die Entwicklung
-   `http://localhost:3000`. Der Velonavi liegt auf der Startseite, die Anmeldung kehrt dorthin zurück.
+   `http://localhost:3000`. Der Velonavi liegt auf der Startseite, die Anmeldung kehrt dorthin zurück. Die Wohnungssuche schickt nach
+   `https://deine-domain/wohnungen` zurück; mit `https://deine-domain/**` in den Redirect URLs sind
+   beide erlaubt.
 5. Für die Anmeldung mit Google unter Authentication, Providers Google einschalten. Client-ID
    und Secret stammen aus einem OAuth-Client in der Google Cloud Console, dessen Redirect-URI
    `https://<projekt>.supabase.co/auth/v1/callback` lautet. Der Knopf erscheint im Velonavi
@@ -94,6 +96,9 @@ Ohne Konto bleiben die Spuren auf dem Gerät. Die Tabellen `velonavi_messungen_*
 auf, die Nutzer freiwillig beitragen (`app/velonavi/gemeinschaft.ts`). Einfügen darf jeder mit dem
 öffentlichen Schlüssel, lesen niemand, die Funktion `velonavi_gemeinschaft()` gibt Durchschnitte erst
 ab fünf Messungen heraus. Sie brauchen kein Login.
+
+Die Tabelle `wohnungen_merkliste` hält je Konto die gemerkten und ausgeblendeten Inserate und die Filter
+der Wohnungssuche (`app/wohnungen/konto.tsx`). Beim Anmelden werden Gerät und Konto vereinigt.
 
 Die Tabelle `velonavi_einstellungen` hält je Konto die Gewichte für «Komfort», ob Schieben erlaubt
 ist und die Darstellung, damit sie auf jedem Gerät für künftige Routen gelten. Lokal bleiben sie ohnehin

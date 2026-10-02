@@ -1,15 +1,18 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Map as MapLibreMap, NavigationControl, AttributionControl, setWorkerUrl, type GeoJSONSource } from 'maplibre-gl'
 import { Wortmarke } from '../marke'
-import { KARMIN, TINTE, GRAU, GRUND } from '../farben'
+import { KARMIN, TINTE, GRUND } from '../farben'
 import { STAEDTE } from '../staedte'
 import { useMedienabfrage } from '../blatt'
+import { Seitenwahl } from '../seitenwahl'
 import { nf } from '../site'
 import { GESAMMELT, WEITERE, type Suche } from './quellen'
+import { Anmeldung, useKonto, useMerklisteImKonto } from './konto'
 import type { Art, Inserat, QuellenId, Wohnungen } from './typen'
+import type { Kreis } from './kreise'
 
 /**
  * Woher die Inserate kommen. Der Workflow `wohnungen.yml` legt die Datei
@@ -52,6 +55,10 @@ type Filter = Suche & {
   nurNeu: boolean
   nurGemerkt: boolean
   nurAusschnitt: boolean
+  /** Befristet oder nicht, erkannt vom Sammler aus Feldern und Text. */
+  dauer: 'alle' | 'unbefristet' | 'befristet'
+  /** Auf der Karte gezeichnete Kreise: Mittelpunkt und Radius in Metern. */
+  gebiete: Gebiet[]
   sorte: Sorte
 }
 
@@ -67,6 +74,8 @@ const FILTER_LEER: Filter = {
   nurNeu: false,
   nurGemerkt: false,
   nurAusschnitt: false,
+  dauer: 'alle',
+  gebiete: [],
   sorte: 'neu',
 }
 
@@ -121,15 +130,21 @@ function top(rang: number | null, haeuser: number) {
   return p < 1 ? 'Top 1 %' : `Top ${Math.ceil(p)} %`
 }
 
-/** Farbe nach ÖV-Rang, dieselbe Rampe wie auf der Erreichbarkeitskarte. */
-function farbe(rang: number | null, haeuser: number) {
-  if (rang == null || !haeuser) return GRAU
-  const p = rang / haeuser
-  if (p <= 0.1) return KARMIN[0]
-  if (p <= 0.25) return KARMIN[1]
-  if (p <= 0.5) return KARMIN[2]
-  if (p <= 0.75) return KARMIN[3]
-  return KARMIN[4]
+type Gebiet = { lon: number; lat: number; r: number }
+
+/** Meter zwischen zwei Punkten, flach gerechnet; reicht innerhalb der Stadt. */
+function meter(alon: number, alat: number, blon: number, blat: number) {
+  return Math.hypot((alon - blon) * 75_400, (alat - blat) * 111_133)
+}
+
+/** Ein Kreis als Polygon für die Karte. */
+function kreisPolygon(g: Gebiet) {
+  const ring: [number, number][] = []
+  for (let k = 0; k <= 64; k++) {
+    const w = (k / 64) * 2 * Math.PI
+    ring.push([g.lon + (Math.cos(w) * g.r) / 75_400, g.lat + (Math.sin(w) * g.r) / 111_133])
+  }
+  return { type: 'Feature' as const, properties: {}, geometry: { type: 'Polygon' as const, coordinates: [ring] } }
 }
 
 function passt(i: Inserat, f: Filter, gemerkt: Set<string>, jetzt: number, ausschnitt: [number, number, number, number] | null) {
@@ -142,6 +157,12 @@ function passt(i: Inserat, f: Filter, gemerkt: Set<string>, jetzt: number, aussc
   if (f.flaecheMin != null && (i.flaeche == null || i.flaeche < f.flaecheMin)) return false
   if (f.oevMax != null && (i.oev == null || i.oev > f.oevMax)) return false
   if (f.nurNeu && jetzt - Date.parse(i.erstGesehen) > TAG) return false
+  if (f.dauer === 'befristet' && !i.befristet) return false
+  if (f.dauer === 'unbefristet' && i.befristet) return false
+  if (f.gebiete.length) {
+    if (i.lon == null || i.lat == null) return false
+    if (!f.gebiete.some((g) => meter(i.lon!, i.lat!, g.lon, g.lat) <= g.r)) return false
+  }
   if (f.nurAusschnitt && ausschnitt) {
     const [w, s, e, n] = ausschnitt
     if (i.lon == null || i.lat == null || i.lon < w || i.lon > e || i.lat < s || i.lat > n) return false
@@ -174,20 +195,26 @@ function zuriWms() {
   )
 }
 
-function alsGeojson(liste: Inserat[], haeuser: number) {
+function alsGeojson(liste: Inserat[]) {
   return {
     type: 'FeatureCollection' as const,
     features: liste
       .filter((i) => i.lon != null && i.lat != null)
       .map((i) => ({
         type: 'Feature' as const,
-        properties: { id: i.id, farbe: farbe(i.oevRang, haeuser) },
+        // Dunkel unbefristet, hell befristet. Die ÖV-Anbindung steht in der Karteikarte.
+        properties: { id: i.id, farbe: i.befristet ? KARMIN[4] : KARMIN[1] },
         geometry: { type: 'Point' as const, coordinates: [i.lon!, i.lat!] },
       })),
   }
 }
 
-export default function Wohnungssuche() {
+/**
+ * `kreis` beschränkt die Seite auf einen Stadtkreis (`/wohnungen/kreis-4`),
+ * `unten` ist der Text unter der Liste, vom Server gerendert, damit ihn
+ * Suchmaschinen lesen.
+ */
+export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?: ReactNode } = {}) {
   const [daten, setDaten] = useState<Wohnungen | null>(null)
   const [ladefehler, setLadefehler] = useState(false)
   const [filter, setFilter] = useState<Filter>(FILTER_LEER)
@@ -201,6 +228,21 @@ export default function Wohnungssuche() {
   const [filterOffen, setFilterOffen] = useState(false)
   const [jetzt, setJetzt] = useState(() => Date.now())
   const breit = useMedienabfrage('(min-width: 900px)')
+
+  // Mit Konto liegt die Merkliste zusätzlich dort und gilt auf jedem Gerät.
+  const k = useKonto()
+  const merkliste = useMemo(() => ({ gemerkt: [...gemerkt], weg: [...weg], filter: { ...filter, nurAusschnitt: false } }), [gemerkt, weg, filter])
+  useMerklisteImKonto(k.nutzer, merkliste, (m) => {
+    setGemerkt(new Set(m.gemerkt))
+    schreib(SPEICHER.gemerkt, m.gemerkt)
+    setWeg(new Set(m.weg))
+    schreib(SPEICHER.weg, m.weg)
+    if (m.filter) {
+      const f = { ...FILTER_LEER, ...(m.filter as Partial<Filter>), nurAusschnitt: false }
+      setFilter(f)
+      schreib(SPEICHER.filter, f)
+    }
+  })
 
   const kartenRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
@@ -274,12 +316,18 @@ export default function Wohnungssuche() {
     schreib(schluessel, [...neu])
   }
 
+  // Auf einer Kreisseite nur die Inserate dieses Kreises.
+  const basis = useMemo(
+    () => (daten ? (kreis ? daten.inserate.filter((i) => i.plz != null && kreis.plz.includes(i.plz)) : daten.inserate) : []),
+    [daten, kreis]
+  )
+
   const treffer = useMemo(() => {
     if (!daten) return []
-    return daten.inserate
+    return basis
       .filter((i) => !weg.has(i.id) && passt(i, filter, gemerkt, jetzt, ausschnitt))
       .sort(SORTIER[filter.sorte])
-  }, [daten, filter, gemerkt, weg, jetzt, ausschnitt])
+  }, [daten, basis, filter, gemerkt, weg, jetzt, ausschnitt])
 
   const neuSeitBesuch = useMemo(
     () => (letzterBesuch ? treffer.filter((i) => Date.parse(i.erstGesehen) > letzterBesuch).length : 0),
@@ -288,6 +336,45 @@ export default function Wohnungssuche() {
 
   // ── Karte ──────────────────────────────────────────────────────────────
   const zeigeKarte = breit || ansicht === 'karte'
+
+  // Zeichnen läuft in MapLibre-Ereignissen; die lesen den Zustand über Refs.
+  const [zeichnen, setZeichnen] = useState(false)
+  const zeichnenRef = useRef(false)
+  const entwurfRef = useRef<Gebiet | null>(null)
+  const gebieteRef = useRef<Gebiet[]>([])
+  gebieteRef.current = filter.gebiete
+  const gebietDazuRef = useRef((g: Gebiet) => {})
+  gebietDazuRef.current = (g) => {
+    setZeichnen(false)
+    aendern({ gebiete: [...filter.gebiete, g] })
+  }
+  const zeichneGebiete = useCallback(() => {
+    const map = mapRef.current
+    const quelle = map?.getSource('gebiete') as GeoJSONSource | undefined
+    const alle = entwurfRef.current ? [...gebieteRef.current, entwurfRef.current] : gebieteRef.current
+    quelle?.setData({ type: 'FeatureCollection', features: alle.map(kreisPolygon) })
+  }, [])
+
+  useEffect(() => {
+    zeichnenRef.current = zeichnen
+    const map = mapRef.current
+    if (!map) return
+    // Beim Zeichnen verschiebt ein Ziehen nicht die Karte.
+    if (zeichnen) {
+      map.dragPan.disable()
+      map.touchZoomRotate.disable()
+      map.getCanvas().style.cursor = 'crosshair'
+    } else {
+      map.dragPan.enable()
+      map.touchZoomRotate.enable()
+      map.touchZoomRotate.disableRotation()
+      map.getCanvas().style.cursor = ''
+    }
+  }, [zeichnen, karteBereit])
+
+  useEffect(() => {
+    if (karteBereit) zeichneGebiete()
+  }, [filter.gebiete, karteBereit, zeichneGebiete])
 
   useEffect(() => {
     if (!zeigeKarte || !kartenRef.current || mapRef.current) return
@@ -309,6 +396,7 @@ export default function Wohnungssuche() {
             attribution: '© Stadt Zürich',
           },
           inserate: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
+          gebiete: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
         },
         layers: [
           // Eigene Grundkarte aus den Daten der Erreichbarkeitskarte. Darüber, sobald geladen,
@@ -341,6 +429,18 @@ export default function Wohnungssuche() {
             type: 'raster',
             source: 'zuri',
             paint: { 'raster-saturation': -0.6, 'raster-contrast': -0.05, 'raster-fade-duration': 150 },
+          },
+          {
+            id: 'gebiete-flaeche',
+            type: 'fill',
+            source: 'gebiete',
+            paint: { 'fill-color': KARMIN[2], 'fill-opacity': 0.08 },
+          },
+          {
+            id: 'gebiete-rand',
+            type: 'line',
+            source: 'gebiete',
+            paint: { 'line-color': KARMIN[1], 'line-width': 2, 'line-dasharray': [2, 1.5] },
           },
           {
             id: 'inserate',
@@ -397,6 +497,33 @@ export default function Wohnungssuche() {
       setAuswahl(id)
       if (!breit) setAnsicht('karte')
     })
+    // Gebiet zeichnen: drücken setzt die Mitte, ziehen den Radius, loslassen legt den Kreis ab.
+    let start: { lon: number; lat: number } | null = null
+    const ziehen = (lon: number, lat: number) => {
+      if (!start) return
+      entwurfRef.current = { ...start, r: meter(start.lon, start.lat, lon, lat) }
+      zeichneGebiete()
+    }
+    const anfangen = (e: { lngLat: { lng: number; lat: number }; preventDefault: () => void }) => {
+      if (!zeichnenRef.current) return
+      e.preventDefault()
+      start = { lon: e.lngLat.lng, lat: e.lngLat.lat }
+      entwurfRef.current = { ...start, r: 0 }
+    }
+    const aufhoeren = () => {
+      if (!start) return
+      const g = entwurfRef.current
+      start = null
+      entwurfRef.current = null
+      // Ein Tippen ohne Ziehen gibt einen Kreis von 400 m.
+      gebietDazuRef.current({ ...g!, r: Math.round(g!.r < 60 ? 400 : g!.r) })
+    }
+    map.on('mousedown', anfangen)
+    map.on('touchstart', anfangen)
+    map.on('mousemove', (e) => ziehen(e.lngLat.lng, e.lngLat.lat))
+    map.on('touchmove', (e) => ziehen(e.lngLat.lng, e.lngLat.lat))
+    map.on('mouseup', aufhoeren)
+    map.on('touchend', aufhoeren)
     map.on('mouseenter', 'inserate', () => (map.getCanvas().style.cursor = 'pointer'))
     map.on('mouseleave', 'inserate', () => (map.getCanvas().style.cursor = ''))
     mapRef.current = map
@@ -414,13 +541,13 @@ export default function Wohnungssuche() {
   const punkte = useMemo(() => {
     if (!daten) return []
     const f = { ...filter, nurAusschnitt: false }
-    return daten.inserate.filter((i) => !weg.has(i.id) && passt(i, f, gemerkt, jetzt, null))
-  }, [daten, filter, gemerkt, weg, jetzt])
+    return basis.filter((i) => !weg.has(i.id) && passt(i, f, gemerkt, jetzt, null))
+  }, [daten, basis, filter, gemerkt, weg, jetzt])
 
   useEffect(() => {
     const map = mapRef.current
     if (!map || !karteBereit || !daten) return
-    ;(map.getSource('inserate') as GeoJSONSource | undefined)?.setData(alsGeojson(punkte, daten.haeuser))
+    ;(map.getSource('inserate') as GeoJSONSource | undefined)?.setData(alsGeojson(punkte))
   }, [punkte, daten, karteBereit])
 
   useEffect(() => {
@@ -454,15 +581,31 @@ export default function Wohnungssuche() {
   const ausgewaehlt = auswahl ? daten?.inserate.find((i) => i.id === auswahl) ?? null : null
 
   // ── Darstellung ────────────────────────────────────────────────────────
+  const ui = {
+    fg: 'var(--ab-tinte)',
+    muted: 'var(--ab-leise)',
+    panel: 'var(--ab-blatt)',
+    border: 'var(--ab-linie)',
+    aktiv: 'var(--ab-aktiv)',
+    schatten: 'none',
+  }
   const kopf = (
+    <>
+    <div className="flex justify-center px-4 pt-4">
+      <Seitenwahl ui={ui} aktiv="wohnungen" immer />
+    </div>
     <header className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 sm:px-5">
       <div className="flex min-w-0 items-baseline gap-2.5">
         <Link href="/" aria-label="angebunden · zum Velonavi" className="hover:opacity-70">
           <Wortmarke size={15} />
         </Link>
-        <h1 className="truncate text-[15px] font-semibold tracking-tight">Wohnungen in Zürich</h1>
+        <h1 className="truncate text-[15px] font-semibold tracking-tight">
+          {kreis ? `Wohnungen Zürich Kreis ${kreis.nummer}` : 'Wohnungen in Zürich'}
+        </h1>
       </div>
+      <Anmeldung k={k} />
     </header>
+    </>
   )
 
   const stand = daten && (
@@ -562,6 +705,39 @@ export default function Wohnungssuche() {
       )}
 
       <Portale filter={filter} />
+      {unten}
+    </div>
+  )
+
+  const werkzeug = (
+    <div className="absolute top-3 right-3 z-10 flex max-w-[15rem] flex-col items-end gap-2">
+      <button
+        type="button"
+        onClick={() => setZeichnen((z) => !z)}
+        className="rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium shadow-[var(--ab-schatten)]"
+        style={
+          zeichnen
+            ? { background: 'var(--ab-tinte)', color: 'var(--ab-papier)', borderColor: 'var(--ab-tinte)' }
+            : { background: 'var(--ab-blatt)', borderColor: 'var(--ab-linie)' }
+        }
+      >
+        {zeichnen ? 'Abbrechen' : filter.gebiete.length ? 'Weiteres Gebiet zeichnen' : 'Gebiet zeichnen'}
+      </button>
+      {zeichnen && (
+        <div className="rounded-xl border border-[var(--ab-linie)] bg-[var(--ab-blatt)] px-3 py-2 text-[11.5px] leading-snug shadow-[var(--ab-schatten)] backdrop-blur-md">
+          Drücken, wo das Gebiet in der Mitte liegt, und ziehen, bis der Kreis passt.
+        </div>
+      )}
+      {filter.gebiete.length > 0 && !zeichnen && (
+        <button
+          type="button"
+          onClick={() => aendern({ gebiete: [] })}
+          className="rounded-full border border-[var(--ab-linie)] bg-[var(--ab-blatt)] px-3 py-1 text-[12px] shadow-[var(--ab-schatten)]"
+        >
+          {filter.gebiete.length === 1 ? 'Gebiet' : `${filter.gebiete.length} Gebiete`} löschen ✕
+        </button>
+      )}
+      <Legende />
     </div>
   )
 
@@ -576,7 +752,7 @@ export default function Wohnungssuche() {
         </div>
         <div className="relative min-w-0 flex-1">
           <div ref={kartenRef} className="h-full w-full" />
-          <Legende />
+          {werkzeug}
         </div>
       </div>
     )
@@ -609,7 +785,7 @@ export default function Wohnungssuche() {
       ) : (
         <div className="relative min-h-0 flex-1">
           <div ref={kartenRef} className="h-full w-full" />
-          <Legende />
+          {werkzeug}
           {ausgewaehlt && daten && (
             <div className="absolute inset-x-2 bottom-2 z-10">
               <ul>
@@ -637,17 +813,14 @@ export default function Wohnungssuche() {
 }
 
 function Legende() {
-  const stufen = [
-    [KARMIN[0], 'Top 10 %'],
-    [KARMIN[1], 'Top 25 %'],
-    [KARMIN[2], 'Top 50 %'],
-    [KARMIN[3], 'Top 75 %'],
-    [KARMIN[4], 'übrige'],
-  ] as const
   return (
-    <div className="pointer-events-none absolute top-3 right-3 rounded-xl border border-[var(--ab-linie)] bg-[var(--ab-blatt)] px-3 py-2 text-[11px] shadow-[var(--ab-schatten)] backdrop-blur-md">
-      <div className="mb-1 font-medium">ÖV-Anbindung</div>
-      {stufen.map(([f, t]) => (
+    <div className="pointer-events-none rounded-xl border border-[var(--ab-linie)] bg-[var(--ab-blatt)] px-3 py-2 text-[11px] shadow-[var(--ab-schatten)] backdrop-blur-md">
+      {(
+        [
+          [KARMIN[1], 'Unbefristet'],
+          [KARMIN[4], 'Befristet'],
+        ] as const
+      ).map(([f, t]) => (
         <div key={t} className="flex items-center gap-1.5 text-[var(--ab-leise)]">
           <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: f }} />
           {t}
@@ -779,32 +952,30 @@ function Filterfeld({
               </Chip>
             ))}
           </div>
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-[var(--ab-leise)]">ÖV: im Schnitt höchstens</span>
-              <span className="font-medium tabular-nums">{f.oevMax == null ? 'egal' : `${f.oevMax} Min.`}</span>
-            </div>
-            <input
-              type="range"
-              className="regler mt-1"
-              min={22}
-              max={46}
-              step={1}
-              value={f.oevMax ?? 46}
-              onChange={(e) => aendern({ oevMax: Number(e.target.value) >= 46 ? null : Number(e.target.value) })}
-              style={
-                {
-                  '--fuellung': `linear-gradient(to right, var(--ab-karmin) ${(((f.oevMax ?? 46) - 22) / 24) * 100}%, var(--ab-spur) 0)`,
-                  '--knopf': 'var(--ab-knopf)',
-                  '--ring': 'var(--ab-ring)',
-                } as React.CSSProperties
-              }
-              aria-label="Höchste mittlere ÖV-Reisezeit"
-            />
-            <p className="mt-1 text-[11px] leading-snug text-[var(--ab-leise)]">
-              Mittlere Reisezeit mit Tram, Bus und S-Bahn zu einer beliebigen Adresse der Stadt. Median 31 Min.
-            </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[var(--ab-leise)]">Dauer</span>
+            {(
+              [
+                ['alle', 'Alle'],
+                ['unbefristet', 'Unbefristet'],
+                ['befristet', 'Befristet'],
+              ] as const
+            ).map(([d, name]) => (
+              <Chip key={d} an={f.dauer === d} onClick={() => aendern({ dauer: d })}>
+                {name}
+              </Chip>
+            ))}
           </div>
+          {f.gebiete.length > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[var(--ab-leise)]">
+                Nur in {f.gebiete.length === 1 ? 'dem gezeichneten Gebiet' : `${f.gebiete.length} gezeichneten Gebieten`}
+              </span>
+              <button type="button" onClick={() => aendern({ gebiete: [] })} className="text-[12px] underline underline-offset-2">
+                aufheben
+              </button>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-1.5">
             {zaehlen.map((q) => (
               <Chip key={q.id} an={!f.quellenAus.includes(q.id)} onClick={() => aendern({ quellenAus: kippe(f.quellenAus, q.id) })}>
@@ -821,6 +992,21 @@ function Filterfeld({
             <label className="flex cursor-pointer items-center gap-1.5">
               <input type="checkbox" checked={f.nurGemerkt} onChange={(e) => aendern({ nurGemerkt: e.target.checked })} />
               Nur gemerkte
+            </label>
+            <label className="flex items-center gap-1.5 text-[var(--ab-leise)]" title="Mittlere Reisezeit mit Tram, Bus und S-Bahn zu einer beliebigen Adresse der Stadt, Median 31 Min.">
+              ÖV
+              <select
+                value={f.oevMax ?? ''}
+                onChange={(e) => aendern({ oevMax: e.target.value === '' ? null : Number(e.target.value) })}
+                className="rounded-md border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-1 py-0.5 text-[12px] text-[var(--ab-tinte)]"
+              >
+                <option value="">egal</option>
+                {[26, 28, 31, 35].map((m) => (
+                  <option key={m} value={m}>
+                    bis {m} Min.
+                  </option>
+                ))}
+              </select>
             </label>
             <button
               type="button"
@@ -889,6 +1075,11 @@ function Karteikarte({
             <div className="text-[15px] font-semibold tabular-nums tracking-tight">
               {i.miete != null ? `CHF ${nf(i.miete)}` : 'Preis auf Anfrage'}
               {proM2 != null && <span className="ml-1.5 text-[11px] font-normal text-[var(--ab-leise)]">{proM2.toFixed(0)}/m²</span>}
+              {i.befristet && (
+                <span className="ml-1.5 rounded-full bg-[var(--ab-weich)] px-1.5 py-0.5 align-middle text-[10.5px] font-medium text-[var(--ab-leise)]">
+                  befristet
+                </span>
+              )}
             </div>
             <a href={haupt.url} target="_blank" rel="noopener noreferrer" className="line-clamp-2 text-[13px] leading-snug hover:underline sm:line-clamp-1">
               {i.titel}
@@ -922,15 +1113,13 @@ function Karteikarte({
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px]">
           {i.oev != null && (
-            <span className="inline-flex items-center gap-1" title="Mittlere ÖV-Reisezeit zu einer beliebigen Adresse der Stadt">
-              <span className="inline-block h-2 w-2 rounded-full" style={{ background: farbe(i.oevRang, haeuser) }} />
+            <span className="text-[var(--ab-leise)]" title={`Mittlere ÖV-Reisezeit zu einer beliebigen Adresse der Stadt, ${top(i.oevRang, haeuser)}`}>
               ÖV {Math.round(i.oev)} Min.
-              <span className="text-[var(--ab-leise)]">{top(i.oevRang, haeuser)}</span>
             </span>
           )}
           {i.kultur != null && (
-            <span title="Kulturorte in 10 Velominuten">
-              {i.kultur} Kulturorte <span className="text-[var(--ab-leise)]">{top(i.kulturRang, haeuser)}</span>
+            <span className="text-[var(--ab-leise)]" title={`Kulturorte in 10 Velominuten, ${top(i.kulturRang, haeuser)}`}>
+              {i.kultur} Kulturorte
             </span>
           )}
         </div>
