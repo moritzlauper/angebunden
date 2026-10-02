@@ -7,9 +7,9 @@ const H = {
   Accept: 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8',
 }
 const ZIELE = {
-  'stadt-frei': 'https://www.stadt-zuerich.ch/de/lebenslagen/wohnen/freie-wohnungen.html',
-  'abz-types': 'https://www.abz.ch/wp-json/wp/v2/types',
-  'abz-grid': 'https://www.abz.ch/wp-json/',
+  'stadt-portal': 'https://www.vermietungen.stadt-zuerich.ch/publication/apartment/',
+  'stadt-portal-api': 'https://www.vermietungen.stadt-zuerich.ch/api/publication/apartment/',
+  'abz-wohnung': 'https://www.abz.ch/wp-json/wp/v2/wohnung?per_page=50',
 }
 mkdirSync('probe', { recursive: true })
 const zeilen = []
