@@ -25,6 +25,7 @@ on:
   push:
     paths:
       - 'pipeline/20-wohnungen.ts'
+      - 'pipeline/21-suchabos.ts'
       - '.github/workflows/wohnungen.yml'
 
 concurrency:
@@ -77,3 +78,13 @@ jobs:
           git commit -q -m "Wohnungen: ${ZAHLEN}"
           git push -q --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "HEAD:${ZWEIG}"
           echo "${ZAHLEN}" >> "$GITHUB_STEP_SUMMARY"
+
+      # Suchabos: neue passende Inserate per Mail. Ohne die Secrets tut der Schritt nichts.
+      # Einrichtung: README, Abschnitt «Suchabos».
+      - name: Suchabos verschicken
+        env:
+          SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SUCHABO_ABSENDER: ${{ vars.SUCHABO_ABSENDER }}
+        run: node pipeline/21-suchabos.ts ausgabe/wohnungen.json

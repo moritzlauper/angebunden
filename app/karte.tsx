@@ -2290,6 +2290,9 @@ function StadtWechsel({ ui, stadt, modus }: { ui: Ui; stadt: Stadt; modus: Modus
           ))}
         </div>
       </div>
+      <Link href="/wohnungen" className="ml-auto shrink-0 font-medium underline underline-offset-2" style={{ color: ui.fg }}>
+        Wohnungen →
+      </Link>
       <Link
         href="/methode"
         aria-label="angebunden · Wie das gerechnet ist"

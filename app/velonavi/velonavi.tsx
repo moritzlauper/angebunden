@@ -15,7 +15,7 @@ import {
 import { Blatt, useMedienabfrage } from '../blatt'
 import { Suchleiste, bauIndex, suchen, Sternsymbol, type Eintrag } from '../suche'
 import { Wortmarke } from '../marke'
-import { Seitenwahl, useKontoVorhanden } from '../seitenwahl'
+import { Seitenwahl, WohnungenLink, useKontoVorhanden } from '../seitenwahl'
 import { STAEDTE } from '../staedte'
 import { nf } from '../site'
 import { ZIEL, TINTE, GRAU, GEFAHREN } from '../farben'
@@ -1513,6 +1513,7 @@ export default function Velonavi() {
       </div>
       <div className="relative z-20 -mt-1 flex justify-end gap-2">
         {/* In der Seitenleiste steht der Knopf neben dem Titel. */}
+        {mobil && <WohnungenLink ui={ui} className="mr-auto" />}
         {mobil && <Fahrtenknopf f={fahrten} offen={menueOffen} onClick={() => setMenueOffen(!menueOffen)} pille />}
         <button
           onClick={tausche}
@@ -1760,6 +1761,7 @@ export default function Velonavi() {
                 </h2>
                 {/* Die Rechenzeit steht nur noch als Tooltip: Im Kopf war sie Unruhe, und «2 Routen» stimmte nicht, wenn beide Varianten zusammenfielen. */}
                 <span className="flex items-center gap-2 self-center" title={routen ? `Gerechnet in ${Math.round(routen.ms)} ms` : undefined}>
+                  <WohnungenLink ui={ui} />
                   <Fahrtenknopf f={fahrten} offen={menueOffen} onClick={() => setMenueOffen(!menueOffen)} />
                 </span>
               </div>
