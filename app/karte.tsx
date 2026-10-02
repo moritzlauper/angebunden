@@ -17,6 +17,7 @@ import { Suchleiste, bauIndex, suchen, type Eintrag } from './suche'
 import { Wortmarke } from './marke'
 import { KARMIN, TINTE, GRUND } from './farben'
 import { Hauptwahl } from './hauptwahl'
+import { Menue } from './menue'
 import { SITE_URL } from './site'
 
 /** Die Grundkarte bleibt schwarzweiss: dunkel = gut, hell = schlecht. */
@@ -2058,7 +2059,8 @@ function Panel({
   return (
     <div style={{ color: ui.fg }}>
       <div>
-        <h2 className="text-[15px] font-semibold tracking-tight leading-tight">
+        <h2 className="flex items-center gap-2 text-[15px] font-semibold tracking-tight leading-tight">
+          <Menue aktiv="erreichbarkeit" />
           {MODI[modus].titel} {stadt.name}
         </h2>
         <p className="mt-1.5 leading-snug" style={{ color: ui.muted }}>
@@ -2290,9 +2292,6 @@ function StadtWechsel({ ui, stadt, modus }: { ui: Ui; stadt: Stadt; modus: Modus
           ))}
         </div>
       </div>
-      <Link href="/wohnungen" className="ml-auto shrink-0 font-medium underline underline-offset-2" style={{ color: ui.fg }}>
-        Wohnungen →
-      </Link>
       <Link
         href="/methode"
         aria-label="angebunden · Wie das gerechnet ist"

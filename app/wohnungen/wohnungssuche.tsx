@@ -7,14 +7,14 @@ import { Wortmarke } from '../marke'
 import { KARMIN, TINTE, GRUND } from '../farben'
 import { STAEDTE } from '../staedte'
 import { useMedienabfrage } from '../blatt'
-import { Seitenwahl } from '../seitenwahl'
+import { Menue } from '../menue'
 import { nf } from '../site'
 import { GESAMMELT, WEITERE, type Suche } from './quellen'
 import { Anmeldung, useAbmeldelink, useKonto, useMerklisteImKonto } from './konto'
 import { SuchaboDialog } from './suchabo'
 import type { Art, Inserat, QuellenId, Wohnungen } from './typen'
 import type { Kreis } from './kreise'
-import { FILTER_LEER, SORTEN, TAG, meter, passt, type Filter, type Gebiet, type Sorte } from './filter'
+import { FILTER_LEER, SORTEN, TAG, passt, umriss, type Filter, type Gebiet, type Sorte } from './filter'
 
 /**
  * Woher die Inserate kommen. Der Workflow `wohnungen.yml` legt die Datei
@@ -89,14 +89,28 @@ function top(rang: number | null, haeuser: number) {
 }
 
 
-/** Ein Kreis als Polygon für die Karte. */
-function kreisPolygon(g: Gebiet) {
-  const ring: [number, number][] = []
-  for (let k = 0; k <= 64; k++) {
-    const w = (k / 64) * 2 * Math.PI
-    ring.push([g.lon + (Math.cos(w) * g.r) / 75_400, g.lat + (Math.sin(w) * g.r) / 111_133])
+/** Ein Gebiet als Fläche für die Karte; `i` ist die Stelle in der Liste, zum Verschieben. */
+function gebietFeature(g: Gebiet, i: number) {
+  const ring = umriss(g)
+  return {
+    type: 'Feature' as const,
+    properties: { i },
+    geometry: { type: 'Polygon' as const, coordinates: [[...ring, ring[0]]] },
   }
-  return { type: 'Feature' as const, properties: {}, geometry: { type: 'Polygon' as const, coordinates: [ring] } }
+}
+
+/** Ein Gebiet um eine Strecke verschieben. */
+function verschoben(g: Gebiet, dlon: number, dlat: number): Gebiet {
+  if ('punkte' in g) return { punkte: g.punkte.map(([x, y]) => [x + dlon, y + dlat] as [number, number]) }
+  return { ...g, lon: g.lon + dlon, lat: g.lat + dlat }
+}
+
+/** Höchstens 200 Ecken, und keine zwei fast am selben Fleck: reicht für jede Handskizze. */
+function geglaettet(punkte: [number, number][]): [number, number][] {
+  const schritt = Math.max(1, Math.ceil(punkte.length / 200))
+  return punkte
+    .filter((_, k) => k % schritt === 0)
+    .map(([x, y]) => [Math.round(x * 1e5) / 1e5, Math.round(y * 1e5) / 1e5] as [number, number])
 }
 
 
@@ -271,16 +285,19 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
   const entwurfRef = useRef<Gebiet | null>(null)
   const gebieteRef = useRef<Gebiet[]>([])
   gebieteRef.current = filter.gebiete
-  const gebietDazuRef = useRef((g: Gebiet) => {})
-  gebietDazuRef.current = (g) => {
+  /** Während ein Gebiet verschoben wird, die Liste mit der verschobenen Fassung. */
+  const vorschauRef = useRef<Gebiet[] | null>(null)
+  const gebieteSetzenRef = useRef((g: Gebiet[]) => {})
+  gebieteSetzenRef.current = (g) => {
     setZeichnen(false)
-    aendern({ gebiete: [...filter.gebiete, g] })
+    aendern({ gebiete: g })
   }
   const zeichneGebiete = useCallback(() => {
     const map = mapRef.current
     const quelle = map?.getSource('gebiete') as GeoJSONSource | undefined
-    const alle = entwurfRef.current ? [...gebieteRef.current, entwurfRef.current] : gebieteRef.current
-    quelle?.setData({ type: 'FeatureCollection', features: alle.map(kreisPolygon) })
+    const basis = vorschauRef.current ?? gebieteRef.current
+    const alle = entwurfRef.current ? [...basis, entwurfRef.current] : basis
+    quelle?.setData({ type: 'FeatureCollection', features: alle.filter((g) => umriss(g).length >= 2).map(gebietFeature) })
   }, [])
 
   useEffect(() => {
@@ -425,33 +442,87 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
       setAuswahl(id)
       if (!breit) setAnsicht('karte')
     })
-    // Gebiet zeichnen: drücken setzt die Mitte, ziehen den Radius, loslassen legt den Kreis ab.
-    let start: { lon: number; lat: number } | null = null
-    const ziehen = (lon: number, lat: number) => {
-      if (!start) return
-      entwurfRef.current = { ...start, r: meter(start.lon, start.lat, lon, lat) }
-      zeichneGebiete()
-    }
-    const anfangen = (e: { lngLat: { lng: number; lat: number }; preventDefault: () => void }) => {
+    // Gebiet zeichnen: drücken und die Umrandung abfahren, loslassen schliesst die Fläche.
+    // Ausserhalb des Zeichnens verschiebt Ziehen in einem Gebiet das Gebiet, ein Doppelklick löscht es.
+    type Ereignis = { lngLat: { lng: number; lat: number }; point: { x: number; y: number }; preventDefault: () => void }
+    let pfad: [number, number][] | null = null
+    let letzterPunkt: { x: number; y: number } | null = null
+    let schieben: { i: number; lon: number; lat: number } | null = null
+    const anfangen = (e: Ereignis) => {
       if (!zeichnenRef.current) return
       e.preventDefault()
-      start = { lon: e.lngLat.lng, lat: e.lngLat.lat }
-      entwurfRef.current = { ...start, r: 0 }
+      pfad = [[e.lngLat.lng, e.lngLat.lat]]
+      letzterPunkt = e.point
+      entwurfRef.current = { punkte: pfad }
     }
-    const aufhoeren = () => {
-      if (!start) return
-      const g = entwurfRef.current
-      start = null
-      entwurfRef.current = null
-      // Ein Tippen ohne Ziehen gibt einen Kreis von 400 m.
-      gebietDazuRef.current({ ...g!, r: Math.round(g!.r < 60 ? 400 : g!.r) })
+    const greifen = (e: Ereignis & { features?: { properties: Record<string, unknown> }[] }) => {
+      if (zeichnenRef.current) return
+      const i = Number(e.features?.[0]?.properties?.i)
+      if (!Number.isFinite(i)) return
+      e.preventDefault()
+      schieben = { i, lon: e.lngLat.lng, lat: e.lngLat.lat }
+      map.dragPan.disable()
+    }
+    const ziehen = (e: Ereignis) => {
+      if (pfad && letzterPunkt) {
+        // Nur alle paar Pixel ein Punkt, sonst wird die Fläche unnötig fein.
+        if (Math.hypot(e.point.x - letzterPunkt.x, e.point.y - letzterPunkt.y) < 4) return
+        pfad.push([e.lngLat.lng, e.lngLat.lat])
+        letzterPunkt = e.point
+        zeichneGebiete()
+      } else if (schieben) {
+        const dlon = e.lngLat.lng - schieben.lon
+        const dlat = e.lngLat.lat - schieben.lat
+        vorschauRef.current = gebieteRef.current.map((g, k) => (k === schieben!.i ? verschoben(g, dlon, dlat) : g))
+        zeichneGebiete()
+      }
+    }
+    const aufhoeren = (e?: Ereignis) => {
+      if (pfad) {
+        const punkte = pfad
+        pfad = null
+        letzterPunkt = null
+        entwurfRef.current = null
+        // Ein Tippen ohne Ziehen gibt einen Kreis von 400 m um die Stelle.
+        const neu: Gebiet =
+          punkte.length >= 3
+            ? { punkte: geglaettet(punkte) }
+            : { punkte: umriss({ lon: punkte[0][0], lat: punkte[0][1], r: 400 }) }
+        gebieteSetzenRef.current([...gebieteRef.current, neu])
+      } else if (schieben) {
+        const vorschau = vorschauRef.current
+        schieben = null
+        vorschauRef.current = null
+        map.dragPan.enable()
+        if (vorschau) gebieteSetzenRef.current(vorschau)
+        else zeichneGebiete()
+      }
+      void e
     }
     map.on('mousedown', anfangen)
     map.on('touchstart', anfangen)
-    map.on('mousemove', (e) => ziehen(e.lngLat.lng, e.lngLat.lat))
-    map.on('touchmove', (e) => ziehen(e.lngLat.lng, e.lngLat.lat))
+    map.on('mousedown', 'gebiete-flaeche', greifen)
+    map.on('touchstart', 'gebiete-flaeche', (e) => {
+      // Mit zwei Fingern wird gezoomt, nicht verschoben.
+      if (e.points.length === 1) greifen(e)
+    })
+    map.on('mousemove', ziehen)
+    map.on('touchmove', ziehen)
     map.on('mouseup', aufhoeren)
     map.on('touchend', aufhoeren)
+    map.on('dblclick', 'gebiete-flaeche', (e) => {
+      if (zeichnenRef.current) return
+      const i = Number(e.features?.[0]?.properties?.i)
+      if (!Number.isFinite(i)) return
+      e.preventDefault()
+      gebieteSetzenRef.current(gebieteRef.current.filter((_, k) => k !== i))
+    })
+    map.on('mouseenter', 'gebiete-flaeche', () => {
+      if (!zeichnenRef.current) map.getCanvas().style.cursor = 'move'
+    })
+    map.on('mouseleave', 'gebiete-flaeche', () => {
+      if (!zeichnenRef.current) map.getCanvas().style.cursor = ''
+    })
     map.on('mouseenter', 'inserate', () => (map.getCanvas().style.cursor = 'pointer'))
     map.on('mouseleave', 'inserate', () => (map.getCanvas().style.cursor = ''))
     mapRef.current = map
@@ -519,11 +590,9 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
   }
   const kopf = (
     <>
-    <div className="flex justify-center px-4 pt-4">
-      <Seitenwahl ui={ui} aktiv="wohnungen" immer />
-    </div>
     <header className="flex items-center justify-between gap-3 px-4 pt-4 pb-3 sm:px-5">
-      <div className="flex min-w-0 items-baseline gap-2.5">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <Menue aktiv="wohnungen" />
         <Link href="/" aria-label="angebunden · zum Velonavi" className="hover:opacity-70">
           <Wortmarke size={15} />
         </Link>
@@ -560,6 +629,13 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
       offen={filterOffen || breit}
       umklappen={breit ? null : () => setFilterOffen((o) => !o)}
       zaehlen={daten ? daten.quellen : []}
+      zeichnetGerade={zeichnen}
+      gebietZeichnen={() => {
+        if (zeichnen) return setZeichnen(false)
+        setZeichnen(true)
+        // Auf dem Handy liegt die Karte hinter der Liste.
+        if (!breit) setAnsicht('karte')
+      }}
     />
   )
 
@@ -703,7 +779,8 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
       </button>
       {zeichnen && (
         <div className="rounded-xl border border-[var(--ab-linie)] bg-[var(--ab-blatt)] px-3 py-2 text-[11.5px] leading-snug shadow-[var(--ab-schatten)] backdrop-blur-md">
-          Drücken, wo das Gebiet in der Mitte liegt, und ziehen, bis der Kreis passt.
+          Maus gedrückt halten und das Gebiet umfahren, beim Loslassen schliesst es sich. Auf dem Handy mit dem
+          Finger. Danach lässt es sich verschieben; ein Doppelklick löscht es.
         </div>
       )}
       {filter.gebiete.length > 0 && !zeichnen && (
@@ -910,13 +987,16 @@ function aktiveFilter(f: Filter) {
 }
 
 function Filterfeld({
-  filter: f, aendern, offen, umklappen, zaehlen,
+  filter: f, aendern, offen, umklappen, zaehlen, gebietZeichnen, zeichnetGerade,
 }: {
   filter: Filter
   aendern: (t: Partial<Filter>) => void
   offen: boolean
   umklappen: (() => void) | null
   zaehlen: Wohnungen['quellen']
+  /** Schaltet das Zeichnen auf der Karte ein (auf dem Handy samt Wechsel zur Karte). */
+  gebietZeichnen: () => void
+  zeichnetGerade: boolean
 }) {
   const [mehr, setMehr] = useState(false)
   const zimmer = (wert: number | null, setzen: (n: number | null) => void, leer: string) => (
@@ -935,24 +1015,33 @@ function Filterfeld({
   )
   const kippe = <T,>(liste: T[], x: T) => (liste.includes(x) ? liste.filter((y) => y !== x) : [...liste, x])
   const anzahl = aktiveFilter(f)
-  const mehrAktiv = [f.oevMax != null, f.nurNeu, f.nurGemerkt].filter(Boolean).length
+  const mehrAktiv = [f.text.trim() !== '', f.oevMax != null, f.nurNeu, f.nurGemerkt].filter(Boolean).length
 
   return (
     <section className="mx-3 rounded-[20px] border border-[var(--ab-linie)] bg-[var(--ab-blatt)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:mx-4">
       <div className="flex items-center gap-2">
-        <label className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-3.5 py-2 focus-within:border-[var(--ab-leise)]">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 text-[var(--ab-leise)]">
-            <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
-            <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        <button
+          type="button"
+          onClick={gebietZeichnen}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full border px-3.5 py-2 text-left transition-colors"
+          style={
+            zeichnetGerade
+              ? { background: 'var(--ab-tinte)', color: 'var(--ab-papier)', borderColor: 'var(--ab-tinte)' }
+              : { background: 'var(--ab-aktiv)', borderColor: 'var(--ab-linie)' }
+          }
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
+            <path d="M4 15c0-5 4-10 9-10 4 0 7 2 7 6 0 5-5 8-10 8-2 0-3-1-3-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="3 3" />
+            <path d="m14 20 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
           </svg>
-          <input
-            type="search"
-            value={f.text}
-            onChange={(e) => aendern({ text: e.target.value })}
-            placeholder="Strasse, Quartier, PLZ oder Stichwort"
-            className="min-w-0 flex-1 bg-transparent text-[14px] outline-none placeholder:text-[var(--ab-leise)]"
-          />
-        </label>
+          <span className="min-w-0 flex-1 truncate text-[14px] font-medium">
+            {zeichnetGerade
+              ? 'Jetzt auf der Karte umfahren …'
+              : f.gebiete.length
+                ? `${f.gebiete.length === 1 ? '1 Gebiet' : `${f.gebiete.length} Gebiete`} · weiteres einzeichnen`
+                : 'Gebiet auf der Karte einzeichnen'}
+          </span>
+        </button>
         {umklappen && (
           <button
             type="button"
@@ -1033,6 +1122,19 @@ function Filterfeld({
 
           {mehr && (
             <div className="flex flex-col gap-2.5 border-t border-[var(--ab-linie)] pt-3">
+              <label className="flex items-center gap-2 rounded-full border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-3.5 py-1.5 focus-within:border-[var(--ab-leise)]">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 text-[var(--ab-leise)]">
+                  <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+                  <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <input
+                  type="search"
+                  value={f.text}
+                  onChange={(e) => aendern({ text: e.target.value })}
+                  placeholder="Stichwort, Strasse oder PLZ"
+                  className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-[var(--ab-leise)]"
+                />
+              </label>
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
                 <label className="flex cursor-pointer items-center gap-1.5">
                   <input type="checkbox" checked={f.nurNeu} onChange={(e) => aendern({ nurNeu: e.target.checked })} />
