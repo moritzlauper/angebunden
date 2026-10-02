@@ -6,7 +6,7 @@ import {
   anmeldeFehler, appUebergabe, konto, kontoAngefangen, KONTO_WECHSEL, rueckkehr, KONTO_MOEGLICH, TABELLE, type Anbieter,
 } from './konto'
 import {
-  lerne, spurAusGpx, spurDistanz, verdichten, kern, zuordnen, DISTANZ_SCHRITT,
+  lerne, spurAusGpx, spurDistanz, verdichten, kern, abschnitte, zuordnen, DISTANZ_SCHRITT,
   type Fahrt, type Lernstand, type Ort, type Spurpunkt, type Vorschlag, type Zuordnung,
 } from './fahrten.ts'
 import type { Lauf, Teilstrecke } from './vergleich.ts'
@@ -23,6 +23,9 @@ import { lies, schreib } from './teile'
  * IndexedDB (`ablage.ts`); hier stehen nur die Schalter und eine Aufzeichnung,
  * die noch läuft oder sich nicht speichern liess.
  */
+/** Die Kennung des `k`-ten Stücks einer Aufzeichnung: dieselbe UUID mit verändertem letztem Byte, nie gleich dem Original. */
+const teilKennung = (id: string, k: number) => id.slice(0, -2) + ((parseInt(id.slice(-2), 16) ^ (k & 0xff)) & 0xff).toString(16).padStart(2, '0')
+
 const SCHLUESSEL = {
   aufzeichnen: 'velonavi.aufzeichnen',
   lernen: 'velonavi.lernen',
@@ -300,55 +303,58 @@ export function useFahrten({
 
   const ablegen = useCallback(
     async (offen: Offen, id?: string, still = false): Promise<Fahrt | null> => {
-      // Nur der Teil, auf dem man Velo fuhr: ohne Fussweg zum Velo und ohne Zittern am Ziel.
-      const spur = kern(verdichten(offen.spur))
-      const distanz = spur.length ? spurDistanz(spur) : 0
-      if (spur.length < 10 || distanz < 150) {
-        schreib(SCHLUESSEL.laufend, null)
+      // Nur was man Velo fuhr: ohne Fussweg zum Velo, ohne Zittern am Ziel, und getrennt an jeder
+      // längeren Pause unterwegs. Jedes Stück wird eine eigene Fahrt, wenn es lang genug ist.
+      const teile = abschnitte(verdichten(offen.spur)).filter((t) => t.length >= 10 && spurDistanz(t) >= 150)
+      schreib(SCHLUESSEL.laufend, null)
+      if (!teile.length) {
         if (!still) setMeldung('Die Aufzeichnung war zu kurz (unter 150 Metern) und wurde nicht gespeichert.')
         return null
       }
-      const erster = spur[0]
-      const letzter = spur[spur.length - 1]
       // Der Vorschlag vom Losfahren lässt sich nur mit einer Fahrt vergleichen,
       // die am geplanten Start begann und am geplanten Ziel ankam.
       const nah = (geplant: Ort | null, [lon, lat]: Spurpunkt) => !!geplant && abstand(geplant.lon, geplant.lat, lon, lat) < ORT_NAH
-      const wieGeplant = nah(startRef.current, erster) && nah(zielRef.current, letzter)
       /** Der geplante Ort, wenn die Spur dort beginnt oder endet, sonst die nächste Adresse. */
       const ortFuer = (geplant: Ort | null, [lon, lat]: Spurpunkt): Ort =>
         geplant && geplant.titel !== 'Mein Standort' && abstand(geplant.lon, geplant.lat, lon, lat) < ORT_NAH
           ? { lon: geplant.lon, lat: geplant.lat, titel: geplant.titel }
           : benenneRef.current(lon, lat)
-      // Wer per Knopf aufzeichnet, fährt Velo. Was die Erkennung aufgezeichnet hat, prüft die Seite aus
-      // Tempo und Halten: Stellt es sich als Tram, Auto oder Fussweg heraus, wird es nicht gespeichert.
-      const modus: Modus = offen.quelle === 'aufzeichnung' || (!offen.quelle && !offen.hinweis) ? 'velo' : erkenne(spur, haltestellenRef.current, offen.hinweis)
-      if (modus !== 'velo') {
-        schreib(SCHLUESSEL.laufend, null)
-        return null
+      const neue: Gespeichert[] = []
+      for (const [k, spur] of teile.entries()) {
+        const erster = spur[0]
+        const letzter = spur[spur.length - 1]
+        // Wer per Knopf aufzeichnet, fährt Velo. Was die Erkennung aufgezeichnet hat, prüft die Seite aus
+        // Tempo und Halten: Stellt es sich als Tram, Auto oder Fussweg heraus, wird es nicht gespeichert.
+        const modus: Modus = offen.quelle === 'aufzeichnung' || (!offen.quelle && !offen.hinweis) ? 'velo' : erkenne(spur, haltestellenRef.current, offen.hinweis)
+        if (modus !== 'velo') continue
+        neue.push({
+          // Das erste Stück trägt die Kennung der Aufzeichnung, die weiteren eine davon abgeleitete:
+          // Holt die Seite dieselbe Aufzeichnung zweimal ab, ersetzt sie die Stücke, statt sie zu verdoppeln.
+          id: k === 0 ? (id ?? crypto.randomUUID()) : id ? teilKennung(id, k) : crypto.randomUUID(),
+          begonnen: new Date(offen.beginn + erster[2] * 1000).toISOString(),
+          dauer: letzter[2] - erster[2],
+          distanz: spurDistanz(spur),
+          start: ortFuer(startRef.current, erster),
+          ziel: ortFuer(zielRef.current, letzter),
+          spur,
+          vorschlag: nah(startRef.current, erster) && nah(zielRef.current, letzter) ? offen.vorschlag : null,
+          quelle: offen.quelle ?? 'aufzeichnung',
+          modus,
+        })
       }
-      const f: Gespeichert = {
-        id: id ?? crypto.randomUUID(),
-        begonnen: new Date(offen.beginn + erster[2] * 1000).toISOString(),
-        dauer: letzter[2] - erster[2],
-        distanz,
-        start: ortFuer(startRef.current, erster),
-        ziel: ortFuer(zielRef.current, letzter),
-        spur,
-        vorschlag: wieGeplant ? offen.vorschlag : null,
-        quelle: offen.quelle ?? 'aufzeichnung',
-        modus,
-      }
+      if (!neue.length) return null
       try {
-        await speichern(f)
-        schreib(SCHLUESSEL.laufend, null)
+        for (const f of neue) await speichern(f)
       } catch {
         // Die Spur bleibt in dieser Sitzung sichtbar. Der Rohstand liegt noch im localStorage.
         schreib(SCHLUESSEL.laufend, offen)
         setMeldung('Die Fahrt liess sich nicht auf dem Gerät speichern. Sie bleibt nur bis zum Schliessen der Seite.')
       }
-      setFahrten((alt) => [f, ...alt.filter((x) => x.id !== f.id)].sort((a, b) => (a.begonnen < b.begonnen ? 1 : -1)))
-      if (sichernImKonto.current) hochladen([f])
-      return f
+      const ids = new Set(neue.map((f) => f.id))
+      setFahrten((alt) => [...neue, ...alt.filter((x) => !ids.has(x.id))].sort((a, b) => (a.begonnen < b.begonnen ? 1 : -1)))
+      if (neue.length > 1 && !still) setMeldung(`Die Aufzeichnung hatte ${neue.length - 1 === 1 ? 'eine Pause' : `${neue.length - 1} Pausen`} und ist jetzt ${neue.length} Fahrten.`)
+      if (sichernImKonto.current) hochladen(neue)
+      return neue[neue.length - 1]
     },
     [hochladen]
   )

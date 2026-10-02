@@ -100,8 +100,39 @@ const KERN_TEMPO = 2.2
  * gekürzt. Kommt die Spur nie auf Velotempo, bleibt sie, wie sie ist.
  */
 export function kern(spur: Spurpunkt[]): Spurpunkt[] {
+  const f = fahrend(spur)
+  return f.length ? spur.slice(f[0][0], f[f.length - 1][1] + 1) : spur
+}
+
+/** So lange ohne Velotempo trennt eine Aufzeichnung in zwei Fahrten. Länger als jede Ampel und Barriere. */
+export const PAUSE_S = 240
+
+/**
+ * Die Fahrten in einer Aufzeichnung: getrennt an jeder Pause, in der man mindestens `PAUSE_S` lang nicht
+ * mit Velotempo vorankommt, ob man steht, herumgeht oder der Standort im Haus zittert. Ein Kaffee
+ * unterwegs ergibt so zwei Fahrten statt einer mit Herumgehen mittendrin. Jedes Stück ist wie bei
+ * `kern` an den Rändern gekürzt. Kommt die Spur nie auf Velotempo, bleibt sie ganz.
+ */
+export function abschnitte(spur: Spurpunkt[]): Spurpunkt[][] {
+  const f = fahrend(spur)
+  if (!f.length) return [spur]
+  const out: Spurpunkt[][] = []
+  let [von, bis] = f[0]
+  for (const [a, b] of f.slice(1)) {
+    if (spur[a][2] - spur[bis][2] >= PAUSE_S) {
+      out.push(spur.slice(von, bis + 1))
+      von = a
+    }
+    bis = Math.max(bis, b)
+  }
+  out.push(spur.slice(von, bis + 1))
+  return out
+}
+
+/** Die Fenster `[i, j]`, in denen man mit Velotempo vorankommt, siehe `kern`. */
+function fahrend(spur: Spurpunkt[]): [number, number][] {
   const n = spur.length
-  if (n < 3) return spur
+  if (n < 3) return []
   // Geglättet über je fünf Punkte davor und danach: Ein einzelner Sprung verschiebt das Mittel kaum.
   const glatt = spur.map((_, i) => {
     let x = 0
@@ -111,8 +142,7 @@ export function kern(spur: Spurpunkt[]): Spurpunkt[] {
     return [x / k, y / k]
   })
   const luft = (a: number, b: number) => Math.hypot((glatt[b][0] - glatt[a][0]) * mx(glatt[a][1]), (glatt[b][1] - glatt[a][1]) * MY)
-  let anfang = -1
-  let ende = -1
+  const out: [number, number][] = []
   let j = 0
   for (let i = 0; i < n; i++) {
     if (j < i) j = i
@@ -121,10 +151,9 @@ export function kern(spur: Spurpunkt[]): Spurpunkt[] {
     const d = luft(i, j)
     // Weniger weit, als die beiden Punkte ungenau sind, ist kein Vorankommen.
     if (d / (spur[j][2] - spur[i][2]) < KERN_TEMPO || d < (spur[i][3] ?? 0) + (spur[j][3] ?? 0)) continue
-    if (anfang < 0) anfang = i
-    ende = j
+    out.push([i, j])
   }
-  return anfang < 0 ? spur : spur.slice(anfang, ende + 1)
+  return out
 }
 
 /**
