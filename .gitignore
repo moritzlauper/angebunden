@@ -65,3 +65,6 @@ next-env.d.ts
 # main nicht täglich einen Bot-Commit bekommt. Lokale Läufe bleiben unsichtbar.
 analytics/besucher.json
 analytics/besucher.csv
+
+# Inserate für /wohnungen: liegen auf dem Zweig «wohnungen», lokal nur zum Ausprobieren.
+public/data/zuerich/wohnungen.json
