@@ -325,20 +325,20 @@ Gefiltert wird mit derselben Funktion wie auf der Seite (`app/wohnungen/filter.t
 Anlegen kommt zuerst eine Bestätigung. Jede Mail hat einen Abmeldelink, der ohne Anmeldung
 funktioniert (`/wohnungen?abmelden=…`).
 
-Einrichtung, einmalig:
+Einrichtung, einmalig. Der Versand läuft in GitHub Actions, nicht bei Vercel; die Werte müssen
+deshalb auch dann in GitHub stehen, wenn sie bei Vercel schon hinterlegt sind (dort kopieren:
+Project → Settings → Environment Variables, Wert einblenden).
 
-1. Bei [Resend](https://resend.com) ein Konto anlegen, die Absender-Domain bestätigen
-   (DNS-Einträge für angebunden.ch) und einen API-Schlüssel erstellen. Der Gratisplan reicht für
-   100 Mails am Tag.
-2. Im GitHub-Repository unter Settings → Secrets and variables → Actions:
-   * Secret `SUPABASE_SERVICE_ROLE_KEY`: der geheime Schlüssel des Supabase-Projekts
-     (Dashboard → Project Settings → API). Er liest alle Abos an der Row Level Security vorbei und
-     gehört nur in GitHub, nie in die Seite.
-   * Secret `RESEND_API_KEY`
-   * Variable `SUPABASE_URL`: `https://<projekt>.supabase.co`
-   * Variable `SUCHABO_ABSENDER`: zum Beispiel `angebunden <wohnungen@angebunden.ch>`
+1. Bei [Resend](https://resend.com) die Absender-Domain (angebunden.ch) bestätigen.
+2. Im GitHub-Repository unter Settings → Secrets and variables → Actions → New repository secret:
+   * `SUPABASE_URL`: wie `NEXT_PUBLIC_SUPABASE_URL` bei Vercel, `https://<projekt>.supabase.co`
+   * `SUPABASE_SERVICE_ROLE_KEY`: bei Vercel meist `SUPABASE_SERVICE_ROLE_KEY` oder
+     `STORAGE_SUPABASE_SERVICE_ROLE_KEY`. Er liest alle Abos an der Row Level Security vorbei und
+     gehört nie in die Seite.
+   * `RESEND_API_KEY`
+   * freiwillig die Variable `SUCHABO_ABSENDER`, sonst gilt `angebunden <wohnungen@angebunden.ch>`.
 
-Fehlt eine der vier Angaben, überspringt der Workflow den Versand.
+Fehlt eine der drei Angaben, überspringt der Workflow den Versand.
 
 ## Aufbau
 

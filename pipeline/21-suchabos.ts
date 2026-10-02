@@ -13,11 +13,13 @@
  *
  * Geprüft wird mit derselben Funktion wie auf der Seite (`app/wohnungen/filter.ts`).
  *
- * Braucht vier Umgebungsvariablen, sonst tut das Skript nichts:
+ * Braucht drei Umgebungsvariablen, sonst tut das Skript nichts. Es sind
+ * dieselben Werte wie bei Vercel, nur müssen sie zusätzlich als Secrets in
+ * GitHub stehen, weil der Versand im Workflow läuft:
  *   SUPABASE_URL                Adresse des Supabase-Projekts
  *   SUPABASE_SERVICE_ROLE_KEY   geheimer Schlüssel, liest alle Abos an der Row Level Security vorbei
  *   RESEND_API_KEY              Schlüssel von resend.com für den Versand
- *   SUCHABO_ABSENDER            z. B. «angebunden <wohnungen@angebunden.ch>», Domain bei Resend bestätigt
+ *   SUCHABO_ABSENDER            freiwillig, sonst «angebunden <wohnungen@angebunden.ch>»; Domain bei Resend bestätigt
  */
 import { readFileSync } from 'node:fs'
 import { FILTER_LEER, passt, type Filter } from '../app/wohnungen/filter.ts'
@@ -28,7 +30,7 @@ const SITE = (process.env.SITE_URL ?? 'https://angebunden.ch').replace(/\/$/, ''
 const SUPABASE = process.env.SUPABASE_URL?.replace(/\/$/, '')
 const GEHEIM = process.env.SUPABASE_SERVICE_ROLE_KEY
 const RESEND = process.env.RESEND_API_KEY
-const ABSENDER = process.env.SUCHABO_ABSENDER
+const ABSENDER = process.env.SUCHABO_ABSENDER || 'angebunden <wohnungen@angebunden.ch>'
 
 /** Höchstens so viele Wohnungen in einer Mail; der Rest steht auf der Seite. */
 const MAX_IN_MAIL = 15
@@ -126,8 +128,8 @@ async function senden(an: string, betreff: string, inhalt: string, abmelden: str
 }
 
 async function main() {
-  if (!SUPABASE || !GEHEIM || !RESEND || !ABSENDER) {
-    console.log('Suchabos: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY oder SUCHABO_ABSENDER fehlt, kein Versand.')
+  if (!SUPABASE || !GEHEIM || !RESEND) {
+    console.log('Suchabos: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY oder RESEND_API_KEY fehlt, kein Versand.')
     return
   }
   const daten = JSON.parse(readFileSync(DATEI, 'utf8')) as Wohnungen

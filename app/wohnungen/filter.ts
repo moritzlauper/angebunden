@@ -55,7 +55,36 @@ export const FILTER_LEER: Filter = {
 
 export const TAG = 24 * 3600 * 1000
 
-export type Gebiet = { lon: number; lat: number; r: number }
+/**
+ * Ein auf der Karte gezeichnetes Gebiet: eine von Hand umfahrene Fläche
+ * (`punkte`, Länge/Breite). Ältere Abos und Merklisten können noch Kreise
+ * enthalten (Mittelpunkt und Radius in Metern); die gelten weiter.
+ */
+export type Gebiet = { punkte: [number, number][] } | { lon: number; lat: number; r: number }
+
+/** Die Umrandung eines Gebiets, für Kreise als Vieleck mit 64 Ecken. */
+export function umriss(g: Gebiet): [number, number][] {
+  if ('punkte' in g) return g.punkte
+  const ring: [number, number][] = []
+  for (let k = 0; k < 64; k++) {
+    const w = (k / 64) * 2 * Math.PI
+    ring.push([g.lon + (Math.cos(w) * g.r) / 75_400, g.lat + (Math.sin(w) * g.r) / 111_133])
+  }
+  return ring
+}
+
+/** Punkt in Vieleck (Strahlverfahren). */
+export function liegtIn(lon: number, lat: number, g: Gebiet): boolean {
+  if (!('punkte' in g)) return meter(lon, lat, g.lon, g.lat) <= g.r
+  let drin = false
+  const p = g.punkte
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+    const [xi, yi] = p[i]
+    const [xj, yj] = p[j]
+    if (yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) drin = !drin
+  }
+  return drin
+}
 
 /** Meter zwischen zwei Punkten, flach gerechnet; reicht innerhalb der Stadt. */
 export function meter(alon: number, alat: number, blon: number, blat: number) {
@@ -77,7 +106,7 @@ export function passt(i: Inserat, f: Filter, gemerkt: Set<string>, jetzt: number
   if (f.plz?.length && !(i.plz && f.plz.includes(i.plz))) return false
   if (f.gebiete.length) {
     if (i.lon == null || i.lat == null) return false
-    if (!f.gebiete.some((g) => meter(i.lon!, i.lat!, g.lon, g.lat) <= g.r)) return false
+    if (!f.gebiete.some((g) => liegtIn(i.lon!, i.lat!, g))) return false
   }
   if (f.nurAusschnitt && ausschnitt) {
     const [w, s, e, n] = ausschnitt

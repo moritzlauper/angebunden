@@ -83,21 +83,3 @@ export function Seitenwahl({
   )
 }
 
-/**
- * Der feste Weg zur Wohnungssuche. Der Umschalter oben verschwindet nach dem
- * ersten Schritt und bei allen mit Konto; dieser kleine Link bleibt immer da.
- */
-export function WohnungenLink({ ui, className = '' }: { ui: Ui; className?: string }) {
-  return (
-    <Link
-      href="/wohnungen"
-      className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-[12px] font-medium backdrop-blur-md transition-opacity hover:opacity-80 ${className}`}
-      style={{ background: ui.panel, borderColor: ui.border, color: ui.fg, boxShadow: ui.schatten }}
-    >
-      Wohnungen
-      <span aria-hidden style={{ color: ui.muted }}>
-        →
-      </span>
-    </Link>
-  )
-}

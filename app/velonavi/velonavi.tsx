@@ -15,7 +15,8 @@ import {
 import { Blatt, useMedienabfrage } from '../blatt'
 import { Suchleiste, bauIndex, suchen, Sternsymbol, type Eintrag } from '../suche'
 import { Wortmarke } from '../marke'
-import { Seitenwahl, WohnungenLink, useKontoVorhanden } from '../seitenwahl'
+import { Seitenwahl, useKontoVorhanden } from '../seitenwahl'
+import { Menue } from '../menue'
 import { STAEDTE } from '../staedte'
 import { nf } from '../site'
 import { ZIEL, TINTE, GRAU, GEFAHREN } from '../farben'
@@ -1513,7 +1514,11 @@ export default function Velonavi() {
       </div>
       <div className="relative z-20 -mt-1 flex justify-end gap-2">
         {/* In der Seitenleiste steht der Knopf neben dem Titel. */}
-        {mobil && <WohnungenLink ui={ui} className="mr-auto" />}
+        {mobil && (
+          <span className="mr-auto">
+            <Menue aktiv="velonavi" />
+          </span>
+        )}
         {mobil && <Fahrtenknopf f={fahrten} offen={menueOffen} onClick={() => setMenueOffen(!menueOffen)} pille />}
         <button
           onClick={tausche}
@@ -1753,7 +1758,8 @@ export default function Velonavi() {
               )}
               <div className="mb-3 flex items-baseline justify-between">
                 {/* Die <h1> der Seite steht in seo-inhalt.tsx, hier deshalb <h2>. */}
-                <h2 className="flex items-baseline gap-2 text-[15px] font-semibold">
+                <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+                  <Menue aktiv="velonavi" />
                   <Link href="/" aria-label="Zur Startseite">
                     <Wortmarke size={15} />
                   </Link>
@@ -1761,7 +1767,6 @@ export default function Velonavi() {
                 </h2>
                 {/* Die Rechenzeit steht nur noch als Tooltip: Im Kopf war sie Unruhe, und «2 Routen» stimmte nicht, wenn beide Varianten zusammenfielen. */}
                 <span className="flex items-center gap-2 self-center" title={routen ? `Gerechnet in ${Math.round(routen.ms)} ms` : undefined}>
-                  <WohnungenLink ui={ui} />
                   <Fahrtenknopf f={fahrten} offen={menueOffen} onClick={() => setMenueOffen(!menueOffen)} />
                 </span>
               </div>
