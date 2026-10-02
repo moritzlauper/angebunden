@@ -10,9 +10,11 @@ import { useMedienabfrage } from '../blatt'
 import { Seitenwahl } from '../seitenwahl'
 import { nf } from '../site'
 import { GESAMMELT, WEITERE, type Suche } from './quellen'
-import { Anmeldung, useKonto, useMerklisteImKonto } from './konto'
+import { Anmeldung, useAbmeldelink, useKonto, useMerklisteImKonto } from './konto'
+import { SuchaboDialog } from './suchabo'
 import type { Art, Inserat, QuellenId, Wohnungen } from './typen'
 import type { Kreis } from './kreise'
+import { FILTER_LEER, SORTEN, TAG, meter, passt, type Filter, type Gebiet, type Sorte } from './filter'
 
 /**
  * Woher die Inserate kommen. Der Workflow `wohnungen.yml` legt die Datei
@@ -35,49 +37,6 @@ const ARTEN: { id: Art; name: string }[] = [
   { id: 'haus', name: 'Haus' },
 ]
 
-const SORTEN = {
-  neu: 'Neueste zuerst',
-  guenstig: 'Günstigste zuerst',
-  m2: 'Preis pro m²',
-  oev: 'Beste ÖV-Anbindung',
-  kultur: 'Meiste Kultur in der Nähe',
-  gross: 'Grösste zuerst',
-} as const
-type Sorte = keyof typeof SORTEN
-
-type Filter = Suche & {
-  arten: Art[]
-  /** Abgewählte Quellen. Als Ausschlussliste, damit neue Quellen von selbst dazukommen. */
-  quellenAus: QuellenId[]
-  /** Höchstens so viele Minuten mittlere ÖV-Reisezeit. */
-  oevMax: number | null
-  text: string
-  nurNeu: boolean
-  nurGemerkt: boolean
-  nurAusschnitt: boolean
-  /** Befristet oder nicht, erkannt vom Sammler aus Feldern und Text. */
-  dauer: 'alle' | 'unbefristet' | 'befristet'
-  /** Auf der Karte gezeichnete Kreise: Mittelpunkt und Radius in Metern. */
-  gebiete: Gebiet[]
-  sorte: Sorte
-}
-
-const FILTER_LEER: Filter = {
-  mieteMax: null,
-  zimmerMin: null,
-  zimmerMax: null,
-  flaecheMin: null,
-  arten: ['wohnung', 'wg', 'studio', 'moebliert', 'haus'],
-  quellenAus: [],
-  oevMax: null,
-  text: '',
-  nurNeu: false,
-  nurGemerkt: false,
-  nurAusschnitt: false,
-  dauer: 'alle',
-  gebiete: [],
-  sorte: 'neu',
-}
 
 const SPEICHER = {
   filter: 'wohnungen.filter2',
@@ -101,7 +60,6 @@ function schreib(schluessel: string, wert: unknown) {
   } catch {}
 }
 
-const TAG = 24 * 3600 * 1000
 
 function vor(iso: string, jetzt: number) {
   const min = Math.max(0, Math.round((jetzt - Date.parse(iso)) / 60000))
@@ -130,12 +88,6 @@ function top(rang: number | null, haeuser: number) {
   return p < 1 ? 'Top 1 %' : `Top ${Math.ceil(p)} %`
 }
 
-type Gebiet = { lon: number; lat: number; r: number }
-
-/** Meter zwischen zwei Punkten, flach gerechnet; reicht innerhalb der Stadt. */
-function meter(alon: number, alat: number, blon: number, blat: number) {
-  return Math.hypot((alon - blon) * 75_400, (alat - blat) * 111_133)
-}
 
 /** Ein Kreis als Polygon für die Karte. */
 function kreisPolygon(g: Gebiet) {
@@ -147,32 +99,6 @@ function kreisPolygon(g: Gebiet) {
   return { type: 'Feature' as const, properties: {}, geometry: { type: 'Polygon' as const, coordinates: [ring] } }
 }
 
-function passt(i: Inserat, f: Filter, gemerkt: Set<string>, jetzt: number, ausschnitt: [number, number, number, number] | null) {
-  if (f.nurGemerkt && !gemerkt.has(i.id)) return false
-  if (!f.arten.includes(i.art)) return false
-  if (i.links.every((l) => f.quellenAus.includes(l.quelle))) return false
-  if (f.mieteMax != null && (i.miete == null || i.miete > f.mieteMax)) return false
-  if (f.zimmerMin != null && (i.zimmer == null || i.zimmer < f.zimmerMin)) return false
-  if (f.zimmerMax != null && (i.zimmer == null || i.zimmer > f.zimmerMax)) return false
-  if (f.flaecheMin != null && (i.flaeche == null || i.flaeche < f.flaecheMin)) return false
-  if (f.oevMax != null && (i.oev == null || i.oev > f.oevMax)) return false
-  if (f.nurNeu && jetzt - Date.parse(i.erstGesehen) > TAG) return false
-  if (f.dauer === 'befristet' && !i.befristet) return false
-  if (f.dauer === 'unbefristet' && i.befristet) return false
-  if (f.gebiete.length) {
-    if (i.lon == null || i.lat == null) return false
-    if (!f.gebiete.some((g) => meter(i.lon!, i.lat!, g.lon, g.lat) <= g.r)) return false
-  }
-  if (f.nurAusschnitt && ausschnitt) {
-    const [w, s, e, n] = ausschnitt
-    if (i.lon == null || i.lat == null || i.lon < w || i.lon > e || i.lat < s || i.lat > n) return false
-  }
-  if (f.text.trim()) {
-    const heu = `${i.titel} ${i.strasse ?? ''} ${i.plz ?? ''} ${i.ort ?? ''}`.toLowerCase()
-    if (!f.text.toLowerCase().split(/\s+/).filter(Boolean).every((w) => heu.includes(w))) return false
-  }
-  return true
-}
 
 const SORTIER: Record<Sorte, (a: Inserat, b: Inserat) => number> = {
   neu: (a, b) => b.erstGesehen.localeCompare(a.erstGesehen),
@@ -231,6 +157,8 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
 
   // Mit Konto liegt die Merkliste zusätzlich dort und gilt auf jedem Gerät.
   const k = useKonto()
+  const [aboOffen, setAboOffen] = useState(false)
+  const [abmeldung, setAbmeldung] = useAbmeldelink()
   const merkliste = useMemo(() => ({ gemerkt: [...gemerkt], weg: [...weg], filter: { ...filter, nurAusschnitt: false } }), [gemerkt, weg, filter])
   useMerklisteImKonto(k.nutzer, merkliste, (m) => {
     setGemerkt(new Set(m.gemerkt))
@@ -637,6 +565,28 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
 
   const liste = (
     <div className="px-3 pb-6 sm:px-4">
+      {abmeldung && (
+        <div className="mx-1 mt-3 flex items-start justify-between gap-3 rounded-2xl bg-[var(--ab-weich)] px-3.5 py-2.5 text-[13px]">
+          <span>{abmeldung}</span>
+          <button type="button" onClick={() => setAbmeldung(null)} aria-label="Schliessen" className="text-[var(--ab-leise)]">
+            ✕
+          </button>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => setAboOffen(true)}
+        className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-[var(--ab-linie)] bg-[var(--ab-blatt)] px-3.5 py-2.5 text-left hover:bg-[var(--ab-weich)]"
+      >
+        <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--ab-tinte)] text-[14px] text-[var(--ab-papier)]">
+          ✉
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[13.5px] font-medium">Suchabo per E-Mail</span>
+          <span className="block truncate text-[12px] text-[var(--ab-leise)]">Mail, sobald eine neue Wohnung zu diesen Filtern passt</span>
+        </span>
+        <span aria-hidden className="text-[var(--ab-leise)]">→</span>
+      </button>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1 pt-4 pb-2.5">
         <div className="text-[15px] font-semibold tracking-tight">
           {daten ? `${nf(treffer.length)} ${treffer.length === 1 ? 'Wohnung' : 'Wohnungen'}` : ladefehler ? '' : 'Lade Inserate …'}
@@ -769,8 +719,12 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
     </div>
   )
 
+  const dialog = aboOffen && <SuchaboDialog k={k} filter={filter} kreis={kreis} schliessen={() => setAboOffen(false)} />
+
   if (breit) {
     return (
+      <>
+      {dialog}
       <div className="flex h-dvh bg-[var(--ab-papier)] text-[var(--ab-tinte)]">
         <div ref={listeRef} className="w-[min(36rem,46vw)] shrink-0 overflow-y-auto border-r border-[var(--ab-linie)]">
           {kopf}
@@ -783,10 +737,13 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
           {werkzeug}
         </div>
       </div>
+      </>
     )
   }
 
   return (
+    <>
+    {dialog}
     <div className="flex h-dvh flex-col bg-[var(--ab-papier)] text-[var(--ab-tinte)]">
       <div className="shrink-0">
         {kopf}
@@ -837,6 +794,7 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
         </div>
       )}
     </div>
+    </>
   )
 }
 
