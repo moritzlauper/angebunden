@@ -119,7 +119,9 @@ export function erkenne(spur: Spurpunkt[], haltestellen: [number, number][] | nu
   // ein flotter Jogger ab 3.4 m/s gibt es selten.
   if (m.p90 < 2.3) return 'gehen'
   if (m.mittel < 2.2) return hinweis === 'laufen' ? 'laufen' : 'gehen'
-  if (m.mittel < 3.4 && m.p90 < 4.6) return hinweis === 'velo' && m.mittel > 3.0 ? 'velo' : 'laufen'
+  // Gemütlich oder bergauf fährt auch ein Velo so langsam. Joggen nur, wenn Android es meldet oder die
+  // Spitzen ganz fehlen: Eine verpasste Velofahrt wiegt schwerer als ein Lauf unter den Velofahrten.
+  if (m.mittel < 3.4 && m.p90 < 4.6) return hinweis === 'laufen' || (hinweis !== 'velo' && m.p90 < 4.0) ? 'laufen' : 'velo'
 
   // Ein Tram hält an Haltestellen, ein Auto nicht. Zwei Halte genügen, damit der Anteil etwas sagt.
   const oev = m.anHaltestelle !== null && m.halte >= 2 && m.anHaltestelle >= 0.6
@@ -127,8 +129,12 @@ export function erkenne(spur: Spurpunkt[], haltestellen: [number, number][] | nu
   const zuSchnell = m.p90 > 11.5 || m.mittel > 9
   if (oev) return 'oev'
   if (zuSchnell) return 'auto'
-  // Meldet Android ein Fahrzeug und es spricht nichts für ein Velo, ist es kein Velo: Lieber aus dem Lernen
-  // heraushalten als ein Auto unter die Velofahrten mischen. Die Korrektur steht im Menü.
-  if (hinweis === 'fahrzeug') return m.mittel >= 6 && m.halte >= 2 && (m.anHaltestelle ?? 0) >= 0.4 ? 'oev' : 'auto'
+  // Meldet Android ein Fahrzeug, entscheidet das Tempo: Android hält Velofahrten oft für Fahrzeuge, und
+  // gespeichert wird nur, was hier als Velo gilt. Ein Auto in der Stadt fährt in den Spitzen schneller
+  // als ein Velo, ein Tram hält an Haltestellen.
+  if (hinweis === 'fahrzeug') {
+    if (m.halte >= 2 && (m.anHaltestelle ?? 0) >= 0.4 && m.mittel >= 6) return 'oev'
+    if (m.p90 > 10) return 'auto'
+  }
   return 'velo'
 }

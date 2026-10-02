@@ -69,11 +69,13 @@ public class TrackerService extends Service {
     /** Eine von selbst erkannte Fahrt muss mindestens so lang sein, sonst war es etwas anderes. */
     private static final double AUTO_MIN_DISTANZ_M = 300;
     private static final long AUTO_MIN_DAUER_MS = 120_000L;
-    /** Schneller als das im Mittel gibt es für die jeweilige Art der Bewegung nicht (Velo 43 km/h, zu Fuss 22 km/h). */
+    /**
+     * Schneller als das im Mittel ist keine Velofahrt (43 km/h), wenn Android «Velo» gemeldet hat. Sonst
+     * nur eine grobe Grenze: Ob es eine Velofahrt war, entscheidet die Seite am Tempo. Eine Velofahrt,
+     * die Android für Gehen hielt, fiel hier bisher an der Grenze für Fussgänger (22 km/h) heraus.
+     */
     private static double maxMittel(String hinweis) {
-        if ("velo".equals(hinweis)) return 12;
-        if ("gehen".equals(hinweis) || "laufen".equals(hinweis)) return 6;
-        return 50;
+        return "velo".equals(hinweis) ? 12 : 50;
     }
 
     private FusedLocationProviderClient client;
@@ -161,15 +163,20 @@ public class TrackerService extends Service {
                 abschliessen();
             } else {
                 String neu = AKTION_AUTO.equals(aktion) ? intent.getStringExtra(EXTRA_HINWEIS) : null;
-                // Die Erkennung zerschneidet keine Aufzeichnung per Knopf. Bisher schloss die erste Meldung
-                // «Velo» von Android die laufende Fahrt ab, eine Minute nach dem Losfahren: Das Stück davor
-                // war meist zu kurz und verschwand, der Rest lief als automatische Fahrt ohne Vorschlag weiter.
-                if ("aufzeichnung".equals(quelle) || neu == null || neu.equals(hinweis)) {
-                    melden();
-                    return START_STICKY;
+                // Die Erkennung zerschneidet keine Aufzeichnung, weder per Knopf noch von selbst. Android
+                // springt während einer Velofahrt gern zwischen Fahrzeug, Gehen und Velo hin und her; jedes
+                // Mal einen neuen Abschnitt zu beginnen, liess Bruchstücke übrig, die zu kurz waren oder
+                // nicht als Velo galten. Die Fahrt läuft bis zum Stillstand, die Seite schneidet den Fussweg
+                // an den Rändern ab (`kern`) und erkennt am Tempo, ob es eine Velofahrt war.
+                if ("velo".equals(neu) && !"aufzeichnung".equals(quelle) && !"velo".equals(hinweis)) {
+                    // Meldet Android doch noch «Velo», zählt das für die Erkennung in der Seite.
+                    hinweis = "velo";
+                    Aufnahme.hinweis = hinweis;
+                    aktivitaetEnde = false;
+                    sichern();
                 }
-                // Eine andere Art der Bewegung beginnt, etwa Velo nach dem Tram: der Abschnitt davor ist zu Ende.
-                abschliessen();
+                melden();
+                return START_STICKY;
             }
         }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {

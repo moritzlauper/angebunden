@@ -40,8 +40,7 @@ public class AktivitaetReceiver extends BroadcastReceiver {
                 && ContextCompat.checkSelfPermission(c, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
             return false;
         }
-        // Alle vier Arten melden sich, damit die Seite zeigen kann, dass die Erkennung lebt. Aufgezeichnet
-        // werden Velofahrten immer und Gehen, Joggen und Fahrzeuge nur auf Wunsch (siehe onReceive).
+        // Alle vier Arten melden sich und starten die Aufzeichnung (siehe onReceive).
         List<Integer> arten = new ArrayList<>();
         arten.add(DetectedActivity.ON_BICYCLE);
         arten.add(DetectedActivity.WALKING);
@@ -95,10 +94,11 @@ public class AktivitaetReceiver extends BroadcastReceiver {
             if (hinweis == null) continue;
             boolean beginn = e.getTransitionType() == ActivityTransition.ACTIVITY_TRANSITION_ENTER;
             Aufnahme.setLetzteMeldung(c, hinweis, beginn);
-            // Velofahrten werden immer aufgezeichnet, alles andere nur mit der Option «Auch Gehen, Joggen, Tram und Auto».
-            if (!"velo".equals(hinweis) && !Aufnahme.alle(c)) continue;
+            // Jede Meldung startet die Aufzeichnung, nicht nur «Velo»: Android hält eine Velofahrt oft für ein
+            // Fahrzeug oder für Gehen, besonders mit dem Handy in der Tasche. Ob es eine Velofahrt war,
+            // entscheidet die Seite am Tempo und speichert nur Velofahrten.
             if (beginn) {
-                // Eine andere Art der Bewegung beginnt: Der Dienst schliesst den Abschnitt davor ab und startet einen neuen.
+                // Läuft schon eine Aufzeichnung, bleibt sie eine Fahrt (siehe TrackerService).
                 if (!Aufnahme.laeuft || !hinweis.equals(Aufnahme.hinweis)) {
                     ContextCompat.startForegroundService(c, new Intent(c, TrackerService.class)
                             .setAction(TrackerService.AKTION_AUTO)

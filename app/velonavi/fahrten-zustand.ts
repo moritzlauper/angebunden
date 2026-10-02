@@ -544,7 +544,7 @@ export function useFahrten({
         setMeldung(freigaben(fehlt))
         return
       }
-      nativStand(await nativ.auto({ aktiv: true, alle: false }))
+      nativStand(await nativ.auto({ aktiv: true, alle: true }))
     }).catch(() => setMeldung('Die automatische Erkennung liess sich nicht einschalten.'))
   }, [nativ, geladen, nativStand])
 
@@ -678,11 +678,13 @@ export function useFahrten({
     schreib(SCHLUESSEL.laufend, null)
   }, [nativ, anhalten, holeNativ, warteAufDienst])
 
-  // Frühere Fassungen konnten auch Gehen, Joggen, Tram und Auto aufzeichnen. Der Velonavi ist nur fürs
-  // Velo: Steht die App noch so, wird sie zurückgestellt.
+  // Die App startet bei jeder Meldung der Bewegungserkennung, nicht nur bei «Velo»: Android hält eine
+  // Velofahrt oft für ein Fahrzeug oder für Gehen, besonders mit dem Handy in der Tasche. Ob es eine
+  // Velofahrt war, entscheidet die Seite am Tempo (`modus.ts`), gespeichert werden nur Velofahrten.
+  // Eine Fassung vom Oktober 2026 hörte nur auf «Velo» und zeichnete deshalb fast nichts mehr auf.
   useEffect(() => {
-    if (!nativ || !autoAlle) return
-    nativ.auto({ aktiv: autoAn, alle: false }).then(nativStand, () => {})
+    if (!nativ || !autoAn || autoAlle) return
+    nativ.auto({ aktiv: true, alle: true }).then(nativStand, () => {})
   }, [nativ, autoAlle, autoAn, nativStand])
 
   const setAuto = useCallback(
@@ -696,7 +698,7 @@ export function useFahrten({
         }
       }
       try {
-        nativStand(await nativ.auto({ aktiv: an, alle: false }))
+        nativStand(await nativ.auto({ aktiv: an, alle: true }))
       } catch {
         setMeldung('Die automatische Erkennung liess sich nicht umschalten.')
       }
