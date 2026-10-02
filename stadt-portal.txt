@@ -1,0 +1,488 @@
+200 https://login.stadt-zuerich.ch/login/op/auth?response_type=code&scope=openid%20stzh_profile&client_id=vermietungen-stadt-zuerich-ch&state=73024173388592516728&nonce=bfk4rDOOOH_5DJeuY7cakk9Ixu0cjKW7KjXFLMfdEIg&redirect_uri=https%3A%2F%2Fvermietungen.stadt-zuerich.ch%2Flogin%2Frp%2Fauth&RequestedPage=%2Fpublication%2Fapartment%2F&missingRoles=oiztrustleveloiz_1a
+
+<!doctype html>
+<!--[if IE 7]>   <html lang="de" class="no-js ie7 lte-ie9 lte-ie8 lte-ie7"> <![endif]-->
+<!--[if IE 8]>   <html lang="de" class="no-js ie8 lte-ie9 lte-ie8">   <![endif]-->
+<!--[if IE 9]>   <html lang="de" class="no-js ie9 lte-ie9">     <![endif]-->
+<!--[if gt IE 9]><!-->
+
+
+
+
+
+<html lang="de" class="no-js">
+   <!--<![endif]-->
+   <head>
+      <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <title>Anmeldung - Stadt Z&uuml;rich</title>
+      <style>
+         html {
+            overflow: scroll;
+         }
+         body,
+         .login-hidden {
+            display: none;
+         }
+         stzh-text:not([lead]) {
+            margin-bottom: var(--stzh-space-medium) !important;
+         }
+         stzh-message p {
+            margin-top: 0 !important;
+         }
+         stzh-actions {
+          margin-top: var(--stzh-space-small) !important;
+          margin-bottom: var(--stzh-space-medium) !important;
+         }
+         stzh-chipselect stzh-chip button {
+           width: 160px !important;
+         } 
+         stzh-chipselect stzh-chip .stzh-clamp__text {
+           text-align: center !important;
+         } 
+         stzh-chip {
+            margin-top: var(--stzh-space-xsmall) !important; 
+         }
+         h2 {
+            margin-top: var(--stzh-space-small) !important;
+         }
+         input[type="text"] {
+            margin-bottom: var(--stzh-space-large) !important;
+         }
+         @media screen and (max-width: 600px) {
+            input[type="text"] {
+                margin-bottom: var(--stzh-space-xsmall) !important;
+            }
+         }
+         @media screen and (max-width: 490px) {
+            stzh-fieldset stzh-link:first-of-type {
+              margin-bottom: var(--stzh-space-xxsmall) !important;        
+            }
+            stzh-chipselect stzh-chip,
+            stzh-chipselect stzh-chip .stzh-chip,
+            stzh-chipselect stzh-chip button {
+               width: 100% !important;
+            }
+            stzh-chip {
+              margin-bottom: var(--stzh-space-xxsmall) !important;
+            }
+         }
+         @media screen and (min-width: 900px) {
+            stzh-section {
+               padding-top: 41px !important;
+            }
+         }
+      </style>
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <script>
+   /*
+      Upon clicking on Links "changePW", "register", or "registeraccessapp", the OIDC Login Process needs to be Terminated.
+      Only after terminating the OIDC flow, the user is redirected to the chosen Link
+   */
+
+   function resetOPLoginModel(action){
+      var opLoginResetURL = window.location.origin + "/login/op/terminate?cmd=terminate";
+      var xhttp = new XMLHttpRequest();
+      xhttp.onreadystatechange = function(){
+         // ready state 4 is state Done
+         if(this.readyState == 4 && this.status == 200){
+            var redirectURL = "";
+
+            // Script may be included even when variable 'roles' is not set. Set variable 'roles' if non-existant
+            
+            
+            if(action == "changePW"){
+               redirectURL =  "https://www.stadt-zuerich.ch/appl/profil/passwordreset?requiredTrustLevel=1a&wesLoginUrl=https%3A%2F%2Fvermietungen.stadt-zuerich.ch%2Flogin%2Frp%2Fauth%3FRequestedPage%3D%252Fpublication%252Fapartment%252F%26cmd%3Dcancel";
+            }
+            else if(action == "register"){
+               redirectURL = "https://www.stadt-zuerich.ch/appl/profil/registration?requiredTrustLevel=1a&wesLoginUrl=https%3A%2F%2Fvermietungen.stadt-zuerich.ch%2Flogin%2Frp%2Fauth%3FRequestedPage%3D%252Fpublication%252Fapartment%252F%26cmd%3Dcancel";
+            }
+            else if(action == "registeraccessapp"){
+               redirectURL = "https://www.stadt-zuerich.ch/app/mkfewww/web/auth/settings?AccessAppHide&requiredTrustLevel=1a&cmd=cancel";
+            }
+            else if(action == "restart"){
+               redirectURL = "https://vermietungen.stadt-zuerich.ch/login/rp/auth?RequestedPage=/publication/apartment/&cmd=cancel";
+            }
+            window.location.replace(redirectURL);
+         }
+      }
+      xhttp.open("GET", opLoginResetURL, true);
+      xhttp.send();
+   }
+</script>
+
+      <script>
+   window.resourceRoot = '/';
+   window.estaticoPrefix = 'estatico';
+   window.initOnlyPrefixed = false;
+
+   /*
+      Once the browser has loaded all HTML Elements,
+      a few actions need to be performed
+   */
+   document.addEventListener("DOMContentLoaded", function(event) {
+   
+      //extract Query String Parameters
+      var getParams = function(url) {
+         var params = {};
+         var parser = document.createElement('a');
+
+         parser.href = url;
+
+         var query = parser.search.substring(1);
+         var vars = query.split('&');
+   
+         for (var i = 0; i < vars.length; i++) {
+            var pair = vars[i].split('=');
+            params[pair[0]] = decodeURIComponent(pair[1]);
+         }
+   
+         return params;
+      };
+   
+      var params = getParams(window.location.href);
+   
+      // Write Query String description to Element 'pagetitle-lead-text'
+      if (params.description) {
+         var leadTextElement = document.getElementById('pagetitle-lead-text');
+         leadTextElement.textContent = params.description;
+      }
+      // Write Query String title to Element 'anchorContent'
+      if (params.title) {
+         var titleH1Element = document.getElementById('anchorContent');
+         titleH1Element.textContent = params.title;
+      }
+   
+      // Hide AccessApp Option (Login.jsp) if URL parameter RequestedPage contains "AccessAppHide"
+      if(params.RequestedPage && params.RequestedPage.match(/AccessAppHide/g)){
+         var appLoginBlock = document.getElementById('appLoginBlock');
+         if(appLoginBlock != null){
+	      appLoginBlock.style.display = "none";
+	 }
+
+         var appLoginInfoBlock = document.getElementById('appLoginInfoBlock');
+         if(appLoginInfoBlock != null){
+	      appLoginInfoBlock.style.display = "none";
+	 }
+
+         var loginDetailText = document.getElementById('loginDetailText');
+         if(loginDetailText != null){
+	      loginDetailText.style.display = "none";
+	 }
+      }else{
+         var accessDetailText = document.getElementById('accessDetailText');
+         if(accessDetailText != null){
+	      accessDetailText.style.display = "none";
+	 }
+      }
+
+      // Hide UserInput Label if username is pre-filled
+      var userinputdiv = document.getElementById('userInput');
+      var userinputfield = document.getElementById('userInputField');
+      if(userinputfield){
+         if(userinputfield.nodeName == "SPAN"){
+            userinputdiv.childNodes[3].style.display = 'none'
+         }
+      } 
+   });
+</script>
+
+      <!-- <script src="/login/op/staticfiles/rwrd/js/head.min.js"></script> -->
+      <!-- <script src="/login/op/staticfiles/rwrd/js/custom.js"></script> -->
+      <!-- include file="custom/style.css"-->
+      
+<!-- SLS JavaScripts -->
+<script language="JavaScript">
+	var formSubmitted = false;
+	function checkFormSubmit(){
+		if(formSubmitted == false){
+			formSubmitted = true;
+			return formSubmitted;
+		}
+		return false;
+	}
+
+	function submitForm(formName) {
+		if(checkFormSubmit()) {
+			document.forms[formName].submit();
+		}
+	}
+
+	function setFocus(formName, fieldNo) {
+               if(document.forms[formName].elements[fieldNo] != null) {
+                        document.forms[formName].elements[fieldNo].focus();
+                }
+	}
+
+	function handleEnter(event, formName) {
+            if (event.keyCode==13) submitForm(formName);
+    }
+
+	function loadUrl(url) {
+		window.location.href=url;
+	}
+
+	function goBack() {
+		history.back(-1);
+	}
+
+	function sendSelection(formobj, fieldname, no) {
+		formobj.elements[fieldname].value = no;
+		submitForm(formobj.name);
+	}
+
+	function toggleDiv(divid) {
+		if(document.getElementById(divid).style.display == 'none') {
+			document.getElementById(divid).style.display = 'block';
+			document.getElementById(divid + 'Link').innerHTML = '(hide)';
+		} else {
+			document.getElementById(divid).style.display = 'none';
+			document.getElementById(divid + 'Link').innerHTML = '(show)';
+		}
+	}
+
+	function openPopup(url, width, height) {
+		var load = window.open(url,'','scrollbars=no,menubar=no,height=' + height + ',width=' + width + ',resizable=no,toolbar=no,location=no,status=no');
+	}
+</script>
+
+      
+
+      <!-- async loading of font stylesheet -->
+      <link rel="preload" as="style" href="/login/op/staticfiles/desi/dist/stzh-components/assets/fonts.css" />
+      <link rel="stylesheet" href="/login/op/staticfiles/desi/dist/stzh-components/assets/fonts.css" media="print" onload="this.media='all'" />
+
+      <!-- stylesheet with CSS properties/variables -->
+      <link rel="stylesheet" href="/login/op/staticfiles/desi/dist/stzh-components/stzh-components.css" />
+
+      <!-- script that loads components lazily -->
+      <script type="module" src="/login/op/staticfiles/desi/dist/stzh-components/stzh-components.esm.js"></script>
+
+      <!-- set path to translation and media files -->
+      <script>
+         window.stzhComponents = window.stzhComponents || {};
+         window.stzhComponents.pathTranslations = "/login/op/staticfiles/desi/dist/stzh-components/assets/i18n";
+         window.stzhComponents.pathMedia = "/login/op/staticfiles/desi/dist/stzh-components/assets/media";
+         window.stzhComponents.pathVendors = "/login/op/staticfiles/desi/dist/stzh-components/assets/vendors";
+         //display page after all style sheets are loaded
+         window.onload = function() {
+            document.body.style.display = "block";
+         }
+      </script>
+      <!-- hide page before all style sheets are loaded -->
+      <style>
+         body{
+            display: none;
+         }
+      </style>
+   </head>
+   <body>
+      <stzh-flyingfocus></stzh-flyingfocus>
+      <div class="stzh-theme-*">
+         <stzh-visuallyhidden>
+            <h1>Navigation</h1>
+            <h2>Skiplinks</h2>
+         </stzh-visuallyhidden>
+         <stzh-page-skiplinks>
+            <stzh-skiplink href="#anchorContent" link-accesskey="2" link-title="[ALT + 2]">Skip to content</stzh-skiplink>
+            <stzh-skiplink href="#anchorNavMeta" link-accesskey="6" link-title="[ALT + 6]">Skip to meta navigation</stzh-skiplink>
+         </stzh-page-skiplinks>
+         <div class="stzh-layout-sticky-footer">
+            <stzh-header hide-metabar="false">
+               <img slot="logo" src="/login/op/staticfiles/rwrd/logo_stzh_portal.svg" alt="Logo City ZÃ¼rich, go to homepage"/>
+               
+               
+               
+               <stzh-heading id="anchorContent" level="1">Anmeldung</stzh-heading>
+               
+                           </stzh-header>
+            <main>
+               <stzh-container>
+                  <stzh-row style="margin-bottom: var(--stzh-space-xxlarge);">
+                     <stzh-cell span-medium="6">
+                        <stzh-cspace remove-first-margin="false">
+                           <!-- Include appliaction logos -->
+                           
+                           
+                           
+                           <stzh-heading id="anchorContent" level="1">Anmeldung</stzh-heading>
+
+                           <!-- Include external maintenance announcement file -->
+                           
+
+                           <!--------------------------------------------- START: ErrorsInc.jsp ------------------------------------------------>
+                           
+                           
+                           <!------------------------------------------------------------------------------------------------------------------->
+
+                           <stzh-text>
+                              <p>Falls Sie bereits Online-Services der Stadt Zürich nutzen (z.B. schulische Betreuung, &laquo;Mein MKZ&raquo;, Sportamt, &laquo;Mein ewz&raquo;), loggen Sie sich mit Ihrem bestehenden &laquo;Mein Konto&raquo; ein.</p>
+                           </stzh-text>
+                           <!-- <span id="accessDetailText">Bitte geben Sie Ihre Login-Daten ein, um Ihr Smartphone mit der<br>Z&uuml;rich Access App zu koppeln.</span> -->
+                           <!-- <stzh-message type="error" label="Title Error" description="This is an optional description text of a message."><stzh-link slot="link">optional link</stzh-link></stzh-message> -->
+
+                           <stzh-heading level="2">Login ausw&auml;hlen</stzh-heading>
+
+                           <!-- chipselect for default login with all options -->
+                           
+                                                                        <stzh-chipselect
+                                 id="chipselect-logins"
+                                 name="logins"
+                                 value="email"
+                                 hide-optional="true"
+                                 data='[
+                                    { "label": "E-Mail", "value": "email", "variant": "filter", "type": "secondary", "size": "large" },
+                                    { "label": "AGOV", "value": "agov", "variant": "filter", "type": "secondary", "size": "large" },
+                                    { "label": "Z&uuml;rich Access App", "value": "zuerichaccessapp","variant": "filter", "type": "secondary", "size": "large" }
+                                 ]'>
+                              </stzh-chipselect>
+                           
+
+                           <!-- chipselect for agov linkup with email only -->
+                           
+
+                                                                        <div id="section-email" class="">
+                                                                        <form action="auth" method="post" name="Email" onsubmit="checkFormSubmit()" >
+                                                                                <stzh-fieldset hide-legend="true" legend="Mit E-Mail anmelden">
+                                    <stzh-text>Nutzen Sie Ihre E-Mail, um sich anzumelden:</stzh-text>
+                                    
+                                       <input type="hidden" name="csrftoken" value="96619369734416197656"/>
+                                    
+                                        <stzh-row>
+                                            <stzh-cell span-medium="10">
+                                                <stzh-input value="" name="userid" label="E-Mail-Adresse" required autofocus></stzh-input>
+                                                <stzh-input value="" name="password" label="Passwort" type="password" required></stzh-input>
+                                            </stzh-cell>
+                                        </stzh-row>
+                                    <stzh-actions variant="form">
+                                       <stzh-button type="submit" slot="primary">Anmelden</stzh-button>
+                                    </stzh-actions>
+                                    <stzh-link fullwidth="true" text-align="left" onclick='return resetOPLoginModel("changePW");' label="Passwort vergessen?" type="button"></stzh-link>
+                                       
+                                       <stzh-link fullwidth="true" text-align="left" onclick='return resetOPLoginModel("register");' label="Neu registrieren" type="button"></stzh-link>
+                                    
+                                                                                </stzh-fieldset>
+                                                                        <input name="currentRequestedPage" type="hidden" value="PVehW9pwFGU9YEqI%2FtFdTAP6iNsZ4IeA" /></form>
+                           </div>
+
+                           <div id="section-agov" class="login-hidden">
+                                                                           <form action="auth" method="post" name="AGOV" onsubmit="checkFormSubmit()" >
+                                  <stzh-fieldset hide-legend="true" legend="Mit AGOV anmelden">
+                                    <stzh-text>Nutzen Sie AGOV, um sich anzumelden:</stzh-text>
+                                                                                      
+                                       <input type="hidden" name="csrftoken" value="96619369734416197656"/>
+                                    
+                                    <stzh-actions variant="form">
+                                       <stzh-button type="submit" slot="primary">Mit AGOV anmelden</stzh-button>
+                                    </stzh-actions>
+                                    <input name="op" type="hidden" value="ciam-kanton-zh" />
+                                       <stzh-link target="_blank" rel="noopener noreferrer" fullwidth="true" text-align="left" href="https://www.stadt-zuerich.ch/meinkonto-agov/
+">Was ist AGOV?</stzh-link>
+                                
+                                       <stzh-link fullwidth="true" text-align="left" onclick='return resetOPLoginModel("register");' label="Neu registrieren" type="button"></stzh-link>
+                                                               
+                                                                                    </stzh-fieldset>
+                                                                           <input name="currentRequestedPage" type="hidden" value="PVehW9pwFGU9YEqI%2FtFdTAP6iNsZ4IeA" /></form>
+                                                         </div>
+
+                           <div id="section-zuerichaccessapp" class="login-hidden">
+                                                                           <form action="auth" method="post" name="AccessApp" onsubmit="checkFormSubmit()" >
+                                  <stzh-fieldset hide-legend="true" legend="Mit AGOV anmelden">
+                                                                                 <stzh-text>Das Anmelden erfolgt neu direkt mit AGOV. Pushnachrichten erhalten Sie wie gewohnt in Ihrer Z&uuml;rich Access App.</stzh-text>
+                                                                                 
+                                       <input type="hidden" name="csrftoken" value="96619369734416197656"/>
+                                    
+                                    <stzh-actions variant="form">
+                                       <stzh-button type="submit" slot="primary">Mit AGOV anmelden</stzh-button>
+                                    </stzh-actions>
+                                    <input name="op" type="hidden" value="ciam-kanton-zh" />
+                                                                                    <stzh-link target="_blank" rel="noopener noreferrer" fullwidth="true" text-align="left" href="https://www.stadt-zuerich.ch/meinkonto-agov/">Was ist AGOV?</stzh-link>
+                                
+                                       <stzh-link fullwidth="true" text-align="left" onclick='return resetOPLoginModel("register");' label="Neu registrieren" type="button"></stzh-link>
+                                
+                                    
+                                                                              </stzh-fieldset>
+                                                                           <input name="currentRequestedPage" type="hidden" value="PVehW9pwFGU9YEqI%2FtFdTAP6iNsZ4IeA" /></form>
+                                                                        </div>
+                                                                </stzh-cspace>
+                     </stzh-cell>
+                     
+                     <stzh-cell span-medium="6">
+                           <stzh-section margin-top="none" margin-bottom="none">
+
+	<stzh-message type="warning" hide-close="true">
+	<p>
+	Falls Sie &laquo;Mein Konto&raquo; neben dem <strong>privaten Gebrauch</strong> auch <strong>gesch&auml;ftlich</strong> oder als <strong>professionelle Vertretung</strong> (Anw&auml;lt*in) verwenden, bitten wir Sie auf AGOV unterschiedliche Konten zu benutzen. 
+	</p>
+	<stzh-link href="https://www.stadt-zuerich.ch/meinkonto-agov-rollen/
+" slot="link">Mehr zu AGOV und Rollen erfahren</stzh-link>
+	</stzh-message>
+
+                              <stzh-heading level="2">Hilfe</stzh-heading>
+                              <stzh-text lead="true">
+                                 <p>Ben&ouml;tigen Sie Unterst&uuml;tzung bei der Anmeldung?</p>
+                              </stzh-text>
+                              <stzh-richtext>
+                                 <p>In unserem <a target="_blank" rel="noopener noreferrer" href="https://www.stadt-zuerich.ch/meinkonto-hilfe
+">Hilfebereich</a> finden Sie Antworten auf die meisten Fragen.</p>
+                              </stzh-richtext>
+                           </stzh-section>
+                        </stzh-cell>
+                     
+                  </stzh-row>
+               </stzh-container>
+            </main>
+            <stzh-footer variant="egov"></stzh-footer>
+         </div>
+      </div>
+      
+
+      
+      <script>
+
+         //Cookie-Helpers fÃ¼r Persistenz
+         function setCookie(name, value, days) {
+            let expires = "";
+            if (days) {
+               const d = new Date(); d.setTime(d.getTime() + days*24*60*60*1000);
+               expires = "; expires=" + d.toUTCString();
+            }
+            document.cookie = name + "=" + encodeURIComponent(value) + expires + "; path=/";
+         }
+         function getCookie(name) {
+            const nameEQ = name + "=";
+            return document.cookie.split(";").map(c => c.trim()).find(c => c.indexOf(nameEQ) === 0)?.substring(nameEQ.length) || null;
+         }
+
+         document.addEventListener('DOMContentLoaded', function () {
+            const chipselect = document.getElementById('chipselect-logins');
+
+            const sections = {
+               "email": document.getElementById('section-email'),
+               "agov": document.getElementById('section-agov'),
+               "zuerichaccessapp": document.getElementById('section-zuerichaccessapp')
+         };
+
+         function showSection(value) {
+            Object.values(sections).forEach(el => el.classList.add('login-hidden'));
+            (sections[value] || sections.email).classList.remove('login-hidden');
+         }
+
+         //Persistenz lesen
+            const saved = getCookie('login_choice');
+            if (saved) {chipselect.setAttribute('value', saved);}
+
+            showSection(chipselect.value || "email");
+
+            chipselect.addEventListener('stzhChange', (event) => {
+               const value = event.detail.value || 'email';
+               showSection(value);
+               //Persistenz schreiben
+               setCookie('login_choice', value, 365);
+            });
+         });
+      </script>
+      
+   </body>
+</html>
+
