@@ -86,5 +86,5 @@ jobs:
           SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          SUCHABO_ABSENDER: ${{ vars.SUCHABO_ABSENDER }}
+          SUCHABO_ABSENDER: ${{ vars.SUCHABO_ABSENDER || secrets.SUCHABO_ABSENDER }}
         run: node pipeline/21-suchabos.ts ausgabe/wohnungen.json
