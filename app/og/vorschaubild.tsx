@@ -167,27 +167,41 @@ export async function stadtBild(stadtName: string, datei: string) {
   )
 }
 
-/** Vorschaubild der Wohnungssuche, für die ganze Stadt oder einen Kreis. */
+/**
+ * Vorschaubild der Wohnungssuche, für die ganze Stadt oder einen Kreis. Schlicht
+ * und hell wie die Seite selbst, alles in der Mitte: WhatsApp und andere
+ * schneiden das Bild oft auf ein Quadrat zu, dann bleibt der Text ganz.
+ */
 export async function wohnungenBild(ort = 'Zürich') {
+  const papier = '#f7f7f5'
+  const tinte = '#18181b'
+  const leise = '#71717a'
+  const g = 112
+  const d = Math.round(g * 0.24)
   return new ImageResponse(
     (
-      <Rahmen bild={await karte('karte-zuerich.svg')} grund={OG.grund}>
-        <div style={{ display: 'flex' }}>
-          <Pille farbe={OG.rampe[0]}>{ort}</Pille>
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: papier,
+          fontFamily: 'Geist',
+          color: tinte,
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-end', fontSize: g, fontWeight: 600, letterSpacing: '-0.035em', lineHeight: 1 }}>
+          angebunden
+          <div style={{ width: d, height: d, borderRadius: 999, background: PUNKT, marginLeft: Math.round(g * 0.03), marginBottom: Math.round(g * 0.045) }} />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <Wortmarke groesse={104} />
-          <div style={{ display: 'flex', fontSize: 44, lineHeight: 1.2, color: OG.text, marginTop: 28, maxWidth: 600 }}>
-            {`Alle Mietwohnungen in ${ort} auf einer Karte`}
-          </div>
+        <div style={{ display: 'flex', fontSize: 52, fontWeight: 600, letterSpacing: '-0.02em', marginTop: 36 }}>
+          {`Wohnungen in ${ort}`}
         </div>
-        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
-          <div style={{ display: 'flex', fontSize: 22, color: OG.leise, maxWidth: 560 }}>
-            Flatfox, Ron Orp, WOKO · alle 10 Min. neu
-          </div>
-          <Domain />
-        </div>
-      </Rahmen>
+        <div style={{ display: 'flex', fontSize: 28, color: leise, marginTop: 16 }}>Alle Inserate auf einer Karte</div>
+      </div>
     ),
     schriften
   )
