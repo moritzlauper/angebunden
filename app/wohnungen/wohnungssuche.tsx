@@ -1042,24 +1042,46 @@ function Filterfeld({
                   <input type="checkbox" checked={f.nurGemerkt} onChange={(e) => aendern({ nurGemerkt: e.target.checked })} />
                   Nur gemerkte
                 </label>
-                <label
-                  className="flex items-center gap-1.5 text-[var(--ab-leise)]"
-                  title="Mittlere Reisezeit mit Tram, Bus und S-Bahn zu einer beliebigen Adresse der Stadt, Median 31 Min."
-                >
-                  ÖV
-                  <select
-                    value={f.oevMax ?? ''}
-                    onChange={(e) => aendern({ oevMax: e.target.value === '' ? null : Number(e.target.value) })}
-                    className="rounded-md border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-1 py-0.5 text-[12px] text-[var(--ab-tinte)]"
-                  >
-                    <option value="">egal</option>
-                    {[26, 28, 31, 35].map((m) => (
-                      <option key={m} value={m}>
-                        bis {m} Min.
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              </div>
+              <div className="mt-1">
+                <div className="flex items-baseline justify-between">
+                  <span className="font-medium">ÖV-Anbindung</span>
+                  <span className="font-medium tabular-nums">{f.oevMax == null ? 'egal' : `höchstens ${f.oevMax} Min.`}</span>
+                </div>
+                <input
+                  type="range"
+                  className="regler mt-1.5"
+                  min={22}
+                  max={46}
+                  step={1}
+                  value={f.oevMax ?? 46}
+                  onChange={(e) => aendern({ oevMax: Number(e.target.value) >= 46 ? null : Number(e.target.value) })}
+                  style={
+                    {
+                      // Ohne Grenze bleibt die Spur grau: Es ist nichts gefiltert.
+                      '--fuellung':
+                        f.oevMax == null
+                          ? 'var(--ab-spur)'
+                          : `linear-gradient(to right, var(--ab-karmin) ${((f.oevMax - 22) / 24) * 100}%, var(--ab-spur) 0)`,
+                      '--knopf': 'var(--ab-knopf)',
+                      '--ring': 'var(--ab-ring)',
+                    } as React.CSSProperties
+                  }
+                  aria-label="Höchste mittlere ÖV-Reisezeit in Minuten"
+                />
+                <div className="mt-0.5 flex justify-between text-[11px] text-[var(--ab-leise)] tabular-nums">
+                  <span>22 Min. zentral</span>
+                  <span>31 Min. Median</span>
+                  <span>egal</span>
+                </div>
+                <p className="mt-1.5 text-[11.5px] leading-snug text-[var(--ab-leise)]">
+                  Wie lange man von der Wohnung aus mit Tram, Bus und S-Bahn im Schnitt zu einer beliebigen Adresse in
+                  Zürich braucht, Türe zu Türe mit Fussweg, Warten und Umsteigen. Je kleiner, desto besser angebunden: Am
+                  Hauptbahnhof sind es gut 20 Minuten, die Hälfte der Häuser liegt unter 31, am Stadtrand über 40.{' '}
+                  <Link href="/methode" className="underline underline-offset-2">
+                    Wie das gerechnet ist
+                  </Link>
+                </p>
               </div>
             </div>
           )}
