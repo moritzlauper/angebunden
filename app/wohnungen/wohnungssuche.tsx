@@ -223,7 +223,10 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
     const laden = async () => {
       for (const url of [DATEN_URL, DATEN_LOKAL]) {
         try {
-          const res = await fetch(url, { cache: 'no-cache' })
+          // GitHub hält Rohdateien bis zu fünf Minuten im Zwischenspeicher. Ein Zusatz, der jede
+          // Minute wechselt, holt die frische Fassung, ohne den Speicher ganz auszuhebeln.
+          const frisch = `${url}${url.includes('?') ? '&' : '?'}t=${Math.floor(Date.now() / 60_000)}`
+          const res = await fetch(frisch, { cache: 'no-cache' })
           if (!res.ok) continue
           const d = (await res.json()) as Wohnungen
           if (!weg) setDaten(d)
@@ -233,8 +236,8 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
       if (!weg) setLadefehler(true)
     }
     laden()
-    // Der Sammler läuft mehrmals am Tag; wer die Seite offen lässt, bekommt neue Inserate ohne Neuladen.
-    const t = setInterval(laden, 5 * 60_000)
+    // Der Sammler läuft alle fünf Minuten; wer die Seite offen lässt, bekommt neue Inserate ohne Neuladen.
+    const t = setInterval(laden, 2 * 60_000)
     return () => {
       weg = true
       clearInterval(t)

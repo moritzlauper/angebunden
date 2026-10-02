@@ -301,12 +301,12 @@ Danach passiert viererlei:
 * **Einordnen**: Jedes Inserat bekommt die Werte des nächsten Hauses der Erreichbarkeitskarte
   (höchstens 120 m entfernt): mittlere ÖV-Reisezeit, Anzahl Kulturorte und beider Rang.
 
-Der Workflow `.github/workflows/wohnungen.yml` lässt den Sammler alle zehn Minuten laufen und
+Der Workflow `.github/workflows/wohnungen.yml` lässt den Sammler alle fünf Minuten laufen und
 ausserdem bei jedem Push, der ihn ändert. Weil GitHubs Zeitplan kurze Abstände unzuverlässig
 bedient, läuft ein Lauf auf main als Schleife von knapp sechs Stunden und startet dann seinen
 Nachfolger selbst; der stündliche Zeitplan fängt eine gerissene Kette wieder auf. Er legt `wohnungen.json` auf den Zweig `wohnungen`,
 jedes Mal als einzigen Commit. Die Seite lädt die Datei über `raw.githubusercontent.com` und
-schaut alle fünf Minuten nach Neuem; main und das Deployment bleiben unberührt. Wer selbst
+schaut alle zwei Minuten nach Neuem; main und das Deployment bleiben unberührt. Wer selbst
 betreibt, setzt `NEXT_PUBLIC_WOHNUNGEN_URL` (siehe `.env.example`). Ohne erreichbare Datei greift
 die Seite auf `public/data/zuerich/wohnungen.json` zurück, so läuft es lokal:
 

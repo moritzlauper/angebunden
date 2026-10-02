@@ -1,6 +1,6 @@
 name: Wohnungen
 
-# Sammelt alle zehn Minuten die Mietinserate für /wohnungen
+# Sammelt alle fünf Minuten die Mietinserate für /wohnungen
 # (pipeline/20-wohnungen.ts), legt sie als wohnungen.json auf den Zweig
 # «wohnungen» und verschickt danach die Suchabos (pipeline/21-suchabos.ts).
 # Die Seite lädt die Datei von dort über raw.githubusercontent.com, main und
@@ -8,7 +8,7 @@ name: Wohnungen
 #
 # Takt: GitHubs Zeitplan ist für kurze Abstände unzuverlässig, er startet
 # verspätet oder lässt Läufe ganz aus. Deshalb läuft ein Lauf auf main als
-# Schleife: alle zehn Minuten ein Durchgang, knapp sechs Stunden lang (das
+# Schleife: alle fünf Minuten ein Durchgang, knapp sechs Stunden lang (das
 # Höchstmass für einen Job), dann startet er seinen Nachfolger über
 # workflow_dispatch. Das darf das eigene GITHUB_TOKEN, ohne Fremddienst und
 # ohne weiteres Secret. Reisst die Kette (Fehler, Abbruch), fängt sie der
@@ -109,7 +109,8 @@ jobs:
             # Ein einzelner Fehler (Portal kurz weg) bricht nichts ab, drei in Folge schon.
             [ "$FEHLER" -ge 3 ] && exit 1
             [ "$SCHLEIFE" = "true" ] || exit $((FEHLER > 0))
-            NAECHSTE=$((RUNDE + 600))
+            # Fünf Minuten von Beginn zu Beginn; ein Durchgang dauert gut zwei.
+            NAECHSTE=$((RUNDE + 300))
             [ "$NAECHSTE" -ge "$ENDE" ] && break
             sleep $((NAECHSTE - $(date +%s) > 0 ? NAECHSTE - $(date +%s) : 0))
           done

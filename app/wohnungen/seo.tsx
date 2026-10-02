@@ -19,9 +19,9 @@ export function wohnungenMetadata(k?: Kreis): Metadata {
     : 'Wohnung mieten in Zürich: alle Inserate auf einer Karte'
   const beschreibung = k
     ? `Freie Mietwohnungen und WG-Zimmer im Kreis ${k.nummer} (${k.quartiere}): Inserate von Flatfox, ` +
-      `Homegate, ImmoScout24, Ron Orp, WOKO und Genossenschaften auf einer Karte, alle 10 Minuten neu.`
+      `Homegate, ImmoScout24, Ron Orp, WOKO und Genossenschaften auf einer Karte, alle 5 Minuten neu.`
     : 'Alle Mietwohnungen und WG-Zimmer in der Stadt Zürich auf einer Karte: Flatfox, Homegate, ' +
-      'ImmoScout24, Ron Orp, WOKO und Genossenschaften, alle 10 Minuten neu. Befristet oder nicht, ' +
+      'ImmoScout24, Ron Orp, WOKO und Genossenschaften, alle 5 Minuten neu. Befristet oder nicht, ' +
       'Gebiet auf der Karte zeichnen, Wohnungen merken.'
   const sozial = `Wohnungen ${ort(k)} · ${SITE_NAME}`
   return {
@@ -47,7 +47,7 @@ export function wohnungenMetadata(k?: Kreis): Metadata {
 const FRAGEN = (k?: Kreis): [string, string][] => [
   [
     `Woher kommen die Wohnungen in ${ort(k)}?`,
-    'Ein Sammler fragt alle zehn Minuten Flatfox ab (dort steht auch ein Teil der Inserate von Homegate ' +
+    'Ein Sammler fragt alle fünf Minuten Flatfox ab (dort steht auch ein Teil der Inserate von Homegate ' +
       'und ImmoScout24), dazu den Wohnungsmarkt von Ron Orp, die freien Zimmer der WOKO und die freien ' +
       'Wohnungen der Stiftung PWG und der ABZ. Steht dieselbe Wohnung auf mehreren Portalen, erscheint sie ' +
       'einmal, mit allen Links.',
