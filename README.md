@@ -16,6 +16,10 @@ Für Zürich gibt es ausserdem den **Velonavi** auf der Startseite `/`, ein Velo
 Steigung, Lichtsignale und Belag abwägt. Er rechnet vollständig im Browser, siehe
 [Velonavi](#velonavi).
 
+Unter `/wohnungen` steht eine **Wohnungssuche** für die Stadt Zürich: Mietinserate aus mehreren
+Portalen auf einer Liste und einer Karte, jedes mit der ÖV- und Kulturkennzahl des Hauses. Siehe
+[Wohnungen](#wohnungen).
+
 Wer Daten korrigieren oder die Seite selbst betreiben will, findet die Anleitungen unter
 [`docs/daten-anpassen.md`](docs/daten-anpassen.md) und [`docs/betreiben.md`](docs/betreiben.md).
 
@@ -263,6 +267,48 @@ GitHub-Action `velodaten.yml` baut das Netz am 3. jedes Monats aus frischen Date
 pnpm daten:velo            # Rohdaten holen und Graph bauen
 pnpm korrekturen:pruefen   # velo-korrekturen.json prüfen, ohne die Pipeline
 ```
+
+## Wohnungen
+
+`/wohnungen` sammelt die Mietinserate der Stadt Zürich an einem Ort. Der Sammler
+`pipeline/20-wohnungen.ts` fragt ab:
+
+| Portal | Wie |
+| --- | --- |
+| Flatfox | Öffentliche API (`/api/v1/pin/` für alle Inserate im Stadtgebiet, dann `/api/v1/public-listing/`) |
+| Homegate | Trefferliste, Daten aus `window.__INITIAL_STATE__` im HTML |
+| ImmoScout24 | wie Homegate, beide gehören zur SMG und teilen das Datenmodell |
+
+Homegate und ImmoScout24 haben keine offene Schnittstelle und sperren automatische Abrufe
+teilweise. Fällt eine Quelle aus, bleiben ihre Inserate vom letzten erfolgreichen Lauf bis zu drei
+Tage stehen, und die Seite sagt, welches Portal nicht geantwortet hat. Bei einer Änderung des
+Seitenformats ist `smgListings()` die Stelle: Sie sucht im Zustand jedes Objekt mit `id`,
+`address` und `prices`, statt sich auf einen festen Pfad zu verlassen.
+
+Danach passiert dreierlei:
+
+* **Zuschneiden** auf die Stadtgrenze (`city.geojson`), ohne Koordinaten über die Postleitzahl.
+* **Zusammenlegen**: Dieselbe Wohnung steht oft auf zwei, drei Portalen. Als gleich gilt, was
+  höchstens 40 m auseinander liegt, gleich viele Zimmer hat und bei Miete (±3 %) und Fläche
+  (±3 m²) übereinstimmt. Die Karte zeigt dann einen Eintrag mit allen Links.
+* **Einordnen**: Jedes Inserat bekommt die Werte des nächsten Hauses der Erreichbarkeitskarte
+  (höchstens 120 m entfernt): mittlere ÖV-Reisezeit, Anzahl Kulturorte und beider Rang.
+
+Der Workflow `.github/workflows/wohnungen.yml` lässt den Sammler tagsüber alle zwei Stunden laufen
+und legt `wohnungen.json` auf den Zweig `wohnungen`, jedes Mal als einzigen Commit. Die Seite
+lädt die Datei über `raw.githubusercontent.com`, main und das Deployment bleiben unberührt. Wer
+selbst betreibt, setzt `NEXT_PUBLIC_WOHNUNGEN_URL` (siehe `.env.example`). Ohne erreichbare
+Datei greift die Seite auf `public/data/zuerich/wohnungen.json` zurück, so läuft es lokal:
+
+```bash
+node pipeline/20-wohnungen.ts   # schreibt public/data/zuerich/wohnungen.json
+pnpm dev                         # http://localhost:3000/wohnungen
+```
+
+Gemerkte und ausgeblendete Inserate, die Filter und der letzte Besuch (für «neu seit deinem
+letzten Besuch») bleiben im Browser, es braucht kein Konto. Unter der Liste stehen die Portale
+mit derselben Suche und die Quellen, die der Sammler nicht abfragt: Newhome, Comparis,
+Kleinanzeigen, WG-Börsen, die Stadt und die Genossenschaften (`app/wohnungen/quellen.ts`).
 
 ## Aufbau
 

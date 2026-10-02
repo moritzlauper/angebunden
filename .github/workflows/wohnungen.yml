@@ -1,0 +1,65 @@
+name: Wohnungen
+
+# Sammelt alle zwei Stunden die Mietinserate für /wohnungen
+# (pipeline/20-wohnungen.ts) und legt sie als wohnungen.json auf den Zweig
+# «wohnungen». Die Seite lädt die Datei von dort über raw.githubusercontent.com,
+# main und das Deployment bleiben unberührt.
+#
+# Der Zweig hat immer genau einen Commit: Alte Stände der Inserate braucht
+# niemand, und das Repository soll nicht mit jedem Lauf um eine Megabyte-Datei
+# wachsen. Was der Sammler vom letzten Lauf braucht (seit wann ein Inserat da
+# ist, die Inserate einer ausgefallenen Quelle), liest er aus der alten Datei.
+
+on:
+  schedule:
+    - cron: '23 5-21/2 * * *' # tagsüber alle zwei Stunden (UTC)
+  workflow_dispatch:
+
+concurrency:
+  group: wohnungen
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  ZWEIG: wohnungen
+
+jobs:
+  sammeln:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Letzten Stand holen
+        run: |
+          set -euo pipefail
+          mkdir -p ausgabe
+          if git ls-remote --exit-code --heads origin "${ZWEIG}" >/dev/null 2>&1; then
+            git fetch --depth 1 origin "${ZWEIG}"
+            git show "FETCH_HEAD:wohnungen.json" > ausgabe/wohnungen.json || rm -f ausgabe/wohnungen.json
+          fi
+
+      - name: Inserate sammeln
+        run: node pipeline/20-wohnungen.ts ausgabe/wohnungen.json
+
+      - name: Auf den Zweig legen
+        run: |
+          set -euo pipefail
+          cd ausgabe
+          git init -q -b "${ZWEIG}"
+          git config user.name  "wohnungen-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add wohnungen.json
+          ZAHLEN=$(node -e '
+            const w = require("./wohnungen.json")
+            console.log(`${w.inserate.length} Inserate (` + w.quellen.map(q => `${q.name} ${q.ok ? q.anzahl : "ausgefallen"}`).join(", ") + ")")
+          ')
+          git commit -q -m "Wohnungen: ${ZAHLEN}"
+          git push -q --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "HEAD:${ZWEIG}"
+          echo "${ZAHLEN}" >> "$GITHUB_STEP_SUMMARY"

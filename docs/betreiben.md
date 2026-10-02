@@ -40,6 +40,8 @@ Die Seite lädt zur Laufzeit von diesen Adressen:
 | `www.ogd.stadt-zuerich.ch/wms/geoportal/` | Hintergrundkarte (WMS der Stadt Zürich) | `app/karte.tsx`, `app/velonavi/velonavi.tsx` |
 | `gc.zgo.at`, `*.goatcounter.com` | Besucherzählung, nur wenn eingerichtet | `app/besucher-zaehler.tsx` |
 | `*.supabase.co` | Konto im Velonavi, nur wenn eingerichtet | `app/velonavi/konto.ts` |
+| `raw.githubusercontent.com` | Gesammelte Inserate für `/wohnungen`, änderbar mit `NEXT_PUBLIC_WOHNUNGEN_URL` | `app/wohnungen/wohnungssuche.tsx` |
+| Bildserver der Portale | Vorschaubilder der Inserate auf `/wohnungen` | `app/wohnungen/wohnungssuche.tsx` |
 
 Schriften, MapLibre und alle Daten liefert die Seite selbst aus. Der Service Worker
 `public/velonavi-sw.js` hält die Kartenbilder der Stadt im Browser, weil der WMS keine
