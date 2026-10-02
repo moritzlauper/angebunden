@@ -1,0 +1,35 @@
+name: Wohnungen-Probe
+
+# Vorübergehend: holt die Antworten aller Quellen der Wohnungssuche und legt sie
+# auf den Zweig «wohnungen-probe», um die Sammler daran auszurichten.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'scripts/wohnungen-probe.mjs'
+      - '.github/workflows/wohnungen-probe.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/wohnungen-probe.mjs
+      - name: Auf den Zweig legen
+        run: |
+          set -euo pipefail
+          cd probe
+          git init -q -b wohnungen-probe
+          git config user.name "wohnungen-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Probe"
+          git push -q --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:wohnungen-probe
