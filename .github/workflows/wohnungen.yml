@@ -1,31 +1,38 @@
 name: Wohnungen
 
 # Sammelt alle zehn Minuten die Mietinserate für /wohnungen
-# (pipeline/20-wohnungen.ts) und legt sie als wohnungen.json auf den Zweig
-# «wohnungen». Die Seite lädt die Datei von dort über raw.githubusercontent.com,
-# main und das Deployment bleiben unberührt.
+# (pipeline/20-wohnungen.ts), legt sie als wohnungen.json auf den Zweig
+# «wohnungen» und verschickt danach die Suchabos (pipeline/21-suchabos.ts).
+# Die Seite lädt die Datei von dort über raw.githubusercontent.com, main und
+# das Deployment bleiben unberührt.
 #
-# Der Zweig hat immer genau einen Commit: Alte Stände der Inserate braucht
+# Takt: GitHubs Zeitplan ist für kurze Abstände unzuverlässig, er startet
+# verspätet oder lässt Läufe ganz aus. Deshalb läuft ein Lauf auf main als
+# Schleife: alle zehn Minuten ein Durchgang, knapp sechs Stunden lang (das
+# Höchstmass für einen Job), dann startet er seinen Nachfolger über
+# workflow_dispatch. Das darf das eigene GITHUB_TOKEN, ohne Fremddienst und
+# ohne weiteres Secret. Reisst die Kette (Fehler, Abbruch), fängt sie der
+# stündliche Zeitplan wieder auf. Dank `concurrency` läuft nie mehr als eine
+# Schleife; ein weiterer Start wartet und ersetzt höchstens einen wartenden.
+#
+# Ein Push, der Sammler oder Workflow ändert, macht auf jedem Branch genau
+# einen Durchgang: So zeigt sich gleich, ob die Änderung mit den echten
+# Portalen zurechtkommt.
+#
+# Der Zweig «wohnungen» hat immer genau einen Commit: Alte Stände braucht
 # niemand, und das Repository soll nicht mit jedem Lauf um eine Megabyte-Datei
-# wachsen. Was der Sammler vom letzten Lauf braucht (seit wann ein Inserat da
-# ist, die Inserate einer ausgefallenen Quelle), liest er aus der alten Datei.
+# wachsen. Was der Sammler vom letzten Durchgang braucht, liest er aus der
+# alten Datei.
 
 on:
   schedule:
-    # Alle zehn Minuten, rund um die Uhr. Günstige Wohnungen sind oft nach
-    # einer Stunde wieder weg, und Ron Orp zeigt nur die neuesten zehn Inserate.
-    # Kürzer als fünf Minuten lässt GitHub nicht zu, und geplante Läufe starten
-    # bei viel Betrieb ohnehin einige Minuten später. Achtung: In öffentlichen
-    # Repositorys schaltet GitHub Zeitpläne nach 60 Tagen ohne Commit ab.
-    - cron: '*/10 * * * *'
+    - cron: '7 * * * *' # stündlich als Absicherung, falls die Kette reisst
   workflow_dispatch:
-  # Auch wenn sich der Sammler ändert, auf jedem Branch: So zeigt sich gleich,
-  # ob er mit den echten Portalen zurechtkommt, und die Seite hat Daten, ohne
-  # dass zuerst gemergt werden muss.
   push:
     paths:
       - 'pipeline/20-wohnungen.ts'
       - 'pipeline/21-suchabos.ts'
+      - 'pipeline/lib/inserat-text.ts'
       - '.github/workflows/wohnungen.yml'
 
 concurrency:
@@ -34,6 +41,7 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write
 
 env:
   ZWEIG: wohnungen
@@ -41,7 +49,7 @@ env:
 jobs:
   sammeln:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 358
     steps:
       - uses: actions/checkout@v4
 
@@ -49,42 +57,65 @@ jobs:
         with:
           node-version: 22
 
-      - name: Letzten Stand holen
-        run: |
-          set -euo pipefail
-          mkdir -p ausgabe
-          if git ls-remote --exit-code --heads origin "${ZWEIG}" >/dev/null 2>&1; then
-            git fetch --depth 1 origin "${ZWEIG}"
-            git show "FETCH_HEAD:wohnungen.json" > ausgabe/wohnungen.json || rm -f ausgabe/wohnungen.json
-          fi
-
-      - name: Inserate sammeln
-        run: node pipeline/20-wohnungen.ts ausgabe/wohnungen.json
-
-      - name: Auf den Zweig legen
-        run: |
-          set -euo pipefail
-          cd ausgabe
-          git init -q -b "${ZWEIG}"
-          git config user.name  "wohnungen-bot"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Der Zweig trägt nur Daten. Ohne das baut Vercel jeden Commit als Website und scheitert.
-          echo '{"git":{"deploymentEnabled":false}}' > vercel.json
-          git add wohnungen.json vercel.json
-          ZAHLEN=$(node -e '
-            const w = require("./wohnungen.json")
-            console.log(`${w.inserate.length} Inserate (` + w.quellen.map(q => `${q.name} ${q.ok ? q.anzahl : "ausgefallen"}`).join(", ") + ")")
-          ')
-          git commit -q -m "Wohnungen: ${ZAHLEN}"
-          git push -q --force "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "HEAD:${ZWEIG}"
-          echo "${ZAHLEN}" >> "$GITHUB_STEP_SUMMARY"
-
-      # Suchabos: neue passende Inserate per Mail. Ohne die Secrets tut der Schritt nichts.
-      # Einrichtung: README, Abschnitt «Suchabos».
-      - name: Suchabos verschicken
+      - name: Sammeln und Suchabos verschicken
         env:
+          SCHLEIFE: ${{ github.ref == 'refs/heads/main' && github.event_name != 'push' }}
+          REPO_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
           SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           SUCHABO_ABSENDER: ${{ vars.SUCHABO_ABSENDER || secrets.SUCHABO_ABSENDER }}
-        run: node pipeline/21-suchabos.ts ausgabe/wohnungen.json
+        run: |
+          set -uo pipefail
+          mkdir -p ausgabe
+
+          # Letzter Stand vom Zweig, einmal zu Beginn; danach liegt er in ausgabe/.
+          if git ls-remote --exit-code --heads origin "${ZWEIG}" >/dev/null 2>&1; then
+            git fetch -q --depth 1 origin "${ZWEIG}"
+            git show "FETCH_HEAD:wohnungen.json" > ausgabe/wohnungen.json || rm -f ausgabe/wohnungen.json
+          fi
+
+          durchgang() {
+            node pipeline/20-wohnungen.ts ausgabe/wohnungen.json || return 1
+
+            rm -rf zweig && mkdir zweig && cp ausgabe/wohnungen.json zweig/
+            (
+              cd zweig
+              git init -q -b "${ZWEIG}"
+              git config user.name  "wohnungen-bot"
+              git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+              # Der Zweig trägt nur Daten. Ohne das baut Vercel jeden Commit als Website und scheitert.
+              echo '{"git":{"deploymentEnabled":false}}' > vercel.json
+              git add wohnungen.json vercel.json
+              ZAHLEN=$(node -e '
+                const w = require("./wohnungen.json")
+                console.log(`${w.inserate.length} Inserate (` + w.quellen.map(q => `${q.name} ${q.ok ? q.anzahl : "ausgefallen"}`).join(", ") + ")")
+              ')
+              git commit -q -m "Wohnungen: ${ZAHLEN}"
+              git push -q --force "${REPO_URL}" "HEAD:${ZWEIG}"
+              echo "$(date -u +%H:%M) ${ZAHLEN}" >> "$GITHUB_STEP_SUMMARY"
+            ) || return 1
+
+            node pipeline/21-suchabos.ts ausgabe/wohnungen.json
+          }
+
+          START=$(date +%s)
+          # Knapp unter sechs Stunden, damit Abschluss und Nachfolger noch Platz haben.
+          ENDE=$((START + 5 * 3600 + 45 * 60))
+          FEHLER=0
+          while true; do
+            RUNDE=$(date +%s)
+            if durchgang; then FEHLER=0; else FEHLER=$((FEHLER + 1)); echo "::warning::Durchgang fehlgeschlagen (${FEHLER} in Folge)"; fi
+            # Ein einzelner Fehler (Portal kurz weg) bricht nichts ab, drei in Folge schon.
+            [ "$FEHLER" -ge 3 ] && exit 1
+            [ "$SCHLEIFE" = "true" ] || exit $((FEHLER > 0))
+            NAECHSTE=$((RUNDE + 600))
+            [ "$NAECHSTE" -ge "$ENDE" ] && break
+            sleep $((NAECHSTE - $(date +%s) > 0 ? NAECHSTE - $(date +%s) : 0))
+          done
+
+      - name: Nachfolger starten
+        if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'push' && !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run wohnungen.yml --ref main
