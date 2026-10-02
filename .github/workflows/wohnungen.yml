@@ -67,7 +67,9 @@ jobs:
           git init -q -b "${ZWEIG}"
           git config user.name  "wohnungen-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add wohnungen.json
+          # Der Zweig trägt nur Daten. Ohne das baut Vercel jeden Commit als Website und scheitert.
+          echo '{"git":{"deploymentEnabled":false}}' > vercel.json
+          git add wohnungen.json vercel.json
           ZAHLEN=$(node -e '
             const w = require("./wohnungen.json")
             console.log(`${w.inserate.length} Inserate (` + w.quellen.map(q => `${q.name} ${q.ok ? q.anzahl : "ausgefallen"}`).join(", ") + ")")
