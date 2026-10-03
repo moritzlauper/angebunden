@@ -85,7 +85,10 @@ erscheint im Velonavi kein Kontobereich.
    `https://<projekt>.supabase.co/auth/v1/callback` lautet. Der Knopf erscheint im Velonavi
    von selbst, sobald der Anbieter eingeschaltet ist. Dasselbe gilt für Apple, GitHub und
    Microsoft.
-6. Für die Anmeldung per E-Mail einen eigenen SMTP-Server eintragen. Der eingebaute Versand
+6. Die Anmeldemail gilt für Velonavi und Wohnungssuche. Unter Authentication → Emails die Vorlage
+   «Magic Link» (und «Confirm signup») durch `supabase/vorlagen/anmeldelink.html` ersetzen, Betreff
+   «Dein Anmeldelink für angebunden», und beim SMTP-Server als Absendernamen «angebunden» eintragen.
+7. Für die Anmeldung per E-Mail einen eigenen SMTP-Server eintragen. Der eingebaute Versand
    von Supabase schickt nur wenige Mails pro Stunde und nur an Adressen des Projektteams.
 
 Aufgezeichnet wird mit dem Standortdienst des Browsers. Er liefert nur, solange die Seite im

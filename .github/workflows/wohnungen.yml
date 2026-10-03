@@ -15,9 +15,10 @@ name: Wohnungen
 # stündliche Zeitplan wieder auf. Dank `concurrency` läuft nie mehr als eine
 # Schleife; ein weiterer Start wartet und ersetzt höchstens einen wartenden.
 #
-# Ein Push, der Sammler oder Workflow ändert, macht auf jedem Branch genau
-# einen Durchgang: So zeigt sich gleich, ob die Änderung mit den echten
-# Portalen zurechtkommt.
+# Ein Push auf einen anderen Branch als main, der Sammler oder Workflow
+# ändert, sammelt genau einmal zur Probe: So zeigt sich gleich, ob die
+# Änderung mit den echten Portalen zurechtkommt. Er veröffentlicht nichts und
+# verschickt keine Mails, und er wartet nicht auf die Schleife von main.
 #
 # Der Zweig «wohnungen» hat immer genau einen Commit: Alte Stände braucht
 # niemand, und das Repository soll nicht mit jedem Lauf um eine Megabyte-Datei
@@ -36,7 +37,8 @@ on:
       - '.github/workflows/wohnungen.yml'
 
 concurrency:
-  group: wohnungen
+  # Die Schleife auf main und Probeläufe auf Branches stehen sich nicht im Weg.
+  group: wohnungen-${{ github.ref == 'refs/heads/main' && 'main' || github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -60,6 +62,7 @@ jobs:
       - name: Sammeln und Suchabos verschicken
         env:
           SCHLEIFE: ${{ github.ref == 'refs/heads/main' && github.event_name != 'push' }}
+          PROBE: ${{ github.ref != 'refs/heads/main' }}
           REPO_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
           SUPABASE_URL: ${{ vars.SUPABASE_URL || secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -77,6 +80,8 @@ jobs:
 
           durchgang() {
             node pipeline/20-wohnungen.ts ausgabe/wohnungen.json || return 1
+            # Probelauf auf einem Branch: nur sammeln.
+            [ "$PROBE" = "true" ] && return 0
 
             rm -rf zweig && mkdir zweig && cp ausgabe/wohnungen.json zweig/
             (
