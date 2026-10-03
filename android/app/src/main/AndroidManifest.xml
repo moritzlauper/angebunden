@@ -43,6 +43,11 @@
             android:name=".AktivitaetReceiver"
             android:exported="false" />
 
+        <!-- Verlässt man den Ort, an dem man zuletzt war, startet die Aufzeichnung zur Probe, siehe Ortswechsel.java -->
+        <receiver
+            android:name=".Ortswechsel"
+            android:exported="false" />
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">

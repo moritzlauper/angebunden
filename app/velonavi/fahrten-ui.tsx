@@ -605,9 +605,30 @@ function Erkennung({ f, gross }: { f: Fahrtenstand; gross?: boolean }) {
     const uhr = window.setInterval(() => setTakt((n) => n + 1), 30_000)
     return () => window.clearInterval(uhr)
   }, [])
+  // Im Menü das Protokoll der automatischen Aufzeichnung: Daran sieht man, wo eine Fahrt verloren ging.
+  const [eintraege, setEintraege] = useState<{ t: number; text: string }[]>([])
+  const protokollRef = useRef(f.protokoll)
+  protokollRef.current = f.protokoll
+  useEffect(() => {
+    if (!gross) return
+    let weg = false
+    const holen = () => protokollRef.current().then((e) => !weg && setEintraege(e.slice(0, 8)), () => {})
+    holen()
+    const uhr = window.setInterval(holen, 15_000)
+    return () => {
+      weg = true
+      window.clearInterval(uhr)
+    }
+  }, [gross])
   const e = f.erkennung
   if (!f.nativ || !f.autoAn || !e) return null
   const bereit = e.bereitSeit > 0
+  // Ohne Standort «Immer» bekommt die Aufzeichnung im Hintergrund keinen Standort, ohne Bewegungserkennung startet sie nie.
+  const fehlt = [
+    e.fehlt.includes('hintergrund') && 'Standort «Immer zulassen»',
+    e.fehlt.includes('bewegung') && 'Körperliche Aktivität',
+    e.fehlt.includes('standort') && 'Standort',
+  ].filter(Boolean)
   const letzte = e.letzteZeit > 0 && e.letzteArt ? `${ART_NAMEN[e.letzteArt] ?? e.letzteArt} ${e.letzteBeginn ? 'begonnen' : 'beendet'}, ${vorText(e.letzteZeit)}` : null
   return (
     <div className={gross ? 'flex flex-col gap-1 text-[12px]' : 'flex items-start gap-2 text-[11px] leading-snug'} style={{ color: ui.muted }}>
@@ -625,6 +646,26 @@ function Erkennung({ f, gross }: { f: Fahrtenstand; gross?: boolean }) {
             <span style={{ color: ui.fg }}>Erkennung nicht aktiv</span>
             {e.bereitFehler ? `: ${e.bereitFehler}` : '. Schalter aus- und wieder einschalten.'}
           </>
+        )}
+        {fehlt.length > 0 && (
+          <span className="mt-1 block" style={{ color: '#d03b3b' }}>
+            Freigabe fehlt: {fehlt.join(', ')}. Ohne sie zeichnet die App nicht von selbst auf.{' '}
+            <button onClick={() => f.setAuto(true)} className="underline underline-offset-2">
+              Freigeben
+            </button>
+          </span>
+        )}
+        {gross && eintraege.length > 0 && (
+          <span className="mt-1.5 block">
+            <span className="block" style={{ color: ui.fg }}>
+              Zuletzt
+            </span>
+            {eintraege.map((x) => (
+              <span key={`${x.t}-${x.text}`} className="block tabular-nums">
+                {new Date(x.t).toLocaleString('de-CH', { weekday: 'short', hour: '2-digit', minute: '2-digit' })} · {x.text}
+              </span>
+            ))}
+          </span>
         )}
       </span>
     </div>

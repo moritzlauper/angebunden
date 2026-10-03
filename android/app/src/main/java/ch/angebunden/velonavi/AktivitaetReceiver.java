@@ -94,15 +94,20 @@ public class AktivitaetReceiver extends BroadcastReceiver {
             if (hinweis == null) continue;
             boolean beginn = e.getTransitionType() == ActivityTransition.ACTIVITY_TRANSITION_ENTER;
             Aufnahme.setLetzteMeldung(c, hinweis, beginn);
+            Aufnahme.notiere(c, "Android meldet: " + hinweis + (beginn ? " beginnt" : " endet"));
             // Jede Meldung startet die Aufzeichnung, nicht nur «Velo»: Android hält eine Velofahrt oft für ein
             // Fahrzeug oder für Gehen, besonders mit dem Handy in der Tasche. Ob es eine Velofahrt war,
             // entscheidet die Seite am Tempo und speichert nur Velofahrten.
             if (beginn) {
                 // Läuft schon eine Aufzeichnung, bleibt sie eine Fahrt (siehe TrackerService).
                 if (!Aufnahme.laeuft || !hinweis.equals(Aufnahme.hinweis)) {
-                    ContextCompat.startForegroundService(c, new Intent(c, TrackerService.class)
-                            .setAction(TrackerService.AKTION_AUTO)
-                            .putExtra(TrackerService.EXTRA_HINWEIS, hinweis));
+                    try {
+                        ContextCompat.startForegroundService(c, new Intent(c, TrackerService.class)
+                                .setAction(TrackerService.AKTION_AUTO)
+                                .putExtra(TrackerService.EXTRA_HINWEIS, hinweis));
+                    } catch (RuntimeException ex) {
+                        Aufnahme.notiere(c, "Aufzeichnung liess sich nicht starten: " + Aufnahme.kurz(ex));
+                    }
                 }
             } else if (Aufnahme.laeuft && hinweis.equals(Aufnahme.hinweis)) {
                 ContextCompat.startForegroundService(c, new Intent(c, TrackerService.class).setAction(TrackerService.AKTION_ENDE));

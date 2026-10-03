@@ -95,12 +95,31 @@ public class TrackerService extends Service {
     private boolean aktivitaetEnde;
     private long aktivitaetEndeZeit;
     private boolean aktiv = false;
+    /** Ob diese Aufzeichnung schon einmal Velotempo erreicht hat. Sonst endet eine automatische nach `PROBE_MS`. */
+    private boolean schnellGesehen;
+    /** Die letzte automatische Aufzeichnung fand nur Gehen. */
+    private boolean probeGescheitert;
+
+    /** Ab diesem Tempo ist es kein Gehen mehr: 11 km/h. */
+    private static final double VELO_V = 3.0;
+    /**
+     * So lange darf eine automatische Aufzeichnung dauern, ohne je Velotempo zu erreichen. Sie startet
+     * auch, wenn man nur einen Ort verlässt (`Ortswechsel`) oder Android Gehen meldet; zu Fuss soll der
+     * Standort nicht eine Stunde lang laufen.
+     */
+    private static final long PROBE_MS = 4 * 60_000L;
 
     private final Runnable pruefer = new Runnable() {
         @Override
         public void run() {
             if (!aktiv) return;
             long jetzt = System.currentTimeMillis();
+            if ("auto".equals(quelle) && !schnellGesehen && jetzt - beginn > PROBE_MS) {
+                Aufnahme.notiere(TrackerService.this, "Probe beendet: in vier Minuten kein Velotempo");
+                probeGescheitert = true;
+                beenden();
+                return;
+            }
             long grenze = aktivitaetEnde
                     ? LEERLAUF_NACH_AKTIVITAET_MS
                     : "auto".equals(quelle) ? LEERLAUF_AUTO_MS : LEERLAUF_MANUELL_MS;
@@ -201,6 +220,10 @@ public class TrackerService extends Service {
             punkte.clear();
             distanz = 0;
             zaehlLon = zaehlLat = ruheLon = ruheLat = Double.NaN;
+            schnellGesehen = false;
+            Aufnahme.notiere(this, "auto".equals(quelle)
+                    ? "Aufzeichnung gestartet, von selbst" + (hinweis.isEmpty() ? "" : " (Android: " + artName(hinweis) + ")")
+                    : "Aufzeichnung gestartet, per Knopf");
         }
         aktivitaetEnde = false;
         letzteBewegung = System.currentTimeMillis();
@@ -288,6 +311,14 @@ public class TrackerService extends Service {
         double lat = l.getLatitude();
         double t = (l.getTime() - beginn) / 1000.0;
         if (!punkte.isEmpty() && t - punkte.get(punkte.size() - 1)[2] < 0.9) return;
+        if (!schnellGesehen) {
+            if (l.hasSpeed() && l.getSpeed() >= VELO_V && (!l.hasAccuracy() || l.getAccuracy() <= 25)) schnellGesehen = true;
+            else if (!punkte.isEmpty()) {
+                double[] vor = punkte.get(punkte.size() - 1);
+                double dt = t - vor[2];
+                if (dt > 0 && dt <= 10 && (!l.hasAccuracy() || l.getAccuracy() <= 20) && meter(vor[0], vor[1], lon, lat) / dt >= VELO_V) schnellGesehen = true;
+            }
+        }
         punkte.add(new double[] {lon, lat, t, l.hasAccuracy() ? l.getAccuracy() : 0});
         if (Double.isNaN(zaehlLon)) {
             zaehlLon = lon;
@@ -399,6 +430,8 @@ public class TrackerService extends Service {
             }
             ruheLon = letzter.getDouble(0);
             ruheLat = letzter.getDouble(1);
+            // Was weiterläuft, war schon eine Fahrt: keine Probe mehr.
+            schnellGesehen = true;
             return true;
         } catch (Exception e) {
             return false;
@@ -419,14 +452,22 @@ public class TrackerService extends Service {
                     && dauerMs >= AUTO_MIN_DAUER_MS
                     && distanz / Math.max(dauerMs / 1000.0, 1) <= maxMittel(hinweis);
         }
+        String grund = punkte.size() < 10 ? "kaum Standortpunkte (" + punkte.size() + ")"
+                : distanz < ("auto".equals(quelle) ? AUTO_MIN_DISTANZ_M : 150) ? "zu kurz (" + Math.round(distanz) + " m)"
+                : "auto".equals(quelle) && dauerMs < AUTO_MIN_DAUER_MS ? "zu kurz (" + dauerMs / 1000 + " s)"
+                : "zu schnell für ein Velo";
         if (brauchbar) {
             try {
                 schreiben(new File(Aufnahme.fahrtenOrdner(this), id + ".json"), alsJson().toString());
+                Aufnahme.notiere(this, String.format(java.util.Locale.US, "Fahrt abgelegt: %.1f km in %d Min.", distanz / 1000, Math.max(1, dauerMs / 60000)));
                 // Nur Velofahrten melden die Benachrichtigung, sonst käme sie bei jedem Gang zum Bus.
                 if ("auto".equals(quelle) && "velo".equals(hinweis)) gespeichertMelden(dauerMs);
             } catch (Exception e) {
                 brauchbar = false;
+                Aufnahme.notiere(this, "Fahrt liess sich nicht ablegen: " + e.getMessage());
             }
+        } else {
+            Aufnahme.notiere(this, "Aufzeichnung verworfen: " + grund);
         }
         Aufnahme.laufendDatei(this).delete();
         Aufnahme.laeuft = false;
@@ -439,9 +480,29 @@ public class TrackerService extends Service {
 
     /** Beendet die Aufzeichnung ganz: abschliessen, Benachrichtigung weg, Dienst stoppen. */
     private void beenden() {
+        Location wo = null;
+        if (!punkte.isEmpty()) {
+            double[] p = punkte.get(punkte.size() - 1);
+            wo = new Location("velonavi");
+            wo.setLongitude(p[0]);
+            wo.setLatitude(p[1]);
+        }
         abschliessen();
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
+        // Der Kreis für den nächsten Ortswechsel liegt um den Ort, an dem die Aufzeichnung endete.
+        Ortswechsel.scharf(this, wo, probeGescheitert ? Ortswechsel.RADIUS_ZU_FUSS_M : Ortswechsel.RADIUS_M);
+        probeGescheitert = false;
+    }
+
+    private static String artName(String hinweis) {
+        switch (hinweis) {
+            case "velo": return "Velo";
+            case "gehen": return "Gehen";
+            case "laufen": return "Joggen";
+            case "fahrzeug": return "Fahrzeug";
+            default: return hinweis;
+        }
     }
 
     private void gespeichertMelden(long dauerMs) {

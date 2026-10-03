@@ -8,6 +8,8 @@ import android.content.Intent;
 public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent intent) {
-        if (Aufnahme.auto(c)) AktivitaetReceiver.anmelden(c);
+        if (!Aufnahme.auto(c)) return;
+        AktivitaetReceiver.anmelden(c);
+        Ortswechsel.scharf(c, null);
     }
 }

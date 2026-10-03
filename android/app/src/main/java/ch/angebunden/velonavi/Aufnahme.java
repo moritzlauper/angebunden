@@ -109,6 +109,38 @@ final class Aufnahme {
         return b.length() > 400 ? b.substring(0, 400) : b.toString();
     }
 
+    private static final int PROTOKOLL_MAX = 40;
+
+    /**
+     * Hält fest, was die automatische Aufzeichnung tut: was Android meldet, wann sie startet und warum
+     * eine Fahrt gespeichert oder verworfen wird. Die Seite zeigt die letzten Einträge im Menü, damit
+     * sich sehen lässt, wo eine Fahrt verloren ging.
+     */
+    static synchronized void notiere(Context c, String text) {
+        try {
+            SharedPreferences p = prefs(c);
+            org.json.JSONArray alt;
+            try {
+                alt = new org.json.JSONArray(p.getString("protokoll", "[]"));
+            } catch (Exception e) {
+                alt = new org.json.JSONArray();
+            }
+            org.json.JSONArray neu = new org.json.JSONArray();
+            for (int i = Math.max(0, alt.length() - (PROTOKOLL_MAX - 1)); i < alt.length(); i++) neu.put(alt.opt(i));
+            org.json.JSONObject o = new org.json.JSONObject();
+            o.put("t", System.currentTimeMillis());
+            o.put("text", text);
+            neu.put(o);
+            p.edit().putString("protokoll", neu.toString()).apply();
+        } catch (Exception ignoriert) {
+            /* Das Protokoll ist eine Hilfe, kein Grund für einen Fehler. */
+        }
+    }
+
+    static String protokoll(Context c) {
+        return prefs(c).getString("protokoll", "[]");
+    }
+
     static File fahrtenOrdner(Context c) {
         File d = new File(c.getFilesDir(), "fahrten");
         if (!d.exists()) d.mkdirs();

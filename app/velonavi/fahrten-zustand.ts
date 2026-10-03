@@ -14,7 +14,7 @@ import { alleEntfernen, alleFahrten, entfernen, speichern, type Gespeichert } fr
 import { tracker, type NativeFahrt, type NativStatus, type Tracker } from './native.ts'
 import { ausKonto, fuerKonto, type Zeile } from './sicherung.ts'
 import { beitrag, type Gemeinschaft } from './gemeinschaft.ts'
-import { erkenne, type Hinweis, type Modus } from './modus.ts'
+import { erkenne, modusName, type Hinweis, type Modus } from './modus.ts'
 import { ladeGemeinschaft, sendeBeitrag } from './gemeinschaft-netz'
 import { lies, schreib } from './teile'
 
@@ -307,7 +307,10 @@ export function useFahrten({
       // längeren Pause unterwegs. Jedes Stück wird eine eigene Fahrt, wenn es lang genug ist.
       const teile = abschnitte(verdichten(offen.spur)).filter((t) => t.length >= 10 && spurDistanz(t) >= 150)
       schreib(SCHLUESSEL.laufend, null)
+      // Ins Protokoll der App, damit sich im Menü sehen lässt, warum eine Fahrt fehlt.
+      const notieren = (text: string) => tracker()?.notieren?.({ text }).catch(() => {})
       if (!teile.length) {
+        notieren('Fahrt nicht gespeichert: zu kurz (unter 150 Metern)')
         if (!still) setMeldung('Die Aufzeichnung war zu kurz (unter 150 Metern) und wurde nicht gespeichert.')
         return null
       }
@@ -326,7 +329,10 @@ export function useFahrten({
         // Wer per Knopf aufzeichnet, fährt Velo. Was die Erkennung aufgezeichnet hat, prüft die Seite aus
         // Tempo und Halten: Stellt es sich als Tram, Auto oder Fussweg heraus, wird es nicht gespeichert.
         const modus: Modus = offen.quelle === 'aufzeichnung' || (!offen.quelle && !offen.hinweis) ? 'velo' : erkenne(spur, haltestellenRef.current, offen.hinweis)
-        if (modus !== 'velo') continue
+        if (modus !== 'velo') {
+          notieren(`Fahrt nicht gespeichert: erkannt als ${modusName(modus)}, ${(spurDistanz(spur) / 1000).toFixed(1)} km in ${Math.round((letzter[2] - erster[2]) / 60)} Min.`)
+          continue
+        }
         neue.push({
           // Das erste Stück trägt die Kennung der Aufzeichnung, die weiteren eine davon abgeleitete:
           // Holt die Seite dieselbe Aufzeichnung zweimal ab, ersetzt sie die Stücke, statt sie zu verdoppeln.
@@ -343,6 +349,7 @@ export function useFahrten({
         })
       }
       if (!neue.length) return null
+      notieren(`Gespeichert: ${neue.length === 1 ? '1 Velofahrt' : `${neue.length} Velofahrten`}`)
       try {
         for (const f of neue) await speichern(f)
       } catch {
@@ -1004,6 +1011,13 @@ export function useFahrten({
     },
     /** Die Android-App, sonst null. Nur sie zeichnet im Hintergrund und von selbst auf. */
     nativ, autoAn, setAuto, erkennung,
+    /** Die letzten Einträge im Protokoll der automatischen Aufzeichnung, die neuesten zuerst. Leer ohne App oder in älteren Fassungen. */
+    protokoll: async () => {
+      const t = tracker()
+      if (!t?.protokoll) return [] as { t: number; text: string }[]
+      const r = await t.protokoll().catch(() => ({ eintraege: [] as { t: number; text: string }[] }))
+      return [...r.eintraege].reverse()
+    },
     ich, ortZeigen,
     /** Den Standort als Punkt zeigen; im Browser wird dabei zum ersten Mal nach der Freigabe gefragt. */
     setOrtZeigen: (v: boolean) => {

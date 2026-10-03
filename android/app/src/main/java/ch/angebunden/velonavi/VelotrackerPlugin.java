@@ -219,6 +219,26 @@ public class VelotrackerPlugin extends Plugin {
         call.resolve(o);
     }
 
+    /** Die letzten Einträge im Protokoll der automatischen Aufzeichnung (`Aufnahme.notiere`). */
+    @PluginMethod
+    public void protokoll(PluginCall call) {
+        JSObject o = new JSObject();
+        try {
+            o.put("eintraege", new JSArray(Aufnahme.protokoll(getContext())));
+        } catch (Exception e) {
+            o.put("eintraege", new JSArray());
+        }
+        call.resolve(o);
+    }
+
+    /** Ein Eintrag der Seite ins selbe Protokoll, etwa warum sie eine Fahrt nicht gespeichert hat. */
+    @PluginMethod
+    public void notieren(PluginCall call) {
+        String text = call.getString("text");
+        if (text != null && !text.isEmpty()) Aufnahme.notiere(getContext(), text.length() > 300 ? text.substring(0, 300) : text);
+        call.resolve();
+    }
+
     /** Was zuletzt schiefging (`Aufnahme.setPanne`), einmal: Danach ist es gelöscht. */
     @PluginMethod
     public void panne(PluginCall call) {
@@ -249,9 +269,11 @@ public class VelotrackerPlugin extends Plugin {
                 return;
             }
             Aufnahme.setAuto(c, true);
+            Ortswechsel.scharf(c, null);
         } else {
             Aufnahme.setAuto(c, false);
             AktivitaetReceiver.abmelden(c);
+            Ortswechsel.aus(c);
         }
         call.resolve(stand());
     }

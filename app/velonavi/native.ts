@@ -62,6 +62,10 @@ export type Tracker = {
   quittieren(o: { ids: string[] }): Promise<void>
   /** Vibriert nach einem Muster wie `navigator.vibrate`, als Alarm. Älteren Fassungen der App fehlt die Funktion. */
   vibrieren?(o: { muster: number[] }): Promise<{ ok: boolean; fehler?: string }>
+  /** Was die automatische Aufzeichnung zuletzt tat, die neuesten Einträge zuletzt. Älteren Fassungen der App fehlt die Funktion. */
+  protokoll?(): Promise<{ eintraege: { t: number; text: string }[] }>
+  /** Ein Eintrag der Seite ins selbe Protokoll. */
+  notieren?(o: { text: string }): Promise<void>
   /** Was zuletzt schiefging (Absturz, abgelehnter Dienst), einmal, danach leer. Älteren Fassungen der App fehlt die Funktion. */
   panne?(): Promise<{ text: string; zeit: number }>
   /** Öffnet das Teilen-Menü von Android mit einer GPX-Datei. Älteren Fassungen der App fehlt die Funktion. */
