@@ -43,7 +43,25 @@ type Abo = {
   bestaetigt: boolean
   geprueft_bis: string | null
   abmelde_token: string
+  /** Prüfsummen der Inserate, die dieses Abo schon kennt (fehlt, solange die Migration nicht eingespielt ist). */
+  gesendet?: string[] | null
 }
+
+/** So viele Prüfsummen merkt sich ein Abo, die neuesten zuerst. Reicht für jede Suche in Zürich. */
+const GEDAECHTNIS = 4000
+
+/** Kurze, stabile Prüfsumme eines Links (FNV-1a, 32 Bit), damit die Liste im Abo klein bleibt. */
+function pruefsumme(text: string): string {
+  let h = 0x811c9dc5
+  for (let k = 0; k < text.length; k++) {
+    h ^= text.charCodeAt(k)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h.toString(36)
+}
+
+/** Alle Prüfsummen eines Inserats: jeder Link zählt, auch wenn Doppelte anders zusammengelegt werden. */
+const summen = (i: Inserat) => i.links.map((l) => pruefsumme(l.url))
 
 async function db(pfad: string, init: RequestInit = {}) {
   const res = await fetch(`${SUPABASE}/rest/v1/${pfad}`, {
@@ -142,21 +160,48 @@ async function main() {
       // Was nur auf der Seite Sinn ergibt, gilt im Abo nicht.
       const f: Filter = { ...FILTER_LEER, ...abo.filter, nurGemerkt: false, nurAusschnitt: false, nurNeu: false }
       const alle = daten.inserate.filter((i) => passt(i, f, new Set(), jetzt, null))
+      const kennt = new Set(abo.gesendet ?? [])
+      // Neu ist, was das Abo noch nie gesehen hat und seit dem letzten Lauf aufgetaucht ist.
       const neu = abo.bestaetigt
-        ? alle.filter((i) => !abo.geprueft_bis || i.erstGesehen > abo.geprueft_bis)
+        ? alle.filter(
+            (i) => !summen(i).some((h) => kennt.has(h)) && (!abo.geprueft_bis || i.erstGesehen > abo.geprueft_bis)
+          )
         : alle
       neu.sort((a, b) => b.erstGesehen.localeCompare(a.erstGesehen))
 
+      // Alles, was jetzt passt, gilt ab jetzt als bekannt, die neuesten zuerst.
+      const gesendet = [...new Set([...neu.flatMap(summen), ...alle.flatMap(summen), ...(abo.gesendet ?? [])])].slice(0, GEDAECHTNIS)
+
+      // Erst den Stand speichern, dann senden: Bricht etwas dazwischen ab, fehlt höchstens eine
+      // Mail, statt dass dieselbe Wohnung beim nächsten Lauf noch einmal hinausgeht.
+      const speichern = (stand: Record<string, unknown>) =>
+        db(`wohnungen_suchabos?id=eq.${abo.id}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify(stand),
+        })
+      const neuerStand = { bestaetigt: true, geprueft_bis: daten.erstellt }
+      try {
+        await speichern({ ...neuerStand, gesendet })
+      } catch (e) {
+        // Ohne die Spalte `gesendet` (Migration noch nicht eingespielt) wenigstens den Zeitpunkt.
+        if (!String(e).includes('gesendet')) throw e
+        await speichern(neuerStand)
+      }
+
       if (!abo.bestaetigt || neu.length) {
         const { betreff, inhalt } = mail(abo, neu, !abo.bestaetigt)
-        await senden(abo.email, betreff, inhalt, `${SITE}/wohnungen?abmelden=${abo.abmelde_token}`)
-        mails++
+        try {
+          await senden(abo.email, betreff, inhalt, `${SITE}/wohnungen?abmelden=${abo.abmelde_token}`)
+          mails++
+        } catch (e) {
+          // Versand gescheitert: den alten Stand zurück, damit es der nächste Lauf noch einmal versucht.
+          await speichern({ bestaetigt: abo.bestaetigt, geprueft_bis: abo.geprueft_bis, gesendet: abo.gesendet ?? [] }).catch(() =>
+            speichern({ bestaetigt: abo.bestaetigt, geprueft_bis: abo.geprueft_bis })
+          )
+          throw e
+        }
       }
-      await db(`wohnungen_suchabos?id=eq.${abo.id}`, {
-        method: 'PATCH',
-        headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ bestaetigt: true, geprueft_bis: daten.erstellt }),
-      })
     } catch (e) {
       // Ein kaputtes Abo hält die anderen nicht auf.
       console.warn(`Suchabo ${abo.id}: ${e instanceof Error ? e.message : e}`)
