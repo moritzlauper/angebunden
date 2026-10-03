@@ -1,0 +1,17 @@
+<!-- Vorlage für Supabase → Authentication → Emails → «Magic Link» (und gleich für «Confirm signup»).
+     Betreff: Dein Anmeldelink für angebunden
+     Gilt für Velonavi und Wohnungssuche gleich, deshalb ohne Namen eines einzelnen Teils. -->
+<div style="max-width:520px;margin:0 auto;padding:28px 20px;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#18181b">
+  <div style="font-size:16px;font-weight:600">angebunden<span style="color:#cc3934">.</span></div>
+  <h1 style="font-size:20px;margin:20px 0 8px">Dein Anmeldelink</h1>
+  <p style="font-size:14px;line-height:1.5;color:#3f3f46;margin:0 0 20px">
+    Mit diesem Link meldest du dich bei angebunden an, für den Velonavi und die Wohnungssuche.
+    Er gilt eine Stunde und nur einmal.
+  </p>
+  <p style="margin:0 0 24px">
+    <a href="{{ .ConfirmationURL }}" style="background:#18181b;color:#fff;padding:11px 18px;border-radius:999px;text-decoration:none;font-size:14px">Anmelden</a>
+  </p>
+  <p style="font-size:12px;color:#a1a1aa;line-height:1.5">
+    Du hast keinen Link angefordert? Dann kannst du diese Mail einfach löschen.
+  </p>
+</div>

@@ -97,6 +97,11 @@ function zeile(i: Inserat): string {
       <div style="font-size:16px;font-weight:600">${i.miete != null ? `CHF ${nf(i.miete)}` : 'Preis auf Anfrage'}</div>
       <a href="${html(i.links[0].url)}" style="color:#18181b;font-size:14px;text-decoration:none">${html(i.titel)}</a>
       <div style="font-size:12px;color:#71717a;margin-top:2px">${html(eck.join(' · '))}</div>
+      <div style="font-size:12px;margin-top:6px">
+        <a href="${html(i.links[0].url)}" style="color:#18181b">Inserat öffnen</a>
+        <span style="color:#a1a1aa"> · </span>
+        <a href="${SITE}/wohnungen?inserat=${encodeURIComponent(i.id)}&amp;u=${encodeURIComponent(i.links[0].url)}" style="color:#18181b">Auf der Karte</a>
+      </div>
     </td>
   </tr>`
 }
