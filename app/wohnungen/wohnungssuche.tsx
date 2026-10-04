@@ -14,7 +14,7 @@ import { Anmeldung, useAbmeldelink, useKonto, useMerklisteImKonto } from './kont
 import { SuchaboDialog } from './suchabo'
 import type { Art, Inserat, QuellenId, Wohnungen } from './typen'
 import type { Kreis } from './kreise'
-import { FILTER_LEER, SORTEN, TAG, passt, umriss, type Filter, type Gebiet, type Sorte } from './filter'
+import { FILTER_LEER, SORTEN, TAG, nachgefuehrt, passt, umriss, type Filter, type Gebiet, type Sorte } from './filter'
 
 /**
  * Woher die Inserate kommen. Der Workflow `wohnungen.yml` legt die Datei
@@ -182,7 +182,7 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
     setWeg(new Set(m.weg))
     schreib(SPEICHER.weg, m.weg)
     if (m.filter) {
-      const f = { ...FILTER_LEER, ...(m.filter as Partial<Filter>), nurAusschnitt: false }
+      const f = { ...FILTER_LEER, ...nachgefuehrt(m.filter as Partial<Filter>), nurAusschnitt: false }
       setFilter(f)
       schreib(SPEICHER.filter, f)
     }
@@ -202,7 +202,7 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
   // Gespeichertes aus dem Browser. Der letzte Besuch zählt erst ab einer Stunde
   // Abstand, sonst wäre nach jedem Neuladen nichts mehr «neu».
   useEffect(() => {
-    setFilter({ ...FILTER_LEER, ...lies<Partial<Filter>>(SPEICHER.filter, {}), nurAusschnitt: false })
+    setFilter({ ...FILTER_LEER, ...nachgefuehrt(lies<Partial<Filter>>(SPEICHER.filter, {})), nurAusschnitt: false })
     setGemerkt(new Set(lies<string[]>(SPEICHER.gemerkt, [])))
     setWeg(new Set(lies<string[]>(SPEICHER.weg, [])))
     const besuch = lies<{ zuletzt: number; davor: number | null } | null>(SPEICHER.besuch, null)
@@ -1047,7 +1047,7 @@ function aktiveFilter(f: Filter) {
     f.zimmerMin != null || f.zimmerMax != null,
     f.arten.length !== FILTER_LEER.arten.length,
     f.dauer !== 'alle',
-    f.quellenAus.length > 0,
+    [...f.quellenAus].sort().join() !== [...FILTER_LEER.quellenAus].sort().join(),
     f.oevMax != null,
     f.nurNeu,
     f.nurGemerkt,
