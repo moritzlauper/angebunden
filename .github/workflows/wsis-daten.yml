@@ -1,7 +1,8 @@
 name: whatshouldistudy data
 
 # Refreshes the study programme database of whatshouldistudy/ every Monday:
-# US (College Scorecard), UK (Discover Uni), France (Parcoursup), research
+# US (College Scorecard), UK (Discover Uni), France (Parcoursup), Switzerland
+# (BFS enrolment by institution and subject), research
 # profiles of universities worldwide (OpenAlex) and a world university
 # directory. The result goes to the branch «whatshouldistudy-data», always a
 # single commit, which the site reads via raw.githubusercontent.com.
@@ -19,6 +20,11 @@ on:
   schedule:
     - cron: '23 2 * * 1' # Mondays 02:23 UTC
   workflow_dispatch:
+    inputs:
+      only:
+        description: 'Run only these sources (comma list: us,uk,fr,ch,research,directory); empty = all'
+        required: false
+        default: ''
   push:
     paths:
       - 'whatshouldistudy/scrapers/**'
@@ -70,22 +76,31 @@ jobs:
           fi
 
       - name: United States (College Scorecard)
+        if: ${{ !inputs.only || contains(inputs.only, 'us') }}
         continue-on-error: true
         env:
           SCORECARD_API_KEY: ${{ secrets.SCORECARD_API_KEY }}
         run: node scrapers/us-scorecard.ts
 
       - name: United Kingdom (Discover Uni)
+        if: ${{ !inputs.only || contains(inputs.only, 'uk') }}
         continue-on-error: true
         env:
           UK_DISCOVERUNI_URL: ${{ vars.UK_DISCOVERUNI_URL }}
         run: node scrapers/uk-discoveruni.ts
 
       - name: France (Parcoursup)
+        if: ${{ !inputs.only || contains(inputs.only, 'fr') }}
         continue-on-error: true
         run: node scrapers/fr-parcoursup.ts
 
+      - name: Switzerland (BFS, opendata.swiss)
+        if: ${{ !inputs.only || contains(inputs.only, 'ch') }}
+        continue-on-error: true
+        run: node scrapers/ch-bfs.ts
+
       - name: Research profiles worldwide (OpenAlex)
+        if: ${{ !inputs.only || contains(inputs.only, 'research') }}
         continue-on-error: true
         env:
           OPENALEX_API_KEY: ${{ secrets.OPENALEX_API_KEY }}
@@ -93,6 +108,7 @@ jobs:
         run: node scrapers/global-openalex.ts
 
       - name: University directory worldwide
+        if: ${{ !inputs.only || contains(inputs.only, 'directory') }}
         continue-on-error: true
         run: node scrapers/global-directory.ts
 
