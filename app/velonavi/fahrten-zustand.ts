@@ -67,6 +67,15 @@ const PAKET = 10
 const ABGLEICH_PAUSE = 60_000
 /** So oft gleicht die offene Seite mit dem Konto ab. */
 const ABGLEICH_TAKT = 5 * 60_000
+/**
+ * So viel braucht ein Stück einer automatischen Aufzeichnung, damit es als Velofahrt zählt. Kürzer lässt
+ * sich ein Velo nicht sicher von einem Tram zwischen zwei Haltestellen unterscheiden: Ein Stück von
+ * 310 m und anderthalb Minuten aus einer Tramfahrt in Oerlikon ging als Velofahrt durch.
+ */
+const AUTO_MIN_S = 180
+const AUTO_MIN_M = 800
+/** Ist die ganze Aufzeichnung eine Tram- oder Autofahrt, zählt ein Stück daraus erst ab dieser Dauer für sich. */
+const TEIL_EIGEN_S = 600
 const KEIN_NETZ = 'Gerade keine Verbindung zum Konto. Die Fahrten gehen hinein, sobald das Netz zurück ist.'
 
 const MY = 111133
@@ -160,6 +169,8 @@ export function useFahrten({
   nutzerIdRef.current = nutzerId
   /** Nur Velofahrten werden dem Netz zugeordnet, verglichen und fürs Lernen genutzt. */
   const istVelo = (f: { modus?: Modus }) => (f.modus ?? 'velo') === 'velo'
+  /** Ältere automatische Fahrten, die nach heutigem Mass zu kurz für eine sichere Erkennung sind, erscheinen nicht mehr. */
+  const sicher = (f: Gespeichert) => f.quelle !== 'auto' || (f.dauer >= AUTO_MIN_S && f.distanz >= AUTO_MIN_M)
   /**
    * Ältere Fahrten ohne Fussweg und Zittern an den Rändern (`kern`), einmal beim Laden und gleich auf
    * dem Gerät gespeichert. Sie gelten danach als nicht gesichert, der nächste Abgleich lädt sie neu hoch.
@@ -193,7 +204,7 @@ export function useFahrten({
     alleFahrten()
       // Der Velonavi ist nur fürs Velo. Wege zu Fuss, im Tram oder Auto aus früheren Fassungen bleiben
       // auf dem Gerät liegen, erscheinen aber nicht mehr.
-      .then(async (f) => setFahrten(await Promise.all(f.filter(istVelo).slice(0, FAHRTEN_MAX).map(geputzt))))
+      .then(async (f) => setFahrten((await Promise.all(f.filter(istVelo).slice(0, FAHRTEN_MAX).map(geputzt))).filter(sicher)))
       .catch(() => setMeldung('Der Speicher dieses Browsers ist nicht verfügbar. Fahrten gehen beim Schliessen der Seite verloren.'))
       .finally(() => setGeladen(true))
     if (!KONTO_MOEGLICH) return
@@ -322,13 +333,24 @@ export function useFahrten({
         geplant && geplant.titel !== 'Mein Standort' && abstand(geplant.lon, geplant.lat, lon, lat) < ORT_NAH
           ? { lon: geplant.lon, lat: geplant.lat, titel: geplant.titel }
           : benenneRef.current(lon, lat)
+      // Wer per Knopf aufzeichnet, fährt Velo. Was die Erkennung aufgezeichnet hat, prüft die Seite aus
+      // Tempo und Halten: Stellt es sich als Tram, Auto oder Fussweg heraus, wird es nicht gespeichert.
+      const vonSelbst = !(offen.quelle === 'aufzeichnung' || (!offen.quelle && !offen.hinweis))
+      // Zuerst die ganze Aufzeichnung: Ein kurzes Stück einer Tramfahrt (zwischen zwei Haltestellen, oder
+      // nach einer Lücke im Standort) sieht für sich allein aus wie ein Velo. Ist das Ganze eine Tram- oder
+      // Autofahrt, gilt das auch für seine kurzen Stücke.
+      const ganz: Modus = vonSelbst ? erkenne(kern(verdichten(offen.spur)), haltestellenRef.current, offen.hinweis) : 'velo'
       const neue: Gespeichert[] = []
       for (const [k, spur] of teile.entries()) {
         const erster = spur[0]
         const letzter = spur[spur.length - 1]
-        // Wer per Knopf aufzeichnet, fährt Velo. Was die Erkennung aufgezeichnet hat, prüft die Seite aus
-        // Tempo und Halten: Stellt es sich als Tram, Auto oder Fussweg heraus, wird es nicht gespeichert.
-        const modus: Modus = offen.quelle === 'aufzeichnung' || (!offen.quelle && !offen.hinweis) ? 'velo' : erkenne(spur, haltestellenRef.current, offen.hinweis)
+        const dauer = letzter[2] - erster[2]
+        if (vonSelbst && (dauer < AUTO_MIN_S || spurDistanz(spur) < AUTO_MIN_M)) {
+          notieren(`Fahrt nicht gespeichert: ${Math.round(spurDistanz(spur))} m in ${Math.round(dauer)} s reichen nicht, um ein Velo sicher von einem Tram zu unterscheiden`)
+          continue
+        }
+        let modus: Modus = vonSelbst ? erkenne(spur, haltestellenRef.current, offen.hinweis) : 'velo'
+        if (modus === 'velo' && (ganz === 'oev' || ganz === 'auto') && dauer < TEIL_EIGEN_S) modus = ganz
         if (modus !== 'velo') {
           notieren(`Fahrt nicht gespeichert: erkannt als ${modusName(modus)}, ${(spurDistanz(spur) / 1000).toFixed(1)} km in ${Math.round((letzter[2] - erster[2]) / 60)} Min.`)
           continue
@@ -833,7 +855,10 @@ export function useFahrten({
         const zeilen = (data as Zeile[]).filter((z) => !begraben.has(z.id))
         const lokal = new Set(fahrtenRef.current.map((f) => f.id))
         const daId = new Set(zeilen.map((z) => z.id))
-        const neu = zeilen.filter((z) => !lokal.has(z.id)).map((z): Gespeichert => ({ ...ausKonto(z, benenneRef.current), gesichert: true }))
+        const neu = zeilen
+          .filter((z) => !lokal.has(z.id))
+          .map((z): Gespeichert => ({ ...ausKonto(z, benenneRef.current), gesichert: true }))
+          .filter(sicher)
         if (neu.length) {
           await Promise.all(neu.map((f) => speichern(f).catch(() => {})))
           setFahrten((alt) => [...alt, ...neu.filter((n) => !alt.some((a) => a.id === n.id))].sort((a, b) => (a.begonnen < b.begonnen ? 1 : -1)))
