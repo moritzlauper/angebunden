@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       only:
-        description: 'Run only these sources (comma list: us,uk,fr,ch,research,directory); empty = all'
+        description: 'Run only these sources (comma list: us,uk,fr,ch,de,at,research,directory); empty = all'
         required: false
         default: ''
   push:
@@ -98,6 +98,16 @@ jobs:
         if: ${{ !inputs.only || contains(inputs.only, 'ch') }}
         continue-on-error: true
         run: node scrapers/ch-bfs.ts
+
+      - name: Germany (Studiensuche, Bundesagentur für Arbeit)
+        if: ${{ !inputs.only || contains(inputs.only, 'de') }}
+        continue-on-error: true
+        run: node scrapers/de-studiensuche.ts
+
+      - name: Austria (universities, FH, PH)
+        if: ${{ !inputs.only || contains(inputs.only, 'at') }}
+        continue-on-error: true
+        run: node scrapers/at-hochschulen.ts
 
       - name: Research profiles worldwide (OpenAlex)
         if: ${{ !inputs.only || contains(inputs.only, 'research') }}
