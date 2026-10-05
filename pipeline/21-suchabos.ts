@@ -43,7 +43,25 @@ type Abo = {
   bestaetigt: boolean
   geprueft_bis: string | null
   abmelde_token: string
+  /** Prüfsummen der Inserate, die dieses Abo schon kennt (fehlt, solange die Migration nicht eingespielt ist). */
+  gesendet?: string[] | null
 }
+
+/** So viele Prüfsummen merkt sich ein Abo, die neuesten zuerst. Reicht für jede Suche in Zürich. */
+const GEDAECHTNIS = 4000
+
+/** Kurze, stabile Prüfsumme eines Links (FNV-1a, 32 Bit), damit die Liste im Abo klein bleibt. */
+function pruefsumme(text: string): string {
+  let h = 0x811c9dc5
+  for (let k = 0; k < text.length; k++) {
+    h ^= text.charCodeAt(k)
+    h = Math.imul(h, 0x01000193) >>> 0
+  }
+  return h.toString(36)
+}
+
+/** Alle Prüfsummen eines Inserats: jeder Link zählt, auch wenn Doppelte anders zusammengelegt werden. */
+const summen = (i: Inserat) => i.links.map((l) => pruefsumme(l.url))
 
 async function db(pfad: string, init: RequestInit = {}) {
   const res = await fetch(`${SUPABASE}/rest/v1/${pfad}`, {
@@ -72,22 +90,44 @@ function zeile(i: Inserat): string {
   const bild = i.bild
     ? `<img src="${html(i.bild)}" width="96" height="72" alt="" style="display:block;width:96px;height:72px;object-fit:cover;border-radius:8px;background:#eeeeeb">`
     : `<div style="width:96px;height:72px;border-radius:8px;background:#eeeeeb"></div>`
+  const ziel = html(i.links[0].url)
+  // Der ganze Eintrag ist ein Link aufs Inserat: Bild, Preis, Titel und Angaben. Mailprogramme
+  // vertragen keinen Link um eine Tabellenzeile, deshalb ein Link je Zelle mit demselben Ziel.
+  const link = 'color:#18181b;text-decoration:none;display:block'
   return `
   <tr>
-    <td style="padding:10px 12px 10px 0;vertical-align:top"><a href="${html(i.links[0].url)}">${bild}</a></td>
+    <td style="padding:10px 12px 10px 0;vertical-align:top"><a href="${ziel}" style="${link}">${bild}</a></td>
     <td style="padding:10px 0;vertical-align:top;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#18181b">
-      <div style="font-size:16px;font-weight:600">${i.miete != null ? `CHF ${nf(i.miete)}` : 'Preis auf Anfrage'}</div>
-      <a href="${html(i.links[0].url)}" style="color:#18181b;font-size:14px;text-decoration:none">${html(i.titel)}</a>
-      <div style="font-size:12px;color:#71717a;margin-top:2px">${html(eck.join(' · '))}</div>
+      <a href="${ziel}" style="${link}">
+        <span style="display:block;font-size:16px;font-weight:600">${i.miete != null ? `CHF ${nf(i.miete)}` : 'Preis auf Anfrage'}</span>
+        <span style="display:block;font-size:14px;text-decoration:underline;text-decoration-color:#d4d4d8">${html(i.titel)}</span>
+        <span style="display:block;font-size:12px;color:#71717a;margin-top:2px">${html(eck.join(' · '))}</span>
+      </a>
+      <div style="font-size:12px;margin-top:6px">
+        <a href="${SITE}/wohnungen?inserat=${encodeURIComponent(i.id)}&amp;u=${encodeURIComponent(i.links[0].url)}" style="color:#71717a">Auf der Karte ansehen</a>
+      </div>
     </td>
   </tr>`
 }
 
 function mail(abo: Abo, inserate: Inserat[], bestaetigung: boolean): { betreff: string; inhalt: string } {
   const abmelden = `${SITE}/wohnungen?abmelden=${abo.abmelde_token}`
+  // Bei einer einzigen Wohnung sagt schon der Betreff, welche: Preis, Zimmer, Strasse.
+  const eine = inserate[0]
+  const kurz = eine
+    ? [
+        eine.miete != null ? `CHF ${nf(eine.miete)}` : null,
+        eine.zimmer != null ? `${String(eine.zimmer).replace('.5', '½')} Zi.` : null,
+        eine.strasse ?? eine.plz,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    : ''
   const titel = bestaetigung
     ? `Dein Suchabo «${abo.name}» ist aktiv`
-    : `${inserate.length} neue ${inserate.length === 1 ? 'Wohnung' : 'Wohnungen'}: ${abo.name}`
+    : inserate.length === 1
+      ? `Neue Wohnung: ${kurz || eine.titel}`
+      : `${inserate.length} neue Wohnungen: ${abo.name}`
   const text = bestaetigung
     ? `Ab jetzt bekommst du eine Mail, sobald eine neue Wohnung zu deiner Suche passt. Der Sammler schaut alle fünf Minuten nach.${
         inserate.length ? ` Heute passen schon ${inserate.length}, hier die neuesten fünf:` : ''
@@ -99,7 +139,11 @@ function mail(abo: Abo, inserate: Inserat[], bestaetigung: boolean): { betreff: 
   const inhalt = `<!doctype html><html><body style="margin:0;background:#f7f7f5">
   <div style="max-width:560px;margin:0 auto;padding:28px 20px;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#18181b">
     <div style="font-size:15px;font-weight:600">angebunden<span style="color:#cc3934">.</span> Wohnungen</div>
-    <h1 style="font-size:20px;margin:18px 0 6px">${html(titel)}</h1>
+    <h1 style="font-size:20px;margin:18px 0 6px">${
+      !bestaetigung && inserate.length === 1
+        ? `<a href="${html(inserate[0].links[0].url)}" style="color:#18181b;text-decoration:none">${html(titel)}</a>`
+        : html(titel)
+    }</h1>
     <p style="font-size:14px;line-height:1.5;color:#3f3f46;margin:0 0 8px">${html(text)}</p>
     <table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse">${liste.map(zeile).join('')}</table>
     ${mehr > 0 ? `<p style="font-size:13px;color:#71717a">und ${mehr} weitere.</p>` : ''}
@@ -142,21 +186,48 @@ async function main() {
       // Was nur auf der Seite Sinn ergibt, gilt im Abo nicht.
       const f: Filter = { ...FILTER_LEER, ...abo.filter, nurGemerkt: false, nurAusschnitt: false, nurNeu: false }
       const alle = daten.inserate.filter((i) => passt(i, f, new Set(), jetzt, null))
+      const kennt = new Set(abo.gesendet ?? [])
+      // Neu ist, was das Abo noch nie gesehen hat und seit dem letzten Lauf aufgetaucht ist.
       const neu = abo.bestaetigt
-        ? alle.filter((i) => !abo.geprueft_bis || i.erstGesehen > abo.geprueft_bis)
+        ? alle.filter(
+            (i) => !summen(i).some((h) => kennt.has(h)) && (!abo.geprueft_bis || i.erstGesehen > abo.geprueft_bis)
+          )
         : alle
       neu.sort((a, b) => b.erstGesehen.localeCompare(a.erstGesehen))
 
+      // Alles, was jetzt passt, gilt ab jetzt als bekannt, die neuesten zuerst.
+      const gesendet = [...new Set([...neu.flatMap(summen), ...alle.flatMap(summen), ...(abo.gesendet ?? [])])].slice(0, GEDAECHTNIS)
+
+      // Erst den Stand speichern, dann senden: Bricht etwas dazwischen ab, fehlt höchstens eine
+      // Mail, statt dass dieselbe Wohnung beim nächsten Lauf noch einmal hinausgeht.
+      const speichern = (stand: Record<string, unknown>) =>
+        db(`wohnungen_suchabos?id=eq.${abo.id}`, {
+          method: 'PATCH',
+          headers: { Prefer: 'return=minimal' },
+          body: JSON.stringify(stand),
+        })
+      const neuerStand = { bestaetigt: true, geprueft_bis: daten.erstellt }
+      try {
+        await speichern({ ...neuerStand, gesendet })
+      } catch (e) {
+        // Ohne die Spalte `gesendet` (Migration noch nicht eingespielt) wenigstens den Zeitpunkt.
+        if (!String(e).includes('gesendet')) throw e
+        await speichern(neuerStand)
+      }
+
       if (!abo.bestaetigt || neu.length) {
         const { betreff, inhalt } = mail(abo, neu, !abo.bestaetigt)
-        await senden(abo.email, betreff, inhalt, `${SITE}/wohnungen?abmelden=${abo.abmelde_token}`)
-        mails++
+        try {
+          await senden(abo.email, betreff, inhalt, `${SITE}/wohnungen?abmelden=${abo.abmelde_token}`)
+          mails++
+        } catch (e) {
+          // Versand gescheitert: den alten Stand zurück, damit es der nächste Lauf noch einmal versucht.
+          await speichern({ bestaetigt: abo.bestaetigt, geprueft_bis: abo.geprueft_bis, gesendet: abo.gesendet ?? [] }).catch(() =>
+            speichern({ bestaetigt: abo.bestaetigt, geprueft_bis: abo.geprueft_bis })
+          )
+          throw e
+        }
       }
-      await db(`wohnungen_suchabos?id=eq.${abo.id}`, {
-        method: 'PATCH',
-        headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ bestaetigt: true, geprueft_bis: daten.erstellt }),
-      })
     } catch (e) {
       // Ein kaputtes Abo hält die anderen nicht auf.
       console.warn(`Suchabo ${abo.id}: ${e instanceof Error ? e.message : e}`)

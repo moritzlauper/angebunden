@@ -14,7 +14,7 @@ import { Anmeldung, useAbmeldelink, useKonto, useMerklisteImKonto } from './kont
 import { SuchaboDialog } from './suchabo'
 import type { Art, Inserat, QuellenId, Wohnungen } from './typen'
 import type { Kreis } from './kreise'
-import { FILTER_LEER, SORTEN, TAG, passt, umriss, type Filter, type Gebiet, type Sorte } from './filter'
+import { FILTER_LEER, SORTEN, TAG, nachgefuehrt, passt, umriss, type Filter, type Gebiet, type Sorte } from './filter'
 
 /**
  * Woher die Inserate kommen. Der Workflow `wohnungen.yml` legt die Datei
@@ -172,6 +172,8 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
   // Mit Konto liegt die Merkliste zusätzlich dort und gilt auf jedem Gerät.
   const k = useKonto()
   const [aboOffen, setAboOffen] = useState(false)
+  // Das Inserat aus einem Link der Suchabo-Mail (siehe unten).
+  const [ausMail, setAusMail] = useState<Inserat | null>(null)
   const [abmeldung, setAbmeldung] = useAbmeldelink()
   const merkliste = useMemo(() => ({ gemerkt: [...gemerkt], weg: [...weg], filter: { ...filter, nurAusschnitt: false } }), [gemerkt, weg, filter])
   useMerklisteImKonto(k.nutzer, merkliste, (m) => {
@@ -180,7 +182,7 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
     setWeg(new Set(m.weg))
     schreib(SPEICHER.weg, m.weg)
     if (m.filter) {
-      const f = { ...FILTER_LEER, ...(m.filter as Partial<Filter>), nurAusschnitt: false }
+      const f = { ...FILTER_LEER, ...nachgefuehrt(m.filter as Partial<Filter>), nurAusschnitt: false }
       setFilter(f)
       schreib(SPEICHER.filter, f)
     }
@@ -200,7 +202,7 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
   // Gespeichertes aus dem Browser. Der letzte Besuch zählt erst ab einer Stunde
   // Abstand, sonst wäre nach jedem Neuladen nichts mehr «neu».
   useEffect(() => {
-    setFilter({ ...FILTER_LEER, ...lies<Partial<Filter>>(SPEICHER.filter, {}), nurAusschnitt: false })
+    setFilter({ ...FILTER_LEER, ...nachgefuehrt(lies<Partial<Filter>>(SPEICHER.filter, {})), nurAusschnitt: false })
     setGemerkt(new Set(lies<string[]>(SPEICHER.gemerkt, [])))
     setWeg(new Set(lies<string[]>(SPEICHER.weg, [])))
     const besuch = lies<{ zuletzt: number; davor: number | null } | null>(SPEICHER.besuch, null)
@@ -311,12 +313,17 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
     if (zeichnen) {
       map.dragPan.disable()
       map.touchZoomRotate.disable()
+      map.doubleClickZoom.disable()
       map.getCanvas().style.cursor = 'crosshair'
+      // Sonst deutet der Browser das Ziehen mit dem Finger als Scrollen oder Zoomen der Seite.
+      map.getCanvasContainer().style.touchAction = 'none'
     } else {
       map.dragPan.enable()
       map.touchZoomRotate.enable()
       map.touchZoomRotate.disableRotation()
+      map.doubleClickZoom.enable()
       map.getCanvas().style.cursor = ''
+      map.getCanvasContainer().style.touchAction = ''
     }
   }, [zeichnen, karteBereit])
 
@@ -447,40 +454,59 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
     })
     // Gebiet zeichnen: drücken und die Umrandung abfahren, loslassen schliesst die Fläche.
     // Ausserhalb des Zeichnens verschiebt Ziehen in einem Gebiet das Gebiet, ein Doppelklick löscht es.
-    type Ereignis = { lngLat: { lng: number; lat: number }; point: { x: number; y: number }; preventDefault: () => void }
+    // Über Pointer-Events statt MapLibres Maus- und Touch-Ereignisse: Die decken Maus, Finger und Stift
+    // gleich ab, und der Browser schiebt nach einer Berührung keine Mausklicks nach.
+    const flaeche = map.getCanvasContainer()
     let pfad: [number, number][] | null = null
     let letzterPunkt: { x: number; y: number } | null = null
     let schieben: { i: number; lon: number; lat: number } | null = null
-    const anfangen = (e: Ereignis) => {
-      if (!zeichnenRef.current) return
-      e.preventDefault()
-      pfad = [[e.lngLat.lng, e.lngLat.lat]]
-      letzterPunkt = e.point
-      entwurfRef.current = { punkte: pfad }
+    let zeiger: number | null = null
+    const punkt = (ev: PointerEvent) => {
+      const r = flaeche.getBoundingClientRect()
+      return { x: ev.clientX - r.left, y: ev.clientY - r.top }
     }
-    const greifen = (e: Ereignis & { features?: { properties: Record<string, unknown> }[] }) => {
-      if (zeichnenRef.current) return
-      const i = Number(e.features?.[0]?.properties?.i)
+    const runter = (ev: PointerEvent) => {
+      if (zeiger != null || (ev.pointerType === 'mouse' && ev.button !== 0)) return
+      const p = punkt(ev)
+      const ll = map.unproject([p.x, p.y])
+      if (zeichnenRef.current) {
+        zeiger = ev.pointerId
+        flaeche.setPointerCapture(ev.pointerId)
+        ev.preventDefault()
+        pfad = [[ll.lng, ll.lat]]
+        letzterPunkt = p
+        entwurfRef.current = { punkte: pfad }
+        return
+      }
+      const treffer = map.queryRenderedFeatures([p.x, p.y], { layers: ['gebiete-flaeche'] })
+      const i = Number(treffer[0]?.properties?.i)
       if (!Number.isFinite(i)) return
-      e.preventDefault()
-      schieben = { i, lon: e.lngLat.lng, lat: e.lngLat.lat }
+      // Vor MapLibres eigenem Ziehen abschalten, sonst verschiebt sich die Karte mit.
       map.dragPan.disable()
+      zeiger = ev.pointerId
+      flaeche.setPointerCapture(ev.pointerId)
+      schieben = { i, lon: ll.lng, lat: ll.lat }
     }
-    const ziehen = (e: Ereignis) => {
+    const bewegen = (ev: PointerEvent) => {
+      if (ev.pointerId !== zeiger) return
+      const p = punkt(ev)
+      const ll = map.unproject([p.x, p.y])
       if (pfad && letzterPunkt) {
         // Nur alle paar Pixel ein Punkt, sonst wird die Fläche unnötig fein.
-        if (Math.hypot(e.point.x - letzterPunkt.x, e.point.y - letzterPunkt.y) < 4) return
-        pfad.push([e.lngLat.lng, e.lngLat.lat])
-        letzterPunkt = e.point
+        if (Math.hypot(p.x - letzterPunkt.x, p.y - letzterPunkt.y) < 4) return
+        pfad.push([ll.lng, ll.lat])
+        letzterPunkt = p
         zeichneGebiete()
       } else if (schieben) {
-        const dlon = e.lngLat.lng - schieben.lon
-        const dlat = e.lngLat.lat - schieben.lat
+        const dlon = ll.lng - schieben.lon
+        const dlat = ll.lat - schieben.lat
         vorschauRef.current = gebieteRef.current.map((g, k) => (k === schieben!.i ? verschoben(g, dlon, dlat) : g))
         zeichneGebiete()
       }
     }
-    const aufhoeren = (e?: Ereignis) => {
+    const hoch = (ev: PointerEvent) => {
+      if (ev.pointerId !== zeiger) return
+      zeiger = null
       if (pfad) {
         const punkte = pfad
         pfad = null
@@ -496,23 +522,15 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
         const vorschau = vorschauRef.current
         schieben = null
         vorschauRef.current = null
-        map.dragPan.enable()
+        if (!zeichnenRef.current) map.dragPan.enable()
         if (vorschau) gebieteSetzenRef.current(vorschau)
         else zeichneGebiete()
       }
-      void e
     }
-    map.on('mousedown', anfangen)
-    map.on('touchstart', anfangen)
-    map.on('mousedown', 'gebiete-flaeche', greifen)
-    map.on('touchstart', 'gebiete-flaeche', (e) => {
-      // Mit zwei Fingern wird gezoomt, nicht verschoben.
-      if (e.points.length === 1) greifen(e)
-    })
-    map.on('mousemove', ziehen)
-    map.on('touchmove', ziehen)
-    map.on('mouseup', aufhoeren)
-    map.on('touchend', aufhoeren)
+    flaeche.addEventListener('pointerdown', runter)
+    flaeche.addEventListener('pointermove', bewegen)
+    flaeche.addEventListener('pointerup', hoch)
+    flaeche.addEventListener('pointercancel', hoch)
     map.on('dblclick', 'gebiete-flaeche', (e) => {
       if (zeichnenRef.current) return
       const i = Number(e.features?.[0]?.properties?.i)
@@ -543,8 +561,10 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
   const punkte = useMemo(() => {
     if (!daten) return []
     const f = { ...filter, nurAusschnitt: false }
-    return basis.filter((i) => !weg.has(i.id) && passt(i, f, gemerkt, jetzt, null))
-  }, [daten, basis, filter, gemerkt, weg, jetzt])
+    const sichtbar = basis.filter((i) => !weg.has(i.id) && passt(i, f, gemerkt, jetzt, null))
+    // Das Inserat aus der Mail steht auf der Karte, auch wenn die Filter es verstecken.
+    return ausMail && !sichtbar.some((i) => i.id === ausMail.id) ? [...sichtbar, ausMail] : sichtbar
+  }, [daten, basis, filter, gemerkt, weg, jetzt, ausMail])
 
   useEffect(() => {
     const map = mapRef.current
@@ -581,6 +601,30 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
   }
 
   const ausgewaehlt = auswahl ? daten?.inserate.find((i) => i.id === auswahl) ?? null : null
+
+  // Aus der Suchabo-Mail: `?inserat=<id>&u=<link>` öffnet genau dieses Inserat, auch wenn die
+  // Filter es gerade verstecken. Gefunden wird es über die Kennung, sonst über den Link.
+  const ausMailGeprueft = useRef(false)
+  useEffect(() => {
+    if (!daten || ausMailGeprueft.current) return
+    ausMailGeprueft.current = true
+    const suche = new URLSearchParams(window.location.search)
+    const id = suche.get('inserat')
+    const u = suche.get('u')
+    if (!id && !u) return
+    const i = daten.inserate.find((x) => x.id === id) ?? daten.inserate.find((x) => u != null && x.links.some((l) => l.url === u))
+    suche.delete('inserat')
+    suche.delete('u')
+    window.history.replaceState(null, '', window.location.pathname + (suche.size ? `?${suche}` : '') + window.location.hash)
+    if (!i) return
+    setAusMail(i)
+    setAuswahl(i.id)
+    if (!breit) setAnsicht('karte')
+  }, [daten, breit])
+  useEffect(() => {
+    if (!ausMail || !karteBereit || ausMail.lon == null || ausMail.lat == null) return
+    mapRef.current?.flyTo({ center: [ausMail.lon, ausMail.lat], zoom: 15.5 })
+  }, [ausMail, karteBereit])
 
   // ── Darstellung ────────────────────────────────────────────────────────
   const ui = {
@@ -644,6 +688,29 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
 
   const liste = (
     <div className="px-3 pb-6 sm:px-4">
+      {ausMail && daten && (
+        <div className="mt-3">
+          <div className="mb-1.5 flex items-center justify-between px-1 text-[12px] text-[var(--ab-leise)]">
+            <span>Aus deiner Suchabo-Mail</span>
+            <button type="button" onClick={() => setAusMail(null)} className="underline underline-offset-2">
+              ausblenden
+            </button>
+          </div>
+          <ul>
+            <Karteikarte
+              i={ausMail}
+              haeuser={daten.haeuser}
+              jetzt={jetzt}
+              neu={false}
+              gewaehlt
+              gemerkt={gemerkt.has(ausMail.id)}
+              merken={() => umschalten(gemerkt, ausMail.id, setGemerkt, SPEICHER.gemerkt)}
+              ausblenden={() => setAusMail(null)}
+              zeigen={() => aufKarte(ausMail)}
+            />
+          </ul>
+        </div>
+      )}
       {abmeldung && (
         <div className="mx-1 mt-3 flex items-start justify-between gap-3 rounded-2xl bg-[var(--ab-weich)] px-3.5 py-2.5 text-[13px]">
           <span>{abmeldung}</span>
@@ -980,7 +1047,7 @@ function aktiveFilter(f: Filter) {
     f.zimmerMin != null || f.zimmerMax != null,
     f.arten.length !== FILTER_LEER.arten.length,
     f.dauer !== 'alle',
-    f.quellenAus.length > 0,
+    [...f.quellenAus].sort().join() !== [...FILTER_LEER.quellenAus].sort().join(),
     f.oevMax != null,
     f.nurNeu,
     f.nurGemerkt,

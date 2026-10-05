@@ -76,4 +76,11 @@ export type Wohnungen = {
   haeuser: number
   quellen: QuellenStand[]
   inserate: Inserat[]
+  /**
+   * Gedächtnis des Sammlers: je Inserat-Adresse, wann es zum ersten und zum
+   * letzten Mal gesehen wurde (ISO). Fehlt ein Inserat bei einem Lauf und
+   * taucht beim nächsten wieder auf, gilt es so nicht als neu. Einträge
+   * verfallen zwei Wochen nach dem letzten Sehen.
+   */
+  gesehen?: Record<string, [string, string]>
 }

@@ -34,6 +34,8 @@ export type Filter = Suche & {
   /** Nur diese Postleitzahlen; setzt ein Suchabo, das auf einer Kreisseite angelegt wurde. */
   plz?: string[]
   sorte: Sorte
+  /** Fassung der Grundeinstellung, gegen die der Filter gespeichert wurde (siehe `nachgefuehrt`). */
+  fassung?: number
 }
 
 export const FILTER_LEER: Filter = {
@@ -42,7 +44,9 @@ export const FILTER_LEER: Filter = {
   zimmerMax: null,
   flaecheMin: null,
   arten: ['wohnung', 'wg', 'studio', 'moebliert', 'haus'],
-  quellenAus: [],
+  // Flatfox ist zu Beginn aus: Dort stehen über 1'800 Inserate, die die kleinen Quellen
+  // (Ron Orp, WOKO, Genossenschaften) sonst untergehen lassen. Ein Klick schaltet es ein.
+  quellenAus: ['flatfox'],
   oevMax: null,
   text: '',
   nurNeu: false,
@@ -51,6 +55,21 @@ export const FILTER_LEER: Filter = {
   dauer: 'alle',
   gebiete: [],
   sorte: 'neu',
+  fassung: 2,
+}
+
+/** Die aktuelle Fassung der Grundeinstellung. Hochzählen, wenn eine Änderung auch gespeicherte Filter treffen soll. */
+export const FILTER_FASSUNG = 2
+
+/**
+ * Bringt einen gespeicherten Filter (Browser oder Konto) auf die aktuelle
+ * Grundeinstellung, ohne die eigenen Einstellungen zu verwerfen. Fassung 2:
+ * Flatfox ist aus, einmalig auch bei allen, die es nie selbst umgestellt haben.
+ */
+export function nachgefuehrt(f: Partial<Filter>): Partial<Filter> {
+  if ((f.fassung ?? 1) >= FILTER_FASSUNG) return f
+  const aus = f.quellenAus ?? []
+  return { ...f, quellenAus: aus.includes('flatfox') ? aus : [...aus, 'flatfox'], fassung: FILTER_FASSUNG }
 }
 
 export const TAG = 24 * 3600 * 1000
