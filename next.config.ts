@@ -10,9 +10,9 @@ import type { NextConfig } from 'next'
  * whatshouldistudy (Unterordner whatshouldistudy/) läuft als eigenes Vercel-Projekt
  * mit basePath /whatshouldistudy. angebunden reicht diesen Pfad dorthin weiter
  * (Next.js Multi-Zones), so ist es unter angebunden.ch/whatshouldistudy erreichbar.
- * Adresse des Projekts: WHATSHOULDISTUDY_URL, sonst die Vercel-Standardadresse.
+ * Adresse des Projekts: WHATSHOULDISTUDY_URL, sonst seine Produktionsdomain auf Vercel.
  */
-const WSIS = (process.env.WHATSHOULDISTUDY_URL ?? 'https://whatshouldistudy-laupermoritz-3127s-projects.vercel.app').replace(/\/$/, '')
+const WSIS = (process.env.WHATSHOULDISTUDY_URL || 'https://angebunden-7o69.vercel.app').replace(/\/$/, '')
 
 const nextConfig: NextConfig = {
   output: process.env.STATISCH ? 'export' : undefined,
