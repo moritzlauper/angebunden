@@ -24,6 +24,7 @@ import { parseTables } from './uk-discoveruni.ts'
 import { rankInstitutions } from './global-openalex.ts'
 import type { RawInstitution } from './global-openalex.ts'
 import { buildDirectory } from './global-directory.ts'
+import { parseRows as parseChRows } from './ch-bfs.ts'
 import type { DirectoryEntry, RawUniversity } from './global-directory.ts'
 
 const SOURCES: Array<Omit<SourceStatus, 'ok' | 'count' | 'fetchedAt' | 'error'>> = [
@@ -47,6 +48,13 @@ const SOURCES: Array<Omit<SourceStatus, 'ok' | 'count' | 'fetchedAt' | 'error'>>
     countries: ['FR'],
     url: 'https://data.enseignementsup-recherche.gouv.fr/',
     licence: 'Licence Ouverte 2.0',
+  },
+  {
+    id: 'ch-bfs',
+    name: 'Studierende nach Hochschule und Fachrichtung (Bundesamt für Statistik)',
+    countries: ['CH'],
+    url: 'https://opendata.swiss/de/organization/bundesamt-fur-statistik-bfs',
+    licence: 'Open use, Quelle: BFS',
   },
   {
     id: 'global-openalex',
@@ -89,7 +97,7 @@ interface Inputs {
 function readOutputs(): Inputs {
   const status = new Map<string, Partial<SourceStatus>>()
   const outputs: ScrapeOutput[] = []
-  for (const id of ['us-college-scorecard', 'uk-discover-uni', 'fr-parcoursup']) {
+  for (const id of ['us-college-scorecard', 'uk-discover-uni', 'fr-parcoursup', 'ch-bfs']) {
     const o = readJson<ScrapeOutput>(join(OUT, `${id}.json`))
     if (o) {
       outputs.push(o)
@@ -116,10 +124,16 @@ function readFixtures(): Inputs {
     { courses: csv('KISCOURSE'), institutions: csv('INSTITUTION'), subjects: csv('SBJ'), aims: csv('KISAIM'), locations: csv('LOCATION'), courseLocations: csv('COURSELOCATION') },
     at,
   ).programmes
+  const chTables = readJson<{ tables: Record<string, Array<Record<string, string>>> }>(join(FIXTURES, 'ch-bfs.json'))!.tables
+  const seen = new Set<string>()
+  const ch = Object.values(chTables)
+    .flatMap((rows) => parseChRows(rows, at).programmes)
+    .filter((p) => !seen.has(p.id) && seen.add(p.id))
   const outputs = [
     { source: 'us-college-scorecard', fetchedAt: at, programmes: us },
     { source: 'uk-discover-uni', fetchedAt: at, programmes: uk },
     { source: 'fr-parcoursup', fetchedAt: at, programmes: fr },
+    { source: 'ch-bfs', fetchedAt: at, programmes: ch },
   ]
   for (const o of outputs) status.set(o.source, { ok: true, count: o.programmes.length, fetchedAt: at })
   const research = rankInstitutions(readJson<RawInstitution[]>(join(FIXTURES, 'openalex-institutions.json'))!)
@@ -147,7 +161,7 @@ function previousFirstSeen(dir: string | undefined): Map<string, string> {
  */
 function carryOver(inputs: Inputs, dir: string) {
   const prevMeta = readJson<DataMeta>(join(dir, 'meta.json'))
-  for (const id of ['us-college-scorecard', 'uk-discover-uni', 'fr-parcoursup']) {
+  for (const id of ['us-college-scorecard', 'uk-discover-uni', 'fr-parcoursup', 'ch-bfs']) {
     const fresh = inputs.outputs.find((o) => o.source === id && o.programmes.length)
     const prevCount = prevMeta?.sources.find((s) => s.id === id)?.count ?? 0
     // A source that suddenly shrinks by half is more likely broken than real.
