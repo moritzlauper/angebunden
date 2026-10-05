@@ -10,9 +10,10 @@ name: whatshouldistudy data
 # kept (see whatshouldistudy/scrapers/build.ts). Runs on other branches only
 # build and upload the result as an artifact, they never publish.
 #
-# Secrets (all optional): SCORECARD_API_KEY (free at api.data.gov/signup; the
-# DEMO_KEY fallback is too slow for a full run), OPENALEX_API_KEY,
-# OPENALEX_EMAIL.
+# Secrets: SCORECARD_API_KEY (free at api.data.gov/signup; without it the
+# DEMO_KEY stops after ~1,000 of ~2,700 US institutions), optionally
+# OPENALEX_API_KEY and OPENALEX_EMAIL. Variable: UK_DISCOVERUNI_URL, the
+# Discover Uni .zip (HESA's download page sits behind a bot challenge).
 
 on:
   schedule:
@@ -76,6 +77,8 @@ jobs:
 
       - name: United Kingdom (Discover Uni)
         continue-on-error: true
+        env:
+          UK_DISCOVERUNI_URL: ${{ vars.UK_DISCOVERUNI_URL }}
         run: node scrapers/uk-discoveruni.ts
 
       - name: France (Parcoursup)
