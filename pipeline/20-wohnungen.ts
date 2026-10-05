@@ -552,8 +552,17 @@ const SAMMELND = new Set<QuellenId>(['ronorp'])
 async function main() {
   const jetzt = new Date().toISOString()
   const vorher: Wohnungen | null = existsSync(AUSGABE) ? JSON.parse(readFileSync(AUSGABE, 'utf8')) : null
-  const bekannt = new Map<string, string>()
-  for (const i of vorher?.inserate ?? []) for (const l of i.links) bekannt.set(l.url, i.erstGesehen)
+  // Seit wann ein Inserat bekannt ist, auch über Läufe hinweg, in denen es kurz fehlte: Flatfox
+  // liefert nicht bei jeder Abfrage dieselben Punkte, und ohne Gedächtnis gälte ein Inserat bei
+  // seiner Rückkehr als neu (und ginge jedes Mal wieder als Suchabo-Mail hinaus).
+  const gesehen = new Map<string, [string, string]>(Object.entries(vorher?.gesehen ?? {}))
+  for (const i of vorher?.inserate ?? []) {
+    for (const l of i.links) {
+      const alt = gesehen.get(l.url)
+      gesehen.set(l.url, [alt && alt[0] < i.erstGesehen ? alt[0] : i.erstGesehen, vorher!.erstellt])
+    }
+  }
+  const bekannt = new Map<string, string>([...gesehen].map(([url, [erst]]) => [url, erst]))
 
   const quellen: [QuellenId, () => Promise<Roh[]>][] = [
     ['flatfox', flatfox],
@@ -648,7 +657,18 @@ async function main() {
     throw new Error('Keine einzige Quelle hat geliefert, die alte Datei bleibt stehen.')
   }
 
-  const ergebnis: Wohnungen = { erstellt: jetzt, haeuser: haeuser.length, quellen: stand, inserate }
+  // Gedächtnis fortschreiben: was jetzt da ist, gilt als gesehen; was seit zwei Wochen fehlt, fällt weg.
+  for (const i of inserate) for (const l of i.links) gesehen.set(l.url, [gesehen.get(l.url)?.[0] ?? i.erstGesehen, jetzt])
+  const grenze = new Date(Date.parse(jetzt) - 14 * 24 * 3600 * 1000).toISOString()
+  for (const [url, [, zuletzt]] of gesehen) if (zuletzt < grenze) gesehen.delete(url)
+
+  const ergebnis: Wohnungen = {
+    erstellt: jetzt,
+    haeuser: haeuser.length,
+    quellen: stand,
+    inserate,
+    gesehen: Object.fromEntries(gesehen),
+  }
   mkdirSync(path.dirname(AUSGABE), { recursive: true })
   writeFileSync(AUSGABE, JSON.stringify(ergebnis))
   const doppelt = alle.length - inserate.length
