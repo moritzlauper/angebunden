@@ -6,8 +6,27 @@ import type { NextConfig } from 'next'
  * deshalb ein reiner Ordner voll statischer Dateien, den jeder Gratis-Hoster
  * ausliefern kann (siehe README).
  */
+/**
+ * whatshouldistudy (Unterordner whatshouldistudy/) läuft als eigenes Vercel-Projekt
+ * mit basePath /whatshouldistudy. angebunden reicht diesen Pfad dorthin weiter
+ * (Next.js Multi-Zones), so ist es unter angebunden.ch/whatshouldistudy erreichbar.
+ * Adresse des Projekts: WHATSHOULDISTUDY_URL, sonst die Vercel-Standardadresse.
+ */
+const WSIS = (process.env.WHATSHOULDISTUDY_URL ?? 'https://whatshouldistudy-laupermoritz-3127s-projects.vercel.app').replace(/\/$/, '')
+
 const nextConfig: NextConfig = {
   output: process.env.STATISCH ? 'export' : undefined,
+  // Der statische Export kennt keine Weiterleitungen.
+  ...(process.env.STATISCH
+    ? {}
+    : {
+        async rewrites() {
+          return [
+            { source: '/whatshouldistudy', destination: `${WSIS}/whatshouldistudy` },
+            { source: '/whatshouldistudy/:path*', destination: `${WSIS}/whatshouldistudy/:path*` },
+          ]
+        },
+      }),
   // Der Android-Emulator erreicht den Rechner unter 10.0.2.2. Ohne diese Angabe blockiert der
   // Entwicklungsserver die Skripte, und die Seite in der App wird nie interaktiv.
   allowedDevOrigins: ['10.0.2.2'],
