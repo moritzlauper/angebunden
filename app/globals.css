@@ -5,6 +5,8 @@
  */
 @import "maplibre-gl/dist/maplibre-gl.css";
 @import "tailwindcss";
+/* Eigenes Projekt im Unterordner, siehe whatshouldistudy/README.md */
+@source not "../whatshouldistudy";
 
 
 html,

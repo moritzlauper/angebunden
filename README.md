@@ -460,3 +460,11 @@ Quellenangabe. Der Velonavi nutzt zusätzlich Open Government Data der Stadt Zü
 und Velowegnetz, Lichtsignale, Tempo, Velonetzplanung, Verkehrsunfälle, Verkehrszählung), die
 Nutzungsbedingungen stehen auf [data.stadt-zuerich.ch](https://data.stadt-zuerich.ch). Die
 Rohdaten liegen nicht im Repository, die Pipeline lädt sie.
+
+## whatshouldistudy (Unterordner)
+
+`whatshouldistudy/` ist ein eigenständiges Projekt, das hier nur vorübergehend liegt: eine englischsprachige
+Seite, die aus YouTube, Google Takeout, Spotify, Reddit, GitHub und einem kurzen Fragebogen passende
+Studienfächer und Studiengänge weltweit ermittelt. Eigene Abhängigkeiten, eigener Build, eigene Workflows
+(`wsis-daten.yml`, `wsis-pruefen.yml`), Daten auf dem Zweig «whatshouldistudy-data». Die angebunden-App
+bindet nichts davon ein. Details in [`whatshouldistudy/README.md`](whatshouldistudy/README.md).

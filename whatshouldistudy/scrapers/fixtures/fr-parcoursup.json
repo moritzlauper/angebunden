@@ -1,0 +1,1321 @@
+[
+ {
+  "annee": "2026",
+  "etab_uai": "0755976N",
+  "etab_nom": "Université Paris Cité",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Informatique"
+  ],
+  "fl": [
+   "Informatique"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10000",
+  "etab_url": null,
+  "nmc": "Licence-Inform",
+  "gta": "10000",
+  "gti": "10000",
+  "code_formation": "10000"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755976N",
+  "etab_nom": "Université Paris Cité",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Mathématiques"
+  ],
+  "fl": [
+   "Mathématiques"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10001",
+  "etab_url": null,
+  "nmc": "Licence-Mathém",
+  "gta": "10001",
+  "gti": "10001",
+  "code_formation": "10001"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755976N",
+  "etab_nom": "Université Paris Cité",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Physique"
+  ],
+  "fl": [
+   "Physique"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10002",
+  "etab_url": null,
+  "nmc": "Licence-Physiq",
+  "gta": "10002",
+  "gti": "10002",
+  "code_formation": "10002"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755976N",
+  "etab_nom": "Université Paris Cité",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Psychologie"
+  ],
+  "fl": [
+   "Psychologie"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10003",
+  "etab_url": null,
+  "nmc": "Licence-Psycho",
+  "gta": "10003",
+  "gti": "10003",
+  "code_formation": "10003"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755976N",
+  "etab_nom": "Université Paris Cité",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Sciences de la vie"
+  ],
+  "fl": [
+   "Sciences de la vie"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10004",
+  "etab_url": null,
+  "nmc": "Licence-Scienc",
+  "gta": "10004",
+  "gti": "10004",
+  "code_formation": "10004"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755976N",
+  "etab_nom": "Université Paris Cité",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Langues, littératures et civilisations étrangères et régionales - Anglais"
+  ],
+  "fl": [
+   "Langues, littératures et civilisations étrangères et régionales - Anglais"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10005",
+  "etab_url": null,
+  "nmc": "Licence-Langue",
+  "gta": "10005",
+  "gti": "10005",
+  "code_formation": "10005"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755976N",
+  "etab_nom": "Université Paris Cité",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Histoire"
+  ],
+  "fl": [
+   "Histoire"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10006",
+  "etab_url": null,
+  "nmc": "Licence-Histoi",
+  "gta": "10006",
+  "gti": "10006",
+  "code_formation": "10006"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755976N",
+  "etab_nom": "Université Paris Cité",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Géographie et aménagement"
+  ],
+  "fl": [
+   "Géographie et aménagement"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10007",
+  "etab_url": null,
+  "nmc": "Licence-Géogra",
+  "gta": "10007",
+  "gti": "10007",
+  "code_formation": "10007"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755976N",
+  "etab_nom": "Université Paris Cité",
+  "tc": "Publics",
+  "tf": [
+   "PASS - Parcours d'Accès Spécifique Santé"
+  ],
+  "nm": [
+   "PASS - Parcours d'accès spécifique santé"
+  ],
+  "fl": [
+   "Parcours d'accès spécifique santé"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10008",
+  "etab_url": null,
+  "nmc": "PASS-Parcou",
+  "gta": "10008",
+  "gti": "10008",
+  "code_formation": "10008"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755890V",
+  "etab_nom": "Sorbonne Université",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Philosophie"
+  ],
+  "fl": [
+   "Philosophie"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10009",
+  "etab_url": null,
+  "nmc": "Licence-Philos",
+  "gta": "10009",
+  "gti": "10009",
+  "code_formation": "10009"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755890V",
+  "etab_nom": "Sorbonne Université",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Lettres"
+  ],
+  "fl": [
+   "Lettres"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10010",
+  "etab_url": null,
+  "nmc": "Licence-Lettre",
+  "gta": "10010",
+  "gti": "10010",
+  "code_formation": "10010"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755890V",
+  "etab_nom": "Sorbonne Université",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Musicologie"
+  ],
+  "fl": [
+   "Musicologie"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10011",
+  "etab_url": null,
+  "nmc": "Licence-Musico",
+  "gta": "10011",
+  "gti": "10011",
+  "code_formation": "10011"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755890V",
+  "etab_nom": "Sorbonne Université",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Chimie"
+  ],
+  "fl": [
+   "Chimie"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10012",
+  "etab_url": null,
+  "nmc": "Licence-Chimie",
+  "gta": "10012",
+  "gti": "10012",
+  "code_formation": "10012"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755890V",
+  "etab_nom": "Sorbonne Université",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Sciences de la Terre"
+  ],
+  "fl": [
+   "Sciences de la Terre"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10013",
+  "etab_url": null,
+  "nmc": "Licence-Scienc",
+  "gta": "10013",
+  "gti": "10013",
+  "code_formation": "10013"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755890V",
+  "etab_nom": "Sorbonne Université",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Sociologie"
+  ],
+  "fl": [
+   "Sociologie"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10014",
+  "etab_url": null,
+  "nmc": "Licence-Sociol",
+  "gta": "10014",
+  "gti": "10014",
+  "code_formation": "10014"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0755890V",
+  "etab_nom": "Sorbonne Université",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Droit"
+  ],
+  "fl": [
+   "Droit"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10015",
+  "etab_url": null,
+  "nmc": "Licence-Droit",
+  "gta": "10015",
+  "gti": "10015",
+  "code_formation": "10015"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0331766R",
+  "etab_nom": "Université de Bordeaux",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Economie et gestion"
+  ],
+  "fl": [
+   "Economie et gestion"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Nouvelle-Aquitaine",
+  "departement": null,
+  "commune": "Bordeaux",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10016",
+  "etab_url": null,
+  "nmc": "Licence-Econom",
+  "gta": "10016",
+  "gti": "10016",
+  "code_formation": "10016"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0331766R",
+  "etab_nom": "Université de Bordeaux",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Droit"
+  ],
+  "fl": [
+   "Droit"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Nouvelle-Aquitaine",
+  "departement": null,
+  "commune": "Bordeaux",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10017",
+  "etab_url": null,
+  "nmc": "Licence-Droit",
+  "gta": "10017",
+  "gti": "10017",
+  "code_formation": "10017"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0331766R",
+  "etab_nom": "Université de Bordeaux",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - STAPS"
+  ],
+  "fl": [
+   "STAPS"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Nouvelle-Aquitaine",
+  "departement": null,
+  "commune": "Bordeaux",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10018",
+  "etab_url": null,
+  "nmc": "Licence-STAPS",
+  "gta": "10018",
+  "gti": "10018",
+  "code_formation": "10018"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0331766R",
+  "etab_nom": "Université de Bordeaux",
+  "tc": "Publics",
+  "tf": [
+   "BUT - Bachelor Universitaire de Technologie"
+  ],
+  "nm": [
+   "BUT - Génie civil - Construction durable"
+  ],
+  "fl": [
+   "Génie civil - Construction durable"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Nouvelle-Aquitaine",
+  "departement": null,
+  "commune": "Bordeaux",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10019",
+  "etab_url": null,
+  "nmc": "BUT-Génie ",
+  "gta": "10019",
+  "gti": "10019",
+  "code_formation": "10019"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0331766R",
+  "etab_nom": "Université de Bordeaux",
+  "tc": "Publics",
+  "tf": [
+   "BUT - Bachelor Universitaire de Technologie"
+  ],
+  "nm": [
+   "BUT - Génie mécanique et productique"
+  ],
+  "fl": [
+   "Génie mécanique et productique"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Nouvelle-Aquitaine",
+  "departement": null,
+  "commune": "Bordeaux",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10020",
+  "etab_url": null,
+  "nmc": "BUT-Génie ",
+  "gta": "10020",
+  "gti": "10020",
+  "code_formation": "10020"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0331766R",
+  "etab_nom": "Université de Bordeaux",
+  "tc": "Publics",
+  "tf": [
+   "BUT - Bachelor Universitaire de Technologie"
+  ],
+  "nm": [
+   "BUT - Informatique"
+  ],
+  "fl": [
+   "Informatique"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Nouvelle-Aquitaine",
+  "departement": null,
+  "commune": "Bordeaux",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10021",
+  "etab_url": null,
+  "nmc": "BUT-Inform",
+  "gta": "10021",
+  "gti": "10021",
+  "code_formation": "10021"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0331766R",
+  "etab_nom": "Université de Bordeaux",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Sciences politiques"
+  ],
+  "fl": [
+   "Sciences politiques"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Nouvelle-Aquitaine",
+  "departement": null,
+  "commune": "Bordeaux",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10022",
+  "etab_url": null,
+  "nmc": "Licence-Scienc",
+  "gta": "10022",
+  "gti": "10022",
+  "code_formation": "10022"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0690192J",
+  "etab_nom": "INSA Lyon",
+  "tc": "Publics",
+  "tf": [
+   "Ecole d'Ingénieur"
+  ],
+  "nm": [
+   "Formation d'ingénieur Bac + 5 - Génie mécanique"
+  ],
+  "fl": [
+   "Ecole d'Ingénieur - Formation d'ingénieur Bac + 5 - Génie mécanique"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Auvergne-Rhône-Alpes",
+  "departement": null,
+  "commune": "Villeurbanne",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10023",
+  "etab_url": null,
+  "nmc": "Ecole d'Ingénieur-Format",
+  "gta": "10023",
+  "gti": "10023",
+  "code_formation": "10023"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0690192J",
+  "etab_nom": "INSA Lyon",
+  "tc": "Publics",
+  "tf": [
+   "Ecole d'Ingénieur"
+  ],
+  "nm": [
+   "Formation d'ingénieur Bac + 5 - Génie électrique"
+  ],
+  "fl": [
+   "Ecole d'Ingénieur - Formation d'ingénieur Bac + 5 - Génie électrique"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Auvergne-Rhône-Alpes",
+  "departement": null,
+  "commune": "Villeurbanne",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10024",
+  "etab_url": null,
+  "nmc": "Ecole d'Ingénieur-Format",
+  "gta": "10024",
+  "gti": "10024",
+  "code_formation": "10024"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0690192J",
+  "etab_nom": "INSA Lyon",
+  "tc": "Publics",
+  "tf": [
+   "Ecole d'Ingénieur"
+  ],
+  "nm": [
+   "Formation d'ingénieur Bac + 5 - Informatique"
+  ],
+  "fl": [
+   "Ecole d'Ingénieur - Formation d'ingénieur Bac + 5 - Informatique"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Auvergne-Rhône-Alpes",
+  "departement": null,
+  "commune": "Villeurbanne",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10025",
+  "etab_url": null,
+  "nmc": "Ecole d'Ingénieur-Format",
+  "gta": "10025",
+  "gti": "10025",
+  "code_formation": "10025"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0750654D",
+  "etab_nom": "Lycée Louis-le-Grand",
+  "tc": "Publics",
+  "tf": [
+   "CPGE"
+  ],
+  "nm": [
+   "CPGE - MPSI"
+  ],
+  "fl": [
+   "MPSI"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10026",
+  "etab_url": null,
+  "nmc": "CPGE-MPSI",
+  "gta": "10026",
+  "gti": "10026",
+  "code_formation": "10026"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0750654D",
+  "etab_nom": "Lycée Louis-le-Grand",
+  "tc": "Publics",
+  "tf": [
+   "CPGE"
+  ],
+  "nm": [
+   "CPGE - Lettres - Hypokhâgne"
+  ],
+  "fl": [
+   "Lettres - Hypokhâgne"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10027",
+  "etab_url": null,
+  "nmc": "CPGE-Lettre",
+  "gta": "10027",
+  "gti": "10027",
+  "code_formation": "10027"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0693736C",
+  "etab_nom": "Université Claude Bernard Lyon 1",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Biologie"
+  ],
+  "fl": [
+   "Biologie"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Auvergne-Rhône-Alpes",
+  "departement": null,
+  "commune": "Villeurbanne",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10028",
+  "etab_url": null,
+  "nmc": "Licence-Biolog",
+  "gta": "10028",
+  "gti": "10028",
+  "code_formation": "10028"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0693736C",
+  "etab_nom": "Université Claude Bernard Lyon 1",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Informatique"
+  ],
+  "fl": [
+   "Informatique"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Auvergne-Rhône-Alpes",
+  "departement": null,
+  "commune": "Villeurbanne",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10029",
+  "etab_url": null,
+  "nmc": "Licence-Inform",
+  "gta": "10029",
+  "gti": "10029",
+  "code_formation": "10029"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0693736C",
+  "etab_nom": "Université Claude Bernard Lyon 1",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Mathématiques et informatique"
+  ],
+  "fl": [
+   "Mathématiques et informatique"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Auvergne-Rhône-Alpes",
+  "departement": null,
+  "commune": "Villeurbanne",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10030",
+  "etab_url": null,
+  "nmc": "Licence-Mathém",
+  "gta": "10030",
+  "gti": "10030",
+  "code_formation": "10030"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0693736C",
+  "etab_nom": "Université Claude Bernard Lyon 1",
+  "tc": "Publics",
+  "tf": [
+   "BUT - Bachelor Universitaire de Technologie"
+  ],
+  "nm": [
+   "BUT - Génie biologique"
+  ],
+  "fl": [
+   "Génie biologique"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Auvergne-Rhône-Alpes",
+  "departement": null,
+  "commune": "Villeurbanne",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10031",
+  "etab_url": null,
+  "nmc": "BUT-Génie ",
+  "gta": "10031",
+  "gti": "10031",
+  "code_formation": "10031"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0693888T",
+  "etab_nom": "EM Lyon Business School",
+  "tc": "Privés hors contrat",
+  "tf": [
+   "Ecole de Commerce"
+  ],
+  "nm": [
+   "Bachelor en management - Global BBA"
+  ],
+  "fl": [
+   "Ecole de Commerce - Bachelor en management - Global BBA"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Auvergne-Rhône-Alpes",
+  "departement": null,
+  "commune": "Ecully",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10032",
+  "etab_url": null,
+  "nmc": "Ecole de Commerce-Bachel",
+  "gta": "10032",
+  "gti": "10032",
+  "code_formation": "10032"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0754444X",
+  "etab_nom": "IFSI AP-HP Pitié-Salpêtrière",
+  "tc": "Publics",
+  "tf": [
+   "Diplôme d'Etat d'infirmier(ère)"
+  ],
+  "nm": [
+   "Diplôme d'Etat d'infirmier"
+  ],
+  "fl": [
+   "IFSI - Diplôme d'Etat d'infirmier"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Ile-de-France",
+  "departement": null,
+  "commune": "Paris",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10033",
+  "etab_url": null,
+  "nmc": "IFSI-Diplôm",
+  "gta": "10033",
+  "gti": "10033",
+  "code_formation": "10033"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0130221V",
+  "etab_nom": "Lycée Marseilleveyre",
+  "tc": "Publics",
+  "tf": [
+   "BTS - BTSA - BTSM"
+  ],
+  "nm": [
+   "BTS - Tourisme"
+  ],
+  "fl": [
+   "Tourisme"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Provence-Alpes-Côte d'Azur",
+  "departement": null,
+  "commune": "Marseille",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10034",
+  "etab_url": null,
+  "nmc": "BTS-Touris",
+  "gta": "10034",
+  "gti": "10034",
+  "code_formation": "10034"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0130221V",
+  "etab_nom": "Lycée Marseilleveyre",
+  "tc": "Publics",
+  "tf": [
+   "BTS - BTSA - BTSM"
+  ],
+  "nm": [
+   "BTS - Management en hôtellerie restauration"
+  ],
+  "fl": [
+   "Management en hôtellerie restauration"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Provence-Alpes-Côte d'Azur",
+  "departement": null,
+  "commune": "Marseille",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10035",
+  "etab_url": null,
+  "nmc": "BTS-Manage",
+  "gta": "10035",
+  "gti": "10035",
+  "code_formation": "10035"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0311382J",
+  "etab_nom": "Université Toulouse III - Paul Sabatier",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Physique, chimie"
+  ],
+  "fl": [
+   "Physique, chimie"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Occitanie",
+  "departement": null,
+  "commune": "Toulouse",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10036",
+  "etab_url": null,
+  "nmc": "Licence-Physiq",
+  "gta": "10036",
+  "gti": "10036",
+  "code_formation": "10036"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0311382J",
+  "etab_nom": "Université Toulouse III - Paul Sabatier",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Sciences de la Terre et de l'Univers"
+  ],
+  "fl": [
+   "Sciences de la Terre et de l'Univers"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Occitanie",
+  "departement": null,
+  "commune": "Toulouse",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10037",
+  "etab_url": null,
+  "nmc": "Licence-Scienc",
+  "gta": "10037",
+  "gti": "10037",
+  "code_formation": "10037"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0311382J",
+  "etab_nom": "Université Toulouse III - Paul Sabatier",
+  "tc": "Publics",
+  "tf": [
+   "BUT - Bachelor Universitaire de Technologie"
+  ],
+  "nm": [
+   "BUT - Génie électrique et informatique industrielle"
+  ],
+  "fl": [
+   "Génie électrique et informatique industrielle"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Occitanie",
+  "departement": null,
+  "commune": "Toulouse",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10038",
+  "etab_url": null,
+  "nmc": "BUT-Génie ",
+  "gta": "10038",
+  "gti": "10038",
+  "code_formation": "10038"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0311382J",
+  "etab_nom": "Université Toulouse III - Paul Sabatier",
+  "tc": "Publics",
+  "tf": [
+   "Licence - Licence générale"
+  ],
+  "nm": [
+   "Licence - Mécanique"
+  ],
+  "fl": [
+   "Mécanique"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Occitanie",
+  "departement": null,
+  "commune": "Toulouse",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10039",
+  "etab_url": null,
+  "nmc": "Licence-Mécani",
+  "gta": "10039",
+  "gti": "10039",
+  "code_formation": "10039"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0890070T",
+  "etab_nom": "Lycée SAINT-JOSEPH (Auxerre - 89)",
+  "tc": "Privés en contrat avec l’Etat / EESC",
+  "tf": [
+   "BTS - BTSA - BTSM"
+  ],
+  "nm": [
+   "BTS - Services - Commerce International"
+  ],
+  "fl": [
+   "BTS - Commerce International"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": [
+   "Des épreuves de sélection sont mises en place pour candidater à cette formation"
+  ],
+  "region": "Bourgogne-Franche-Comté",
+  "departement": "Yonne",
+  "commune": "Auxerre",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10780&typeBac=0&originePc=0",
+  "nmc": "BTS-CI",
+  "gta": "10780",
+  "gti": "10780",
+  "code_formation": "10780"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0891185E",
+  "etab_nom": "Pôle Formation 58-89 (CFA industrie Auxerre) (89)",
+  "tc": "Privés en contrat avec l’Etat / EESC",
+  "tf": [
+   "BTS - BTSA - BTSM"
+  ],
+  "nm": [
+   "BTS - Production - Conception des processus de réalisation de produits (1ère année commune) - en apprentissage"
+  ],
+  "fl": [
+   "BTS - Conception des processus de réalisation de produits (1ère année commune)"
+  ],
+  "app": [
+   "Formations en apprentissage"
+  ],
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Bourgogne-Franche-Comté",
+  "departement": "Yonne",
+  "commune": "Auxerre",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10781",
+  "nmc": "BTS-CPRP-App",
+  "gta": "10781",
+  "gti": "10781",
+  "code_formation": "10781"
+ },
+ {
+  "annee": "2026",
+  "etab_uai": "0891200W",
+  "etab_nom": "Lycée Catherine et Raymond JANOT (Sens - 89)",
+  "tc": "Publics",
+  "tf": [
+   "BTS - BTSA - BTSM"
+  ],
+  "nm": [
+   "BTS - Services - Support à l'action managériale"
+  ],
+  "fl": [
+   "BTS - Support à l'action managériale"
+  ],
+  "app": null,
+  "int": null,
+  "amg": [
+   "Enseignement en présentiel"
+  ],
+  "aut": null,
+  "region": "Bourgogne-Franche-Comté",
+  "departement": "Yonne",
+  "commune": "Sens",
+  "fiche": "https://dossierappel.parcoursup.fr/Candidats/public/fiches/afficherFicheFormation?g_ta_cod=10796",
+  "nmc": "BTS-SAM",
+  "gta": "10796",
+  "gti": "10796",
+  "code_formation": "10796"
+ }
+]
