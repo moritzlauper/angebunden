@@ -109,10 +109,6 @@ jobs:
         continue-on-error: true
         run: node scrapers/at-hochschulen.ts
 
-      - name: Probe programme links (temporary)
-        if: ${{ contains(inputs.only, 'probe') }}
-        run: node scrapers/probe-links.ts
-
       - name: Research profiles worldwide (OpenAlex)
         if: ${{ !inputs.only || contains(inputs.only, 'research') }}
         continue-on-error: true
