@@ -403,10 +403,14 @@ function TopMatch({ m, stat }: { m: FieldMatch; stat?: FieldStat }) {
 
 /** Share or keep the result: everything lives in the link, nothing on a server. */
 function ShareCard({ results, prefs, token }: { results: Results; prefs: Preferences; token?: string }) {
-  const { t, conf } = useSite()
+  const { t, conf, site } = useSite()
   const s = t.share
+  const config = useConfig(site)
   const [copied, setCopied] = useState(false)
   const [canShare, setCanShare] = useState(false)
+  const [mailOpen, setMailOpen] = useState(false)
+  const [to, setTo] = useState('')
+  const [mailState, setMailState] = useState<{ k: 'idle' | 'sending' | 'sent' | 'error'; msg?: string }>({ k: 'idle' })
   const url = useMemo(() => `${window.location.origin}${window.location.pathname}#s=${encodeSnapshot(results, prefs, token)}`, [results, prefs, token])
   useEffect(() => setCanShare(typeof navigator.share === 'function'), [])
 
@@ -418,6 +422,19 @@ function ShareCard({ results, prefs, token }: { results: Results; prefs: Prefere
     }
     setCopied(true)
     setTimeout(() => setCopied(false), 2500)
+  }
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault()
+    setMailState({ k: 'sending' })
+    try {
+      const res = await fetch(withBase('/api/mail'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to, url, site }) })
+      if (res.ok) return setMailState({ k: 'sent', msg: s.sent(to) })
+      const { error } = (await res.json().catch(() => ({}))) as { error?: string }
+      setMailState({ k: 'error', msg: error === 'address' ? s.sendAddress : error === 'busy' ? s.sendBusy : s.sendFailed })
+    } catch {
+      setMailState({ k: 'error', msg: s.sendFailed })
+    }
   }
 
   return (
@@ -436,11 +453,38 @@ function ShareCard({ results, prefs, token }: { results: Results; prefs: Prefere
               {s.share}
             </button>
           )}
-          <a href={`mailto:?subject=${encodeURIComponent(s.mailSubject(conf.name))}&body=${encodeURIComponent(s.mailBody(url))}`} className="btn btn-ghost">
-            {s.mail}
-          </a>
+          {config?.mail ? (
+            <button type="button" onClick={() => setMailOpen(!mailOpen)} aria-expanded={mailOpen} className="btn btn-ghost">
+              {s.mail}
+            </button>
+          ) : (
+            <a href={`mailto:?subject=${encodeURIComponent(s.mailSubject(conf.name))}&body=${encodeURIComponent(s.mailBody(url))}`} className="btn btn-ghost">
+              {s.mail}
+            </a>
+          )}
         </div>
       </div>
+      {mailOpen && config?.mail && (
+        <form onSubmit={send} className="mt-4 grid gap-2 border-t-2 border-line pt-4">
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              placeholder={s.mailTo}
+              aria-label={s.mailTo}
+              className="input min-w-[14rem] flex-1"
+            />
+            <button type="submit" disabled={mailState.k === 'sending'} className="btn btn-primary">
+              {mailState.k === 'sending' ? s.sending : s.send}
+            </button>
+          </div>
+          {mailState.msg && <p className={`text-sm font-semibold ${mailState.k === 'error' ? 'text-bad' : ''}`}>{mailState.msg}</p>}
+          <p className="text-xs">{s.mailPrivacy}</p>
+        </form>
+      )}
     </section>
   )
 }

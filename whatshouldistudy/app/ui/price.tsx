@@ -10,6 +10,8 @@ import { SITES } from '@/lib/site/config.ts'
 export interface Config {
   payments: 'stripe' | 'free' | 'off'
   price: PriceT
+  /** The site can send the result link by mail itself. */
+  mail?: boolean
 }
 
 let cached: Promise<Config> | null = null

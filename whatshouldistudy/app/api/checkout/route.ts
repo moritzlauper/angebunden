@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { priceFor, stripeAmount } from '@/lib/pricing.ts'
+import { ownOrigins } from '@/lib/server/origins.ts'
 import { paymentMode, visitorCountry } from '@/lib/server/token.ts'
-import { LOCAL_SITES, SITES, isLocal, routes } from '@/lib/site/config.ts'
+import { SITES, isLocal, routes } from '@/lib/site/config.ts'
 import type { SiteId } from '@/lib/site/config.ts'
-import { BASE_PATH, SITE_URL } from '@/lib/site.ts'
+import { BASE_PATH } from '@/lib/site.ts'
 
 /**
  * Starts a Stripe Checkout session in the visitor's currency (or, without
@@ -12,19 +13,10 @@ import { BASE_PATH, SITE_URL } from '@/lib/site.ts'
  * the amount comes from lib/pricing.ts and nothing has to be set up in Stripe.
  */
 
-const origin = (u: string) => {
-  try {
-    return u ? new URL(u).origin : ''
-  } catch {
-    return ''
-  }
-}
-
 /** Where buyers may be sent back to: our own domains. Anything else would be an open redirect. */
 function returnOrigin(req: Request, claimed: string | null): string {
   const own = new URL(req.url).origin
-  const allowed = new Set([own, origin(SITE_URL), ...LOCAL_SITES.map((s) => origin(SITES[s].domainUrl)), ...(process.env.WSIS_ALLOWED_ORIGINS ?? '').split(',').map((o) => origin(o.trim()))])
-  allowed.delete('')
+  const allowed = ownOrigins(req)
   // Behind angebunden's rewrite the request arrives at this deployment's own address; the page tells us where the buyer is.
   return claimed && allowed.has(claimed) ? claimed : own
 }

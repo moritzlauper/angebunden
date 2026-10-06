@@ -331,7 +331,7 @@ export function PrivacyView({ site, base }: SiteProps) {
 
         <h2>Geteilte Links</h2>
         <p>
-          Wenn du dein Resultat teilst, steckt es im Link nach dem «#». Diesen Teil schicken Browser an keinen Server, auch nicht an uns. Er enthält deine Fächer, Prozente und dein Profil, keine Videos, Suchen oder Namen. Wer den Link hat, sieht diese Angaben. Teilen ist freiwillig.
+          Wenn du dein Resultat teilst, steckt es im Link nach dem «#». Diesen Teil schicken Browser an keinen Server, auch nicht an uns. Er enthält deine Fächer, Prozente und dein Profil, keine Videos, Suchen oder Namen. Wer den Link hat, sieht diese Angaben. Teilen ist freiwillig. Drückst du «An mich mailen» und gibst eine Adresse ein, gehen Adresse und Link einmal über unseren Server an unseren Mail-Anbieter Infomaniak (Schweiz), der das Mail verschickt. Wir speichern und protokollieren weder Adresse noch Link.
         </p>
 
         <h2>Cookies und Analyse</h2>
@@ -392,6 +392,11 @@ export function PrivacyView({ site, base }: SiteProps) {
           <strong>Hosting:</strong> the site runs on Vercel, which keeps short-lived technical logs (IP address, time, page). We use your IP address only to infer your country and show the price in your currency.
         </li>
       </ul>
+
+      <h2>Shared links</h2>
+      <p>
+        When you share your result, it lives in the link after the «#». Browsers never send that part to any server, ours included. It holds your fields, percentages and profile, no videos, searches or names. Anyone with the link sees those. Sharing is optional. If you press «Email it to me» and enter an address, the address and the link pass once through our server to our mail provider Infomaniak (Switzerland), which sends the email. We neither store nor log either.
+      </p>
 
       <h2>Google user data</h2>
       <p>
