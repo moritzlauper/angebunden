@@ -13,7 +13,11 @@ jobs:
         working-directory: whatshouldistudy
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: whatshouldistudy/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: for f in probe/*.ts; do echo "=== $f"; node "$f"; done
+      - run: pnpm install --frozen-lockfile
+      - run: for f in probe/*.ts; do echo "=== $f"; node "$f" || echo "!!! $f failed"; done
