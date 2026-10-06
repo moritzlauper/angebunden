@@ -2,7 +2,7 @@ name: whatshouldistudy data
 
 # Refreshes the study programme database of whatshouldistudy/ every Monday:
 # US (College Scorecard), UK (Discover Uni), France (Parcoursup), Switzerland
-# (BFS enrolment by institution and subject), research
+# (BFS enrolment by institution and subject, graduate salaries), research
 # profiles of universities worldwide (OpenAlex) and a world university
 # directory. The result goes to the branch «whatshouldistudy-data», always a
 # single commit, which the site reads via raw.githubusercontent.com.
@@ -98,6 +98,11 @@ jobs:
         if: ${{ !inputs.only || contains(inputs.only, 'ch') }}
         continue-on-error: true
         run: node scrapers/ch-bfs.ts
+
+      - name: Switzerland salaries (BFS graduate survey)
+        if: ${{ !inputs.only || contains(inputs.only, 'ch') }}
+        continue-on-error: true
+        run: node scrapers/ch-salaries.ts
 
       - name: Germany (Studiensuche, Bundesagentur für Arbeit)
         if: ${{ !inputs.only || contains(inputs.only, 'de') }}
