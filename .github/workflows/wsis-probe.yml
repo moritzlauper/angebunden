@@ -1,0 +1,19 @@
+name: whatshouldistudy probe (temporary)
+on:
+  push:
+    branches-ignore: [main]
+    paths: ['whatshouldistudy/probe/**', '.github/workflows/wsis-probe.yml']
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: whatshouldistudy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: for f in probe/*.ts; do echo "=== $f"; node "$f"; done
