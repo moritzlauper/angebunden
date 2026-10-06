@@ -26,6 +26,9 @@ on:
         required: false
         default: ''
   push:
+    # Only main: work branches get the same commits, a second hour-long run
+    # there adds nothing. Test a branch with «Run workflow» instead.
+    branches: [main]
     paths:
       - 'whatshouldistudy/scrapers/**'
       - 'whatshouldistudy/lib/taxonomy/**'
