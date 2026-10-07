@@ -19,7 +19,7 @@ function peekJson(v, depth = 0) {
 for (const r of reqs) {
   console.log(`\n===== ${r.name ?? r.url}`)
   try {
-    const res = await fetch(r.url, { method: r.method ?? 'GET', headers: { 'User-Agent': UA, Accept: '*/*', ...(r.headers ?? {}) }, body: r.body ? JSON.stringify(r.body) : undefined, redirect: 'follow', signal: AbortSignal.timeout(r.timeout ?? 40000) })
+    const res = await fetch(r.url, { method: r.method ?? 'GET', headers: { 'User-Agent': UA, Accept: '*/*', ...(r.headers ?? {}) }, body: r.form ? new URLSearchParams(r.form).toString() : r.body ? JSON.stringify(r.body) : undefined, redirect: 'follow', signal: AbortSignal.timeout(r.timeout ?? 40000) })
     const buf = new Uint8Array(await res.arrayBuffer())
     const type = res.headers.get('content-type') ?? ''
     console.log(`status ${res.status} · ${type} · ${buf.length} bytes · final ${res.url}`)

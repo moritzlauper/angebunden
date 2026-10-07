@@ -1,2 +1,1 @@
-# Scrapers to try on this branch; empty = none.
-true
+node scrapers/au-cricos.ts && node -e "const o=require('./scrapers/out/au-cricos.json');const c={};for(const p of o.programmes){c[p.level]=(c[p.level]||0)+1}console.log(o.programmes.length,c);const f={};for(const p of o.programmes)f[p.fields[0]]=(f[p.fields[0]]||0)+1;console.log(JSON.stringify(Object.entries(f).sort((a,b)=>b[1]-a[1]).slice(0,20)));console.log(JSON.stringify(o.programmes.slice(0,2)))"

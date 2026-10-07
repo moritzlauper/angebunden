@@ -1,12 +1,8 @@
 [
-  { "name": "IT ustat atenei links", "url": "https://ustat.mur.gov.it/dati/didattica/italia/atenei", "dump": 300, "grep": "href=\"[^\"]*(csv|xlsx|xls|download|opendata|api|json)[^\"]*\"" },
-  { "name": "IT ustat home links", "url": "https://ustat.mur.gov.it/", "dump": 200, "grep": "href=\"[^\"]*(csv|xlsx|download|opendata|open-data|dati)[^\"]*\"" },
-  { "name": "IT ustat corsi page", "url": "https://ustat.mur.gov.it/dati/didattica/italia/corsi", "dump": 300, "grep": "href=\"[^\"]*(csv|xlsx|download|api|json)[^\"]*\"|data-url=\"[^\"]+\"|fetch\\([^)]+\\)|\\$\\.(get|ajax|getJSON)\\([^)]+" },
-  { "name": "IT universitaly home", "url": "https://www.universitaly.it/", "dump": 300, "grep": "(api|json|cerca-corsi|cercacorsi|offerta)[^\"' ]{0,120}" },
-  { "name": "IT dati.gov.it ckan", "url": "https://www.dati.gov.it/opendata/api/3/action/package_search?q=ustat%20corsi&rows=5", "expr": "j.result.results.map(p => [p.name, p.title, p.resources.map(r => r.url).slice(0,3)])", "dump": 3000 },
-  { "name": "IT dati-ustat quick", "url": "https://dati-ustat.mur.gov.it/", "timeout": 15000, "dump": 300 },
-  { "name": "NZ nzqa search form", "url": "https://www.nzqa.govt.nz/framework/search/index.do", "dump": 300, "grep": "<(form|select|input)[^>]{0,300}>" },
-  { "name": "NZ nzqa results degrees", "url": "https://www.nzqa.govt.nz/framework/search/results.do?searchType=qualification&qualificationType=Bachelor", "dump": 2500, "grep": "href=\"[^\"]*(qualification|qual|view)[^\"]*\"" },
-  { "name": "NZ study in nz", "url": "https://www.studyinnewzealand.govt.nz/", "dump": 300, "grep": "(api|graphql|course-search|coursesearch)[^\"' ]{0,120}" },
-  { "name": "NZ education counts", "url": "https://www.educationcounts.govt.nz/statistics/tertiary-participation", "dump": 300, "grep": "href=\"[^\"]*\\.(xlsx|csv|xls)\"" }
+  { "name": "NL opleidingsoverzicht", "url": "https://onderwijsdata.duo.nl/dataset/7c0686f4-b5c2-418e-8e44-7be0057d8084/resource/ffffa7ad-e6a2-4ba7-9fc2-a09df4128555/download/ho_opleidingsoverzicht.csv", "dump": 2500 },
+  { "name": "NO klass NUS corr", "url": "https://data.ssb.no/api/klass/v1/classifications/36", "expr": "({name: j.name, links: Object.keys(j._links||{}), versions: (j.versions||[]).slice(0,2).map(v=>v._links.self.href)})", "dump": 1500 },
+  { "name": "NO klass corr search", "url": "https://data.ssb.no/api/klass/v1/classifications/36/corresponds?targetClassificationId=66&from=2020-01-01", "expr": "(j.correspondenceItems||[]).slice(0,8)", "dump": 2000 },
+  { "name": "NZ nzqa options", "url": "https://www.nzqa.govt.nz/framework/search/index.do", "dump": 10, "grep": "<option[^>]*>[^<]*" },
+  { "name": "NZ nzqa post", "url": "https://www.nzqa.govt.nz/framework/search/results.do", "method": "POST", "headers": { "Content-Type": "application/x-www-form-urlencoded" }, "form": { "maxItems": "200", "query": "Bachelor of Arts", "type": "qualification" }, "dump": 10, "grep": "<(tr|td|a)[^>]{0,200}>[^<]{0,120}" },
+  { "name": "IT universitaly cerca-corsi", "url": "https://www.universitaly.it/it/cerca-corsi", "dump": 10, "grep": "(https?://[^\"' ]*(api|json)[^\"' ]*|/api/[^\"' ]{0,100}|_nuxt/[^\"' ]{0,60}\\.js)" }
 ]
