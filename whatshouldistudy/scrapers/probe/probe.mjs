@@ -43,6 +43,10 @@ for (const r of reqs) {
     if (/json/.test(type) || /^\s*[[{]/.test(text)) {
       try {
         const j = JSON.parse(text)
+        if (r.expr) {
+          console.log('expr:', JSON.stringify(new Function('j', `return ${r.expr}`)(j), null, 0).slice(0, r.dump ?? 6000))
+          continue
+        }
         console.log('json:', peekJson(j).slice(0, 3000))
         if (r.dump) console.log(text.slice(0, r.dump))
         continue

@@ -1,8 +1,11 @@
 [
-  { "name": "AU data.gov.au CKAN cricos", "url": "https://data.gov.au/data/api/3/action/package_search?q=cricos&rows=5", "dump": 6000 },
-  { "name": "NZ data.govt.nz CKAN nzqa qualifications", "url": "https://catalogue.data.govt.nz/api/3/action/package_search?q=nzqa%20qualifications&rows=8", "dump": 5000 },
-  { "name": "NL DUO CKAN opleidingen", "url": "https://onderwijsdata.duo.nl/api/3/action/package_search?q=opleidingen%20hoger%20onderwijs&rows=8", "dump": 6000 },
-  { "name": "IT USTAT CKAN", "url": "https://dati-ustat.mur.gov.it/api/3/action/package_search?q=corsi&rows=8", "dump": 5000 },
-  { "name": "FI konfo search", "url": "https://opintopolku.fi/konfo-backend/search/koulutukset?koulutustyyppi=yo&size=2&lng=en", "dump": 3000 },
-  { "name": "NO dbh api root", "url": "https://dbh.hkdir.no/api/Tabeller/hentJSONTabellData", "method": "POST", "headers": { "Content-Type": "application/json" }, "body": { "tabell_id": 347, "api_versjon": 1, "statuslinje": "N", "begrensning": "5", "kodetekst": "J", "desimal_separator": "." }, "dump": 3000 }
+  { "name": "AU cricos resources", "url": "https://data.gov.au/data/api/3/action/package_show?id=cricos", "expr": "j.result.resources.map(r => [r.name, r.format, r.id, r.datastore_active, r.last_modified])", "dump": 8000 },
+  { "name": "AU qilt search", "url": "https://data.gov.au/data/api/3/action/package_search?q=graduate%20outcomes%20survey&rows=5", "expr": "j.result.results.map(p => [p.name, p.title, p.resources.map(r => r.name + ' ' + r.url).slice(0,4)])", "dump": 4000 },
+  { "name": "NL duo opleidingen search", "url": "https://onderwijsdata.duo.nl/api/3/action/package_search?q=opleidingen&rows=40", "expr": "j.result.results.map(p => [p.name, p.title, p.resources.length])", "dump": 6000 },
+  { "name": "FI search amk", "url": "https://opintopolku.fi/konfo-backend/search/koulutukset?koulutustyyppi=amk&size=1&page=1&lng=en", "expr": "({total: j.total, keys: Object.keys(j.hits[0]), koulutukset: j.hits[0].koulutukset, nimi: j.hits[0].nimi, oid: j.hits[0].oid})" },
+  { "name": "FI koulutus detail", "url": "https://opintopolku.fi/konfo-backend/koulutus/1.2.246.562.13.00000000000000011501", "expr": "({keys: Object.keys(j), metadata: j.metadata && Object.keys(j.metadata), koulutukset: j.koulutukset, tutkinto: j.metadata && j.metadata.tutkintonimike, ala: j.metadata && j.metadata.koulutusala, kieli: j.metadata && j.metadata.opetuskieli, tarjoajat: j.tarjoajat && j.tarjoajat.length, sample: JSON.stringify(j).slice(0, 2500)})", "dump": 5000 },
+  { "name": "IT ustat retry", "url": "https://ustat.mur.gov.it/dati/didattica/italia/atenei", "dump": 1500 },
+  { "name": "IT dati.mur open data", "url": "https://dati.mur.gov.it/api/3/action/package_search?q=corsi%20di%20studio&rows=5", "dump": 3000 },
+  { "name": "NZ nzqa api", "url": "https://www.nzqa.govt.nz/api/", "dump": 800 },
+  { "name": "NO dbh 347 groupBy", "url": "https://dbh.hkdir.no/api/Tabeller/hentJSONTabellData", "method": "POST", "headers": { "Content-Type": "application/json" }, "body": { "tabell_id": 347, "api_versjon": 1, "statuslinje": "N", "begrensning": "5", "kodetekst": "J", "desimal_separator": ".", "groupBy": ["Institusjonskode", "Studieprogramkode"] }, "dump": 3000 }
 ]
