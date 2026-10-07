@@ -1,42 +1,12 @@
 [
- {
-  "name": "AU courses url",
-  "url": "https://data.gov.au/data/api/3/action/package_show?id=cricos",
-  "expr": "j.result.resources.filter(r => /csv/i.test(r.format)).map(r => [r.name, r.url])",
-  "dump": 2000
- },
- {
-  "name": "AU levels",
-  "url": "https://data.gov.au/data/api/3/action/datastore_search_sql?sql=SELECT%20%22Course%20Level%22,%20count(*)%20FROM%20%2248cacf69-2082-415e-9595-f17d0c3a4af0%22%20GROUP%20BY%201%20ORDER%20BY%202%20DESC",
-  "expr": "j.result ? j.result.records : j",
-  "dump": 3000
- },
- {
-  "name": "NL opleidingsoverzicht csv",
-  "url": "https://onderwijsdata.duo.nl/dataset/7c0686f4-b5c2-418e-8e44-7be0057d8084/resource/ffffa7ad-e6a2-4ba7-9fc2-a09df4128555/download/ho_opleidingsoverzicht.csv",
-  "dump": 5000
- },
- {
-  "name": "NL erkenningen csv",
-  "url": "https://onderwijsdata.duo.nl/dataset/bb07cc6e-00fe-4100-9528-a0c5fd27d2fb/resource/28a4d89b-c223-4dbc-8deb-9d02a533f215/download/ho_erkenningen_rio.csv",
-  "dump": 3000
- },
- {
-  "name": "NO klass NUS",
-  "url": "https://data.ssb.no/api/klass/v1/classifications/36",
-  "expr": "({name: j.name, versions: (j.versions||[]).map(v => [v.name, v._links && v._links.self && v._links.self.href]).slice(0,4), corr: JSON.stringify(j).match(/correspondence[^\\\"]*\\\"[^\\\"]*\\\"/gi)})",
-  "dump": 3000
- },
- {
-  "name": "NO klass search isced",
-  "url": "https://data.ssb.no/api/klass/v1/classifications/search?query=ISCED",
-  "expr": "(j._embedded && j._embedded.searchResults || []).map(r => [r.name, r._links.self.href])",
-  "dump": 2000
- },
- {
-  "name": "IT http",
-  "url": "http://dati-ustat.mur.gov.it/api/3/action/package_list",
-  "dump": 800,
-  "timeout": 15000
- }
+  { "name": "IT ustat atenei links", "url": "https://ustat.mur.gov.it/dati/didattica/italia/atenei", "dump": 300, "grep": "href=\"[^\"]*(csv|xlsx|xls|download|opendata|api|json)[^\"]*\"" },
+  { "name": "IT ustat home links", "url": "https://ustat.mur.gov.it/", "dump": 200, "grep": "href=\"[^\"]*(csv|xlsx|download|opendata|open-data|dati)[^\"]*\"" },
+  { "name": "IT ustat corsi page", "url": "https://ustat.mur.gov.it/dati/didattica/italia/corsi", "dump": 300, "grep": "href=\"[^\"]*(csv|xlsx|download|api|json)[^\"]*\"|data-url=\"[^\"]+\"|fetch\\([^)]+\\)|\\$\\.(get|ajax|getJSON)\\([^)]+" },
+  { "name": "IT universitaly home", "url": "https://www.universitaly.it/", "dump": 300, "grep": "(api|json|cerca-corsi|cercacorsi|offerta)[^\"' ]{0,120}" },
+  { "name": "IT dati.gov.it ckan", "url": "https://www.dati.gov.it/opendata/api/3/action/package_search?q=ustat%20corsi&rows=5", "expr": "j.result.results.map(p => [p.name, p.title, p.resources.map(r => r.url).slice(0,3)])", "dump": 3000 },
+  { "name": "IT dati-ustat quick", "url": "https://dati-ustat.mur.gov.it/", "timeout": 15000, "dump": 300 },
+  { "name": "NZ nzqa search form", "url": "https://www.nzqa.govt.nz/framework/search/index.do", "dump": 300, "grep": "<(form|select|input)[^>]{0,300}>" },
+  { "name": "NZ nzqa results degrees", "url": "https://www.nzqa.govt.nz/framework/search/results.do?searchType=qualification&qualificationType=Bachelor", "dump": 2500, "grep": "href=\"[^\"]*(qualification|qual|view)[^\"]*\"" },
+  { "name": "NZ study in nz", "url": "https://www.studyinnewzealand.govt.nz/", "dump": 300, "grep": "(api|graphql|course-search|coursesearch)[^\"' ]{0,120}" },
+  { "name": "NZ education counts", "url": "https://www.educationcounts.govt.nz/statistics/tertiary-participation", "dump": 300, "grep": "href=\"[^\"]*\\.(xlsx|csv|xls)\"" }
 ]

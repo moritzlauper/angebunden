@@ -26,9 +26,20 @@ jobs:
           node-version: 22
       - run: pnpm install --frozen-lockfile
       - run: node scrapers/probe/probe.mjs
-      - name: Australia scraper
-        continue-on-error: true
-        run: node scrapers/au-cricos.ts && node -e "const o=require('./scrapers/out/au-cricos.json');const c={};for(const p of o.programmes){c[p.level]=(c[p.level]||0)+1}console.log(o.programmes.length,c);const f={};for(const p of o.programmes)f[p.fields[0]]=(f[p.fields[0]]||0)+1;console.log(Object.entries(f).sort((a,b)=>b[1]-a[1]).slice(0,25));console.log(JSON.stringify(o.programmes.slice(0,3),null,1))"
-      - name: Finland scraper
-        continue-on-error: true
-        run: node scrapers/fi-opintopolku.ts && node -e "const o=require('./scrapers/out/fi-opintopolku.json');const c={};for(const p of o.programmes){c[p.level]=(c[p.level]||0)+1}console.log(o.programmes.length,c);const f={};for(const p of o.programmes)f[p.fields[0]]=(f[p.fields[0]]||0)+1;console.log(Object.entries(f).sort((a,b)=>b[1]-a[1]).slice(0,25));const l={};for(const p of o.programmes)l[(p.languages||[]).join()]=(l[(p.languages||[]).join()]||0)+1;console.log(l);console.log(JSON.stringify(o.programmes.slice(0,2),null,1))"
+
+  scrapers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: whatshouldistudy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: whatshouldistudy/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install --frozen-lockfile
+      - run: bash scrapers/probe/run-scrapers.sh
