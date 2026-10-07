@@ -1,0 +1,8 @@
+[
+  { "name": "AU data.gov.au CKAN cricos", "url": "https://data.gov.au/data/api/3/action/package_search?q=cricos&rows=5", "dump": 6000 },
+  { "name": "NZ data.govt.nz CKAN nzqa qualifications", "url": "https://catalogue.data.govt.nz/api/3/action/package_search?q=nzqa%20qualifications&rows=8", "dump": 5000 },
+  { "name": "NL DUO CKAN opleidingen", "url": "https://onderwijsdata.duo.nl/api/3/action/package_search?q=opleidingen%20hoger%20onderwijs&rows=8", "dump": 6000 },
+  { "name": "IT USTAT CKAN", "url": "https://dati-ustat.mur.gov.it/api/3/action/package_search?q=corsi&rows=8", "dump": 5000 },
+  { "name": "FI konfo search", "url": "https://opintopolku.fi/konfo-backend/search/koulutukset?koulutustyyppi=yo&size=2&lng=en", "dump": 3000 },
+  { "name": "NO dbh api root", "url": "https://dbh.hkdir.no/api/Tabeller/hentJSONTabellData", "method": "POST", "headers": { "Content-Type": "application/json" }, "body": { "tabell_id": 347, "api_versjon": 1, "statuslinje": "N", "begrensning": "5", "kodetekst": "J", "desimal_separator": "." }, "dump": 3000 }
+]
