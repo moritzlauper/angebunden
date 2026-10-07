@@ -7,12 +7,11 @@ import type { NextConfig } from 'next'
  * ausliefern kann (siehe README).
  */
 /**
- * whatshouldistudy (Unterordner whatshouldistudy/) läuft als eigenes Vercel-Projekt
- * mit basePath /whatshouldistudy. angebunden reicht diesen Pfad dorthin weiter
- * (Next.js Multi-Zones), so ist es unter angebunden.ch/whatshouldistudy erreichbar.
- * Adresse des Projekts: WHATSHOULDISTUDY_URL, sonst seine Produktionsdomain auf Vercel.
+ * whatshouldistudy läuft unter whatshouldistudy.ch. Der frühere Pfad auf
+ * angebunden.ch leitet dorthin weiter. WHATSHOULDISTUDY_URL kann für Vorschauen
+ * oder einen abweichenden Domainnamen gesetzt werden.
  */
-const WSIS = (process.env.WHATSHOULDISTUDY_URL || 'https://angebunden-7o69.vercel.app').replace(/\/$/, '')
+const WSIS = (process.env.WHATSHOULDISTUDY_URL || 'https://whatshouldistudy.ch').replace(/\/$/, '')
 
 const nextConfig: NextConfig = {
   output: process.env.STATISCH ? 'export' : undefined,
@@ -20,10 +19,10 @@ const nextConfig: NextConfig = {
   ...(process.env.STATISCH
     ? {}
     : {
-        async rewrites() {
+        async redirects() {
           return [
-            { source: '/whatshouldistudy', destination: `${WSIS}/whatshouldistudy` },
-            { source: '/whatshouldistudy/:path*', destination: `${WSIS}/whatshouldistudy/:path*` },
+            { source: '/whatshouldistudy', destination: WSIS, permanent: true },
+            { source: '/whatshouldistudy/:path*', destination: `${WSIS}/:path*`, permanent: true },
           ]
         },
       }),
