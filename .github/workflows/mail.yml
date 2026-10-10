@@ -1,0 +1,51 @@
+# One mail through Resend, started by hand (e.g. a request to a data
+# publisher). Secret: RESEND_API_KEY. Leave «to» empty to only check the key,
+# the sending domains and the addresses on the «lookup» page.
+name: Mail
+
+on:
+  workflow_dispatch:
+    inputs:
+      lookup:
+        description: Page to read contact addresses from
+        required: false
+      to:
+        description: Recipient (empty = check only)
+        required: false
+      from:
+        description: Sender, e.g. «Name <a@b.ch>», on a domain verified at Resend
+        required: false
+      reply_to:
+        description: Reply-to address
+        required: false
+      bcc:
+        description: Blind copy
+        required: false
+      subject:
+        description: Subject
+        required: false
+      body:
+        description: Text
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  mail:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node .github/scripts/mail.mjs
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          LOOKUP: ${{ inputs.lookup }}
+          TO: ${{ inputs.to }}
+          FROM: ${{ inputs.from }}
+          REPLY_TO: ${{ inputs.reply_to }}
+          BCC: ${{ inputs.bcc }}
+          SUBJECT: ${{ inputs.subject }}
+          BODY: ${{ inputs.body }}
