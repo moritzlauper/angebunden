@@ -559,27 +559,29 @@ const PRUEF_BUDGET = 40
 
 type Pruefung = 'lebt' | 'tot' | 'unbekannt'
 
-// DIAGNOSE (vorübergehend): Die Detailseite trägt keine Inseratsdaten, also die JavaScript-Pakete
-// nach Adressen einer Schnittstelle durchsuchen, von der die Seite sie nachlädt.
-async function ronorpPakete(url: string): Promise<void> {
-  const res = await fetch(url, { headers: { ...BROWSER, Accept: 'text/html' }, signal: AbortSignal.timeout(20_000) })
+// DIAGNOSE (vorübergehend): Die Post-Route `/market/posts/<id>` der Bundles gegen Live und Alt prüfen.
+async function ronorpPosten(url: string, titel: string, label: string): Promise<void> {
+  const res = await fetch(url, {
+    headers: { ...BROWSER, Accept: 'text/html' },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  })
   const html = await res.text()
-  const pakete = [...new Set([...html.matchAll(/["'](\/_next\/static\/[^"']+\.js)["']/g)].map((m) => m[1]))]
-  console.log(`  PAKETE ${pakete.length} aus ${url}`)
-  const treffer = new Set<string>()
-  for (const p of pakete) {
+  const norm = (s: string) =>
+    s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')
+  const kopf = norm(titel).slice(0, 20)
+  let info = 'kein __NEXT_DATA__'
+  const nd = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
+  if (nd) {
     try {
-      const js = await (await fetch(`https://ronorp.net${p}`, { headers: BROWSER, signal: AbortSignal.timeout(20_000) })).text()
-      for (const m of js.matchAll(
-        /["'`]((?:https?:\/\/[a-z0-9.-]*ronorp[^"'`\s]{0,120})|(?:\/api\/[^"'`\s]{0,120})|(?:\/wp-json[^"'`\s]{0,120})|(?:[^"'`\s]{0,60}graphql[^"'`\s]{0,60}))["'`]/gi)
-      ) {
-        treffer.add(m[1])
-      }
+      const d = JSON.parse(nd[1])
+      info = `page=${d.page} pageProps=${Object.keys(d.props?.pageProps ?? {}).join(',')}`
     } catch {
-      console.log(`    Paket nicht ladbar: ${p}`)
+      info = 'NEXT_DATA unlesbar'
     }
   }
-  console.log(`  PAKET-TREFFER (${treffer.size}): ${[...treffer].slice(0, 60).join(' | ')}`)
+  console.log(`  POSTEN ${label} ${url}`)
+  console.log(`    status=${res.status} final=${res.url} len=${html.length} titelImHtml=${norm(html).includes(kopf)} ${info}`)
 }
 
 /**
@@ -735,8 +737,10 @@ async function main() {
         for (const r of funde) geprueft.set(r.url, jetzt)
         const aktuelle = new Set(funde.map((r) => r.quellId))
         const kandidaten = alteVon(id).filter((i) => !neueUrls.has(i.links[0].url) && !(i.bis && i.bis < heute()))
-        // DIAGNOSE (vorübergehend): Schnittstelle der Detailseite in den Paketen suchen.
-        if (funde[0]) await ronorpPakete(funde[0].url)
+        // DIAGNOSE (vorübergehend): Post-Route mit Nummer für aktuelle und alte Inserate.
+        for (const r of funde.slice(0, 2)) await ronorpPosten(`https://ronorp.net/market/posts/${r.quellId}`, r.titel, 'AKTUELL')
+        for (const i of kandidaten.slice(0, 3)) await ronorpPosten(`https://ronorp.net/market/posts/${i.id.split(':')[1]}`, i.titel, 'ALT')
+        if (funde[0]) await ronorpPosten(`https://ronorp.net/market/posts/${funde[0].url.split('/').pop()}`, funde[0].titel, 'AKTUELL-SLUG')
         for (const i of await ronorpAlte(kandidaten, geprueft, jetzt, aktuelle)) {
           alle.push(i)
           drin++
