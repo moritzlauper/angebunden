@@ -712,7 +712,28 @@ async function main() {
         for (const r of funde) geprueft.set(r.url, jetzt)
         const aktuelle = new Set(funde.map((r) => r.quellId))
         // Gegenprobe: Was die Liste zeigt, ist online. Erkennt die Prüfung es nicht, stimmt sie nicht.
-        for (const r of funde.slice(0, 2)) console.log(`  Kontrolle, aktuell gelistet: ${await ronorpPruefen(r.url, r.quellId)} ${r.url}`)
+        // DIAGNOSE (vorübergehend): Aufbau der Detailseite eines aktuellen und eines entfernten Inserats.
+        const diag = [funde[0]?.url, 'https://ronorp.net/zurich/market/housing/apartment-1-bedroom'].filter(Boolean) as string[]
+        for (const u of diag) {
+          const slug = u.split('/').pop() ?? ''
+          const res = await fetch(u, { headers: { ...BROWSER, Accept: 'text/html' }, redirect: 'follow' })
+          const html = await res.text()
+          const nd = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
+          const titel = (html.match(/<title>([^<]*)<\/title>/) ?? [])[1]
+          let build = ''
+          let info = 'kein __NEXT_DATA__'
+          if (nd) {
+            const d = JSON.parse(nd[1])
+            build = d.buildId
+            info = `page=${d.page} pageProps=${Object.keys(d.props?.pageProps ?? {}).join(',')} query=${JSON.stringify(d.query)}`
+          }
+          console.log(`  DIAG ${u}\n    status=${res.status} final=${res.url} len=${html.length} slugIn=${html.includes(slug)} title=${titel}\n    ${info}`)
+          if (build) {
+            const jr = await fetch(`https://ronorp.net/_next/data/${build}/zurich/market/housing/${slug}.json`, { headers: BROWSER })
+            const jt = await jr.text()
+            console.log(`    _next/data: status=${jr.status} len=${jt.length} head=${jt.slice(0, 300)}`)
+          }
+        }
         const kandidaten = alteVon(id).filter((i) => !neueUrls.has(i.links[0].url) && !(i.bis && i.bis < heute()))
         for (const i of await ronorpAlte(kandidaten, geprueft, jetzt, aktuelle)) {
           alle.push(i)
