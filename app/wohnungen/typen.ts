@@ -83,4 +83,9 @@ export type Wohnungen = {
    * verfallen zwei Wochen nach dem letzten Sehen.
    */
   gesehen?: Record<string, [string, string]>
+  /**
+   * Wann ein Ron-Orp-Inserat zuletzt auf seiner Detailseite bestätigt wurde
+   * (je Link, ISO). Ältere Bestätigungen gelten nicht mehr und werden neu geprüft.
+   */
+  geprueft?: Record<string, string>
 }

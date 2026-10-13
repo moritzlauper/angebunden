@@ -546,8 +546,98 @@ function stadtgrenze(): (lon: number, lat: number) => boolean {
 
 // ─── Lauf ─────────────────────────────────────────────────────────────────
 
-/** Quellen, die nur die neuesten Inserate zeigen: Früher Gesammeltes bleibt bis `bis` stehen. */
+/**
+ * Quellen, die nur die neuesten Inserate zeigen. Was früher gesammelt wurde, prüft der Sammler
+ * einzeln auf der Detailseite (siehe `ronorpAlte`), statt es blind bis zum Ablaufdatum zu behalten.
+ */
 const SAMMELND = new Set<QuellenId>(['ronorp'])
+
+/** Eine Bestätigung «online» gilt so lange, dann wird das Inserat neu geprüft. */
+const PRUEF_FENSTER_MS = 60 * 60 * 1000
+/** Höchstens so viele Detailseiten je Lauf, damit ein Durchgang nicht ausufert. */
+const PRUEF_BUDGET = 40
+
+type Pruefung = 'lebt' | 'tot' | 'unbekannt'
+
+/**
+ * Gibt es das Inserat noch? Ron Orp antwortet auf eine Adresse von vermieteten oder entfernten
+ * Inseraten nicht mit 404, sondern mit der Startseite. Ein bestehendes Inserat trägt dagegen
+ * seinen Slug und seine Nummer auf der Seite.
+ */
+async function ronorpPruefen(url: string, id: string): Promise<Pruefung> {
+  const slug = url.split('/').filter(Boolean).pop() ?? ''
+  try {
+    const res = await fetch(url, {
+      headers: { ...BROWSER, Accept: 'text/html,application/xhtml+xml' },
+      signal: AbortSignal.timeout(20_000),
+    })
+    if (res.status === 404 || res.status === 410) return 'tot'
+    if (!res.ok) return 'unbekannt'
+    const html = await res.text()
+    return html.includes(slug) && html.includes(id) ? 'lebt' : 'tot'
+  } catch {
+    return 'unbekannt'
+  }
+}
+
+/**
+ * Die früher gesammelten Ron-Orp-Inserate, die noch online sind. Zuerst die Doppelten: Hat dieselbe
+ * Nummer inzwischen einen neuen Link, ist der alte überholt. Danach die übrigen, die am längsten
+ * nicht geprüft wurden, bis zum Budget. Kann eine Seite nicht geladen werden, bleibt das Inserat,
+ * wenn es kürzlich bestätigt war, sonst fällt es weg.
+ */
+async function ronorpAlte(
+  kandidaten: Inserat[],
+  geprueft: Map<string, string>,
+  jetzt: string,
+  aktuelle: Set<string>
+): Promise<Inserat[]> {
+  const lebend: Inserat[] = []
+  const zaehl = { gecacht: 0, lebt: 0, tot: 0, unbekannt: 0, spaeter: 0 }
+  const beispiele: string[] = []
+  let budget = PRUEF_BUDGET
+  const reihe = [...kandidaten].sort((a, b) =>
+    (geprueft.get(a.links[0].url) ?? '').localeCompare(geprueft.get(b.links[0].url) ?? '')
+  )
+  for (const i of reihe) {
+    const url = i.links[0].url
+    const id = i.id.split(':')[1]
+    if (aktuelle.has(id)) {
+      zaehl.tot++
+      geprueft.delete(url)
+      continue
+    }
+    const zuletzt = geprueft.get(url)
+    if (zuletzt && Date.parse(jetzt) - Date.parse(zuletzt) < PRUEF_FENSTER_MS) {
+      zaehl.gecacht++
+      lebend.push(i)
+      continue
+    }
+    if (budget <= 0) {
+      zaehl.spaeter++
+      continue
+    }
+    budget--
+    const r = await ronorpPruefen(url, id)
+    zaehl[r]++
+    if (r === 'tot' && beispiele.length < 3) beispiele.push(url)
+    if (r === 'lebt') {
+      geprueft.set(url, jetzt)
+      lebend.push(i)
+    } else if (r === 'unbekannt' && zuletzt) {
+      lebend.push(i)
+    } else {
+      geprueft.delete(url)
+    }
+    await warte(400)
+  }
+  console.log(
+    `Ron Orp, früher gesammelt: ${zaehl.gecacht} eben bestätigt, ${zaehl.lebt} neu bestätigt, ` +
+      `${zaehl.tot} entfernt, ${zaehl.unbekannt} unklar, ${zaehl.spaeter} auf später`
+  )
+  for (const u of beispiele) console.log(`  entfernt: ${u}`)
+  return lebend
+}
 
 async function main() {
   const jetzt = new Date().toISOString()
@@ -563,6 +653,8 @@ async function main() {
     }
   }
   const bekannt = new Map<string, string>([...gesehen].map(([url, [erst]]) => [url, erst]))
+  // Wann ein Ron-Orp-Inserat zuletzt auf seiner Detailseite bestätigt wurde (siehe `ronorpAlte`).
+  const geprueft = new Map<string, string>(Object.entries(vorher?.geprueft ?? {}))
 
   const quellen: [QuellenId, () => Promise<Roh[]>][] = [
     ['flatfox', flatfox],
@@ -616,8 +708,11 @@ async function main() {
         drin++
       }
       if (SAMMELND.has(id)) {
-        for (const i of alteVon(id)) {
-          if (neueUrls.has(i.links[0].url) || (i.bis && i.bis < heute())) continue
+        // Was die Liste gerade zeigt, ist online.
+        for (const r of funde) geprueft.set(r.url, jetzt)
+        const aktuelle = new Set(funde.map((r) => r.quellId))
+        const kandidaten = alteVon(id).filter((i) => !neueUrls.has(i.links[0].url) && !(i.bis && i.bis < heute()))
+        for (const i of await ronorpAlte(kandidaten, geprueft, jetzt, aktuelle)) {
           alle.push(i)
           drin++
         }
@@ -662,12 +757,17 @@ async function main() {
   const grenze = new Date(Date.parse(jetzt) - 14 * 24 * 3600 * 1000).toISOString()
   for (const [url, [, zuletzt]] of gesehen) if (zuletzt < grenze) gesehen.delete(url)
 
+  // Bestätigungen, die älter als drei Tage sind, braucht niemand mehr.
+  const altGrenze = Date.parse(jetzt) - 3 * 24 * 3600 * 1000
+  for (const [url, t] of geprueft) if (Date.parse(t) < altGrenze) geprueft.delete(url)
+
   const ergebnis: Wohnungen = {
     erstellt: jetzt,
     haeuser: haeuser.length,
     quellen: stand,
     inserate,
     gesehen: Object.fromEntries(gesehen),
+    geprueft: Object.fromEntries(geprueft),
   }
   mkdirSync(path.dirname(AUSGABE), { recursive: true })
   writeFileSync(AUSGABE, JSON.stringify(ergebnis))

@@ -194,6 +194,8 @@ async function main() {
           )
         : alle
       neu.sort((a, b) => b.erstGesehen.localeCompare(a.erstGesehen))
+      // Im Lauf sichtbar machen, warum eine Suche keine Mail bekommt: passt nichts, oder ist nichts neu.
+      console.log(`Suchabo «${abo.name}»: ${alle.length} passen, ${neu.length} neu${abo.bestaetigt ? '' : ' (Bestätigung)'}`)
 
       // Alles, was jetzt passt, gilt ab jetzt als bekannt, die neuesten zuerst.
       const gesendet = [...new Set([...neu.flatMap(summen), ...alle.flatMap(summen), ...(abo.gesendet ?? [])])].slice(0, GEDAECHTNIS)
