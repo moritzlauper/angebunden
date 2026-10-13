@@ -574,8 +574,12 @@ async function ronorpPosten(url: string, titel: string, label: string): Promise<
   const nd = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
   if (nd) {
     try {
-      const d = JSON.parse(nd[1])
-      info = `page=${d.page} pageProps=${Object.keys(d.props?.pageProps ?? {}).join(',')}`
+      const pp = JSON.parse(nd[1]).props?.pageProps ?? {}
+      const sp = pp.singlePost
+      const kopfSp =
+        sp === undefined ? 'fehlt' : sp === null ? 'null' : typeof sp === 'object' ? `{${Object.keys(sp).join(',')}}` : String(sp)
+      info = `singlePost=${kopfSp} metaTitel=${JSON.stringify(pp.metaData?.title ?? '').slice(0, 140)} robots=${JSON.stringify(pp.robotsProps ?? null).slice(0, 160)}`
+      if (sp && typeof sp === 'object') info += `\n    singlePost-Auszug: ${JSON.stringify(sp).slice(0, 700)}`
     } catch {
       info = 'NEXT_DATA unlesbar'
     }
@@ -737,10 +741,10 @@ async function main() {
         for (const r of funde) geprueft.set(r.url, jetzt)
         const aktuelle = new Set(funde.map((r) => r.quellId))
         const kandidaten = alteVon(id).filter((i) => !neueUrls.has(i.links[0].url) && !(i.bis && i.bis < heute()))
-        // DIAGNOSE (vorübergehend): Post-Route mit Nummer für aktuelle und alte Inserate.
+        // DIAGNOSE (vorübergehend): Post-Route mit Nummer; eine erfundene Nummer als Negativkontrolle.
         for (const r of funde.slice(0, 2)) await ronorpPosten(`https://ronorp.net/market/posts/${r.quellId}`, r.titel, 'AKTUELL')
         for (const i of kandidaten.slice(0, 3)) await ronorpPosten(`https://ronorp.net/market/posts/${i.id.split(':')[1]}`, i.titel, 'ALT')
-        if (funde[0]) await ronorpPosten(`https://ronorp.net/market/posts/${funde[0].url.split('/').pop()}`, funde[0].titel, 'AKTUELL-SLUG')
+        await ronorpPosten('https://ronorp.net/market/posts/9999999', 'Negativ', 'NEGATIV')
         for (const i of await ronorpAlte(kandidaten, geprueft, jetzt, aktuelle)) {
           alle.push(i)
           drin++
