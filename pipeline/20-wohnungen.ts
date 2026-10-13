@@ -559,30 +559,27 @@ const PRUEF_BUDGET = 40
 
 type Pruefung = 'lebt' | 'tot' | 'unbekannt'
 
-// DIAGNOSE (vorübergehend): Aufbau einer Detailseite, zum Vergleich aktuell gegen früher gesammelt.
-async function ronorpAufbau(url: string, titel: string, label: string): Promise<void> {
-  const res = await fetch(url, {
-    headers: { ...BROWSER, Accept: 'text/html' },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(20_000),
-  })
+// DIAGNOSE (vorübergehend): Die Detailseite trägt keine Inseratsdaten, also die JavaScript-Pakete
+// nach Adressen einer Schnittstelle durchsuchen, von der die Seite sie nachlädt.
+async function ronorpPakete(url: string): Promise<void> {
+  const res = await fetch(url, { headers: { ...BROWSER, Accept: 'text/html' }, signal: AbortSignal.timeout(20_000) })
   const html = await res.text()
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
-  const kopf = norm(titel).slice(0, 20)
-  const sichtbar = html
-    .replace(/<script[\s\S]*?<\/script>/g, ' ')
-    .replace(/<style[\s\S]*?<\/style>/g, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-  const ld = (html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/) ?? [])[1] ?? ''
-  const skripte = [...new Set([...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1]))].slice(0, 4)
-  const apis = [...new Set(html.match(/https?:\/\/[^"'\s\\<>]{0,200}api[^"'\s\\<>]{0,200}/g) ?? [])].slice(0, 8)
-  console.log(`  AUFBAU ${label} ${url}`)
-  console.log(`    status=${res.status} final=${res.url} len=${html.length} titel(${kopf})imHtml=${norm(html).includes(kopf)}`)
-  console.log(`    sichtbar(${sichtbar.length}): ${sichtbar.slice(0, 400)}`)
-  console.log(`    ld+json(${ld.length}): ${ld.slice(0, 400)}`)
-  console.log(`    skripte: ${skripte.join(' ')}`)
-  console.log(`    api-urls: ${apis.join(' ')}`)
+  const pakete = [...new Set([...html.matchAll(/["'](\/_next\/static\/[^"']+\.js)["']/g)].map((m) => m[1]))]
+  console.log(`  PAKETE ${pakete.length} aus ${url}`)
+  const treffer = new Set<string>()
+  for (const p of pakete) {
+    try {
+      const js = await (await fetch(`https://ronorp.net${p}`, { headers: BROWSER, signal: AbortSignal.timeout(20_000) })).text()
+      for (const m of js.matchAll(
+        /["'`]((?:https?:\/\/[a-z0-9.-]*ronorp[^"'`\s]{0,120})|(?:\/api\/[^"'`\s]{0,120})|(?:\/wp-json[^"'`\s]{0,120})|(?:[^"'`\s]{0,60}graphql[^"'`\s]{0,60}))["'`]/gi)
+      ) {
+        treffer.add(m[1])
+      }
+    } catch {
+      console.log(`    Paket nicht ladbar: ${p}`)
+    }
+  }
+  console.log(`  PAKET-TREFFER (${treffer.size}): ${[...treffer].slice(0, 60).join(' | ')}`)
 }
 
 /**
@@ -738,9 +735,8 @@ async function main() {
         for (const r of funde) geprueft.set(r.url, jetzt)
         const aktuelle = new Set(funde.map((r) => r.quellId))
         const kandidaten = alteVon(id).filter((i) => !neueUrls.has(i.links[0].url) && !(i.bis && i.bis < heute()))
-        // DIAGNOSE (vorübergehend): drei aktuelle gegen drei früher gesammelte Inserate.
-        for (const r of funde.slice(0, 3)) await ronorpAufbau(r.url, r.titel, 'AKTUELL')
-        for (const i of kandidaten.slice(0, 3)) await ronorpAufbau(i.links[0].url, i.titel, 'ALT')
+        // DIAGNOSE (vorübergehend): Schnittstelle der Detailseite in den Paketen suchen.
+        if (funde[0]) await ronorpPakete(funde[0].url)
         for (const i of await ronorpAlte(kandidaten, geprueft, jetzt, aktuelle)) {
           alle.push(i)
           drin++
