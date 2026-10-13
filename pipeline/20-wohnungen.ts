@@ -559,6 +559,28 @@ const PRUEF_BUDGET = 40
 
 type Pruefung = 'lebt' | 'tot' | 'unbekannt'
 
+// DIAGNOSE (vorübergehend): Aufbau einer Detailseite, zum Vergleich aktuell gegen früher gesammelt.
+async function ronorpAufbau(url: string, titel: string, label: string): Promise<void> {
+  const res = await fetch(url, { headers: { ...BROWSER, Accept: 'text/html' }, redirect: 'follow' })
+  const html = await res.text()
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const kopf = norm(titel).slice(0, 20)
+  const sichtbar = html
+    .replace(/<script[\s\S]*?<\/script>/g, ' ')
+    .replace(/<style[\s\S]*?<\/style>/g, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+  const ld = (html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/) ?? [])[1] ?? ''
+  const skripte = [...new Set([...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1]))].slice(0, 4)
+  const apis = [...new Set(html.match(/https?:\/\/[^"'\s\\]*api[^"'\s\\]*/g) ?? [])].slice(0, 8)
+  console.log(`  AUFBAU ${label} ${url}`)
+  console.log(`    status=${res.status} final=${res.url} len=${html.length} titel(${kopf})imHtml=${norm(html).includes(kopf)}`)
+  console.log(`    sichtbar(${sichtbar.length}): ${sichtbar.slice(0, 400)}`)
+  console.log(`    ld+json(${ld.length}): ${ld.slice(0, 400)}`)
+  console.log(`    skripte: ${skripte.join(' ')}`)
+  console.log(`    api-urls: ${apis.join(' ')}`)
+}
+
 /**
  * Gibt es das Inserat noch? Ron Orp antwortet auf eine Adresse von vermieteten oder entfernten
  * Inseraten nicht mit 404, sondern mit der Startseite. Ein bestehendes Inserat trägt dagegen
@@ -711,30 +733,10 @@ async function main() {
         // Was die Liste gerade zeigt, ist online.
         for (const r of funde) geprueft.set(r.url, jetzt)
         const aktuelle = new Set(funde.map((r) => r.quellId))
-        // Gegenprobe: Was die Liste zeigt, ist online. Erkennt die Prüfung es nicht, stimmt sie nicht.
-        // DIAGNOSE (vorübergehend): Aufbau der Detailseite eines aktuellen und eines entfernten Inserats.
-        const diag = [funde[0]?.url, 'https://ronorp.net/zurich/market/housing/apartment-1-bedroom'].filter(Boolean) as string[]
-        for (const u of diag) {
-          const slug = u.split('/').pop() ?? ''
-          const res = await fetch(u, { headers: { ...BROWSER, Accept: 'text/html' }, redirect: 'follow' })
-          const html = await res.text()
-          const nd = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
-          const titel = (html.match(/<title>([^<]*)<\/title>/) ?? [])[1]
-          let build = ''
-          let info = 'kein __NEXT_DATA__'
-          if (nd) {
-            const d = JSON.parse(nd[1])
-            build = d.buildId
-            info = `page=${d.page} pageProps=${Object.keys(d.props?.pageProps ?? {}).join(',')} query=${JSON.stringify(d.query)}`
-          }
-          console.log(`  DIAG ${u}\n    status=${res.status} final=${res.url} len=${html.length} slugIn=${html.includes(slug)} title=${titel}\n    ${info}`)
-          if (build) {
-            const jr = await fetch(`https://ronorp.net/_next/data/${build}/zurich/market/housing/${slug}.json`, { headers: BROWSER })
-            const jt = await jr.text()
-            console.log(`    _next/data: status=${jr.status} len=${jt.length} head=${jt.slice(0, 300)}`)
-          }
-        }
         const kandidaten = alteVon(id).filter((i) => !neueUrls.has(i.links[0].url) && !(i.bis && i.bis < heute()))
+        // DIAGNOSE (vorübergehend): drei aktuelle gegen drei früher gesammelte Inserate.
+        for (const r of funde.slice(0, 3)) await ronorpAufbau(r.url, r.titel, 'AKTUELL')
+        for (const i of kandidaten.slice(0, 3)) await ronorpAufbau(i.links[0].url, i.titel, 'ALT')
         for (const i of await ronorpAlte(kandidaten, geprueft, jetzt, aktuelle)) {
           alle.push(i)
           drin++
