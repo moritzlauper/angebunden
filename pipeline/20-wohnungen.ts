@@ -561,7 +561,11 @@ type Pruefung = 'lebt' | 'tot' | 'unbekannt'
 
 // DIAGNOSE (vorübergehend): Aufbau einer Detailseite, zum Vergleich aktuell gegen früher gesammelt.
 async function ronorpAufbau(url: string, titel: string, label: string): Promise<void> {
-  const res = await fetch(url, { headers: { ...BROWSER, Accept: 'text/html' }, redirect: 'follow' })
+  const res = await fetch(url, {
+    headers: { ...BROWSER, Accept: 'text/html' },
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
+  })
   const html = await res.text()
   const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
   const kopf = norm(titel).slice(0, 20)
@@ -572,7 +576,7 @@ async function ronorpAufbau(url: string, titel: string, label: string): Promise<
     .replace(/\s+/g, ' ')
   const ld = (html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/) ?? [])[1] ?? ''
   const skripte = [...new Set([...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1]))].slice(0, 4)
-  const apis = [...new Set(html.match(/https?:\/\/[^"'\s\\]*api[^"'\s\\]*/g) ?? [])].slice(0, 8)
+  const apis = [...new Set(html.match(/https?:\/\/[^"'\s\\<>]{0,200}api[^"'\s\\<>]{0,200}/g) ?? [])].slice(0, 8)
   console.log(`  AUFBAU ${label} ${url}`)
   console.log(`    status=${res.status} final=${res.url} len=${html.length} titel(${kopf})imHtml=${norm(html).includes(kopf)}`)
   console.log(`    sichtbar(${sichtbar.length}): ${sichtbar.slice(0, 400)}`)
