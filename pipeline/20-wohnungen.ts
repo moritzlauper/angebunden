@@ -576,10 +576,12 @@ async function ronorpPosten(url: string, titel: string, label: string): Promise<
     try {
       const pp = JSON.parse(nd[1]).props?.pageProps ?? {}
       const sp = pp.singlePost
-      const kopfSp =
-        sp === undefined ? 'fehlt' : sp === null ? 'null' : typeof sp === 'object' ? `{${Object.keys(sp).join(',')}}` : String(sp)
-      info = `singlePost=${kopfSp} metaTitel=${JSON.stringify(pp.metaData?.title ?? '').slice(0, 140)} robots=${JSON.stringify(pp.robotsProps ?? null).slice(0, 160)}`
-      if (sp && typeof sp === 'object') info += `\n    singlePost-Auszug: ${JSON.stringify(sp).slice(0, 700)}`
+      info =
+        sp && typeof sp === 'object'
+          ? `status=${sp.status} geloescht=${sp.deleted_at} ende=${sp.publication_end_date} aktualisiert=${sp.updated_at} ` +
+            `typ=${sp.post_type} kat=${sp.category?.name ?? '-'} unavailableAfter=${pp.robotsProps?.unavailableAfter ?? '-'} ` +
+            `meta=${JSON.stringify(pp.metaData?.title ?? '').slice(0, 60)}`
+          : `singlePost=${JSON.stringify(sp ?? null).slice(0, 120)}`
     } catch {
       info = 'NEXT_DATA unlesbar'
     }
@@ -743,7 +745,7 @@ async function main() {
         const kandidaten = alteVon(id).filter((i) => !neueUrls.has(i.links[0].url) && !(i.bis && i.bis < heute()))
         // DIAGNOSE (vorübergehend): Post-Route mit Nummer; eine erfundene Nummer als Negativkontrolle.
         for (const r of funde.slice(0, 2)) await ronorpPosten(`https://ronorp.net/market/posts/${r.quellId}`, r.titel, 'AKTUELL')
-        for (const i of kandidaten.slice(0, 3)) await ronorpPosten(`https://ronorp.net/market/posts/${i.id.split(':')[1]}`, i.titel, 'ALT')
+        for (const i of kandidaten.slice(0, 8)) await ronorpPosten(`https://ronorp.net/market/posts/${i.id.split(':')[1]}`, i.titel, 'ALT')
         await ronorpPosten('https://ronorp.net/market/posts/9999999', 'Negativ', 'NEGATIV')
         for (const i of await ronorpAlte(kandidaten, geprueft, jetzt, aktuelle)) {
           alle.push(i)
