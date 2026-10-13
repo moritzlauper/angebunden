@@ -711,6 +711,8 @@ async function main() {
         // Was die Liste gerade zeigt, ist online.
         for (const r of funde) geprueft.set(r.url, jetzt)
         const aktuelle = new Set(funde.map((r) => r.quellId))
+        // Gegenprobe: Was die Liste zeigt, ist online. Erkennt die Prüfung es nicht, stimmt sie nicht.
+        for (const r of funde.slice(0, 2)) console.log(`  Kontrolle, aktuell gelistet: ${await ronorpPruefen(r.url, r.quellId)} ${r.url}`)
         const kandidaten = alteVon(id).filter((i) => !neueUrls.has(i.links[0].url) && !(i.bis && i.bis < heute()))
         for (const i of await ronorpAlte(kandidaten, geprueft, jetzt, aktuelle)) {
           alle.push(i)
