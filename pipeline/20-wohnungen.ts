@@ -576,18 +576,18 @@ function ronorpLinksUmschreiben(w: Wohnungen): void {
 }
 
 /**
- * Ist das Ron-Orp-Inserat noch online? Die Beitragsseite antwortet auf eine unbekannte Nummer mit 410.
+ * Ist das Ron-Orp-Inserat noch online? Die Beitragsseite antwortet auf einen unbekannten Beitrag mit 410.
  * Ein bestehendes Inserat trägt den Status 1, kein Löschdatum und ein Enddatum in der Zukunft.
  */
-async function ronorpPruefen(id: string): Promise<Pruefung> {
+async function ronorpPruefen(url: string): Promise<Pruefung> {
   try {
-    const res = await fetch(`https://ronorp.net/market/posts/${id}`, {
+    const res = await fetch(url, {
       headers: { ...BROWSER, Accept: 'text/html' },
       redirect: 'follow',
       signal: AbortSignal.timeout(20_000),
     })
     if (res.status === 404 || res.status === 410) {
-      console.log(`  entfernt ${id}: HTTP ${res.status}`)
+      console.log(`  entfernt ${url}: HTTP ${res.status}`)
       return 'tot'
     }
     if (!res.ok) return 'unbekannt'
@@ -597,7 +597,7 @@ async function ronorpPruefen(id: string): Promise<Pruefung> {
     if (!beitrag || typeof beitrag !== 'object') return 'unbekannt'
     const ende = beitrag.publication_end_date ? String(beitrag.publication_end_date).slice(0, 10) : null
     if (beitrag.status !== 1 || beitrag.deleted_at || (ende && ende < heute())) {
-      console.log(`  entfernt ${id}: status=${beitrag.status} geloescht=${beitrag.deleted_at} ende=${ende}`)
+      console.log(`  entfernt ${url}: status=${beitrag.status} geloescht=${beitrag.deleted_at} ende=${ende}`)
       return 'tot'
     }
     return 'lebt'
@@ -644,7 +644,7 @@ async function ronorpAlte(
       continue
     }
     budget--
-    const r = await ronorpPruefen(id)
+    const r = await ronorpPruefen(url)
     zaehl[r]++
     if (r === 'tot' && beispiele.length < 3) beispiele.push(url)
     if (r === 'lebt') {
