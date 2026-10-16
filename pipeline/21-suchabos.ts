@@ -60,8 +60,12 @@ function pruefsumme(text: string): string {
   return h.toString(36)
 }
 
+/** Ron-Orp-Links bis zum Umbau führten auf die Kategorieseite. Auch ihre Prüfsumme zählt, damit schon verschickte Mails nicht erneut kommen. */
+const alterRonorpLink = (u: string) =>
+  u.replace(/^https:\/\/ronorp\.net\/market\/posts\//, 'https://ronorp.net/zurich/market/housing/')
 /** Alle Prüfsummen eines Inserats: jeder Link zählt, auch wenn Doppelte anders zusammengelegt werden. */
-const summen = (i: Inserat) => i.links.map((l) => pruefsumme(l.url))
+const summen = (i: Inserat) =>
+  i.links.flatMap((l) => (l.quelle === 'ronorp' ? [pruefsumme(l.url), pruefsumme(alterRonorpLink(l.url))] : [pruefsumme(l.url)]))
 
 async function db(pfad: string, init: RequestInit = {}) {
   const res = await fetch(`${SUPABASE}/rest/v1/${pfad}`, {

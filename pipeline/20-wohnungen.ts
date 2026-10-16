@@ -312,7 +312,7 @@ async function ronorp(): Promise<Roh[]> {
     funde.push({
       quelle: 'ronorp',
       quellId: String(p.id),
-      url: `https://ronorp.net/zurich/market/housing/${p.slug}`,
+      url: `https://ronorp.net/market/posts/${p.slug}`,
       titel: text(p.title) ?? 'Inserat auf Ron Orp',
       art,
       strasse: ort.strasse,
@@ -559,53 +559,42 @@ const PRUEF_BUDGET = 40
 
 type Pruefung = 'lebt' | 'tot' | 'unbekannt'
 
-// DIAGNOSE (vorübergehend): Die Post-Route `/market/posts/<id>` der Bundles gegen Live und Alt prüfen.
-async function ronorpPosten(url: string, titel: string, label: string): Promise<void> {
-  const res = await fetch(url, {
-    headers: { ...BROWSER, Accept: 'text/html' },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(20_000),
-  })
-  const html = await res.text()
-  const norm = (s: string) =>
-    s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]/g, '')
-  const kopf = norm(titel).slice(0, 20)
-  let info = 'kein __NEXT_DATA__'
-  const nd = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
-  if (nd) {
-    try {
-      const pp = JSON.parse(nd[1]).props?.pageProps ?? {}
-      const sp = pp.singlePost
-      info =
-        sp && typeof sp === 'object'
-          ? `status=${sp.status} geloescht=${sp.deleted_at} ende=${sp.publication_end_date} aktualisiert=${sp.updated_at} ` +
-            `typ=${sp.post_type} kat=${sp.category?.name ?? '-'} unavailableAfter=${pp.robotsProps?.unavailableAfter ?? '-'} ` +
-            `meta=${JSON.stringify(pp.metaData?.title ?? '').slice(0, 60)}`
-          : `singlePost=${JSON.stringify(sp ?? null).slice(0, 120)}`
-    } catch {
-      info = 'NEXT_DATA unlesbar'
-    }
-  }
-  console.log(`  POSTEN ${label} ${url}`)
-  console.log(`    status=${res.status} final=${res.url} len=${html.length} titelImHtml=${norm(html).includes(kopf)} ${info}`)
+/**
+ * Ron Orp führt ein Inserat unter `/market/posts/<slug>`. Die Adresse unter `/zurich/market/housing/`
+ * führt auf eine Kategorieseite, nicht auf das Inserat. Gespeicherte alte Links werden beim Lesen umgeschrieben.
+ */
+function ronorpLinkNeu(url: string): string {
+  const m = url.match(/^https:\/\/ronorp\.net\/zurich\/market\/housing\/([^/?#]+)$/)
+  return m ? `https://ronorp.net/market/posts/${m[1]}` : url
+}
+
+/** Den Stand des letzten Laufs auf die neuen Ron-Orp-Links umschreiben, samt Gedächtnis und Bestätigungen. */
+function ronorpLinksUmschreiben(w: Wohnungen): void {
+  for (const i of w.inserate) for (const l of i.links) if (l.quelle === 'ronorp') l.url = ronorpLinkNeu(l.url)
+  if (w.gesehen) w.gesehen = Object.fromEntries(Object.entries(w.gesehen).map(([u, v]) => [ronorpLinkNeu(u), v]))
+  if (w.geprueft) w.geprueft = Object.fromEntries(Object.entries(w.geprueft).map(([u, v]) => [ronorpLinkNeu(u), v]))
 }
 
 /**
- * Gibt es das Inserat noch? Ron Orp antwortet auf eine Adresse von vermieteten oder entfernten
- * Inseraten nicht mit 404, sondern mit der Startseite. Ein bestehendes Inserat trägt dagegen
- * seinen Slug und seine Nummer auf der Seite.
+ * Ist das Ron-Orp-Inserat noch online? Die Beitragsseite antwortet auf eine unbekannte Nummer mit 410.
+ * Ein bestehendes Inserat trägt den Status 1, kein Löschdatum und ein Enddatum in der Zukunft.
  */
-async function ronorpPruefen(url: string, id: string): Promise<Pruefung> {
-  const slug = url.split('/').filter(Boolean).pop() ?? ''
+async function ronorpPruefen(id: string): Promise<Pruefung> {
   try {
-    const res = await fetch(url, {
-      headers: { ...BROWSER, Accept: 'text/html,application/xhtml+xml' },
+    const res = await fetch(`https://ronorp.net/market/posts/${id}`, {
+      headers: { ...BROWSER, Accept: 'text/html' },
+      redirect: 'follow',
       signal: AbortSignal.timeout(20_000),
     })
     if (res.status === 404 || res.status === 410) return 'tot'
     if (!res.ok) return 'unbekannt'
     const html = await res.text()
-    return html.includes(slug) && html.includes(id) ? 'lebt' : 'tot'
+    const nd = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
+    const beitrag = nd ? JSON.parse(nd[1])?.props?.pageProps?.singlePost : null
+    if (!beitrag || typeof beitrag !== 'object') return 'unbekannt'
+    if (beitrag.status !== 1 || beitrag.deleted_at) return 'tot'
+    if (beitrag.publication_end_date && String(beitrag.publication_end_date).slice(0, 10) < heute()) return 'tot'
+    return 'lebt'
   } catch {
     return 'unbekannt'
   }
@@ -649,7 +638,7 @@ async function ronorpAlte(
       continue
     }
     budget--
-    const r = await ronorpPruefen(url, id)
+    const r = await ronorpPruefen(id)
     zaehl[r]++
     if (r === 'tot' && beispiele.length < 3) beispiele.push(url)
     if (r === 'lebt') {
@@ -673,6 +662,7 @@ async function ronorpAlte(
 async function main() {
   const jetzt = new Date().toISOString()
   const vorher: Wohnungen | null = existsSync(AUSGABE) ? JSON.parse(readFileSync(AUSGABE, 'utf8')) : null
+  if (vorher) ronorpLinksUmschreiben(vorher)
   // Seit wann ein Inserat bekannt ist, auch über Läufe hinweg, in denen es kurz fehlte: Flatfox
   // liefert nicht bei jeder Abfrage dieselben Punkte, und ohne Gedächtnis gälte ein Inserat bei
   // seiner Rückkehr als neu (und ginge jedes Mal wieder als Suchabo-Mail hinaus).
@@ -743,10 +733,6 @@ async function main() {
         for (const r of funde) geprueft.set(r.url, jetzt)
         const aktuelle = new Set(funde.map((r) => r.quellId))
         const kandidaten = alteVon(id).filter((i) => !neueUrls.has(i.links[0].url) && !(i.bis && i.bis < heute()))
-        // DIAGNOSE (vorübergehend): Post-Route mit Nummer; eine erfundene Nummer als Negativkontrolle.
-        for (const r of funde.slice(0, 2)) await ronorpPosten(`https://ronorp.net/market/posts/${r.quellId}`, r.titel, 'AKTUELL')
-        for (const i of kandidaten.slice(0, 8)) await ronorpPosten(`https://ronorp.net/market/posts/${i.id.split(':')[1]}`, i.titel, 'ALT')
-        await ronorpPosten('https://ronorp.net/market/posts/9999999', 'Negativ', 'NEGATIV')
         for (const i of await ronorpAlte(kandidaten, geprueft, jetzt, aktuelle)) {
           alle.push(i)
           drin++
