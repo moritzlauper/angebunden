@@ -579,9 +579,11 @@ function ronorpLinksUmschreiben(w: Wohnungen): void {
  * Ist das Ron-Orp-Inserat noch online? Die Beitragsseite antwortet auf einen unbekannten Beitrag mit 410.
  * Ein bestehendes Inserat trägt den Status 1, kein Löschdatum und ein Enddatum in der Zukunft.
  */
-async function ronorpPruefen(url: string): Promise<Pruefung> {
+async function ronorpPruefen(url: string, id: string): Promise<Pruefung> {
+  // Nur die Nummer bleibt gleich. Ändert Ron Orp den Slug, führt der alte Link ins Leere (410).
+  if (!/^\d+$/.test(id)) return 'unbekannt'
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`https://ronorp.net/market/posts/${id}`, {
       headers: { ...BROWSER, Accept: 'text/html' },
       redirect: 'follow',
       signal: AbortSignal.timeout(20_000),
@@ -644,7 +646,7 @@ async function ronorpAlte(
       continue
     }
     budget--
-    const r = await ronorpPruefen(url)
+    const r = await ronorpPruefen(url, id)
     zaehl[r]++
     if (r === 'tot' && beispiele.length < 3) beispiele.push(url)
     if (r === 'lebt') {
