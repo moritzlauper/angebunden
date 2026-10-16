@@ -586,14 +586,20 @@ async function ronorpPruefen(id: string): Promise<Pruefung> {
       redirect: 'follow',
       signal: AbortSignal.timeout(20_000),
     })
-    if (res.status === 404 || res.status === 410) return 'tot'
+    if (res.status === 404 || res.status === 410) {
+      console.log(`  entfernt ${id}: HTTP ${res.status}`)
+      return 'tot'
+    }
     if (!res.ok) return 'unbekannt'
     const html = await res.text()
     const nd = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
     const beitrag = nd ? JSON.parse(nd[1])?.props?.pageProps?.singlePost : null
     if (!beitrag || typeof beitrag !== 'object') return 'unbekannt'
-    if (beitrag.status !== 1 || beitrag.deleted_at) return 'tot'
-    if (beitrag.publication_end_date && String(beitrag.publication_end_date).slice(0, 10) < heute()) return 'tot'
+    const ende = beitrag.publication_end_date ? String(beitrag.publication_end_date).slice(0, 10) : null
+    if (beitrag.status !== 1 || beitrag.deleted_at || (ende && ende < heute())) {
+      console.log(`  entfernt ${id}: status=${beitrag.status} geloescht=${beitrag.deleted_at} ende=${ende}`)
+      return 'tot'
+    }
     return 'lebt'
   } catch {
     return 'unbekannt'
