@@ -580,10 +580,11 @@ function ronorpLinksUmschreiben(w: Wohnungen): void {
  * Ein bestehendes Inserat trägt den Status 1, kein Löschdatum und ein Enddatum in der Zukunft.
  */
 async function ronorpPruefen(url: string, id: string): Promise<Pruefung> {
-  // Nur die Nummer bleibt gleich. Ändert Ron Orp den Slug, führt der alte Link ins Leere (410).
-  if (!/^\d+$/.test(id)) return 'unbekannt'
+  // Mit gültiger Nummer über die Nummer prüfen: Ändert Ron Orp den Slug, führt der alte Link ins Leere.
+  // Ohne Nummer bleibt nur der gespeicherte Link, und der zählt nur, wenn er einen Beitrag liefert.
+  const ziel = /^\d+$/.test(id) ? `https://ronorp.net/market/posts/${id}` : url
   try {
-    const res = await fetch(`https://ronorp.net/market/posts/${id}`, {
+    const res = await fetch(ziel, {
       headers: { ...BROWSER, Accept: 'text/html' },
       redirect: 'follow',
       signal: AbortSignal.timeout(20_000),
@@ -595,8 +596,12 @@ async function ronorpPruefen(url: string, id: string): Promise<Pruefung> {
     if (!res.ok) return 'unbekannt'
     const html = await res.text()
     const nd = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
-    const beitrag = nd ? JSON.parse(nd[1])?.props?.pageProps?.singlePost : null
-    if (!beitrag || typeof beitrag !== 'object') return 'unbekannt'
+    if (!nd) return 'unbekannt'
+    const beitrag = JSON.parse(nd[1])?.props?.pageProps?.singlePost
+    if (!beitrag || typeof beitrag !== 'object' || beitrag.error || !beitrag.id) {
+      console.log(`  entfernt ${url}: kein Beitrag auf der Seite`)
+      return 'tot'
+    }
     const ende = beitrag.publication_end_date ? String(beitrag.publication_end_date).slice(0, 10) : null
     if (beitrag.status !== 1 || beitrag.deleted_at || (ende && ende < heute())) {
       console.log(`  entfernt ${url}: status=${beitrag.status} geloescht=${beitrag.deleted_at} ende=${ende}`)
