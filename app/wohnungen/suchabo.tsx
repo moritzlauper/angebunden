@@ -1,9 +1,27 @@
 'use client'
 
 import { useState } from 'react'
-import type { Filter } from './filter'
+import { FILTER_LEER, type Filter } from './filter'
 import type { Kreis } from './kreise'
-import { AnmeldeFormular, useSuchabos, type useKonto } from './konto'
+import { AnmeldeFormular, useSuchabos, type Suchabo, type useKonto } from './konto'
+import { GESAMMELT } from './quellen'
+import type { QuellenId } from './typen'
+
+const QUELLEN = Object.keys(GESAMMELT) as QuellenId[]
+
+/**
+ * Welche Quellen eingeschaltet sind, in Worten: «nur WOKO und ABZ», «ohne Ron Orp». Die Grund-
+ * einstellung (Flatfox aus) zählt nicht als Abweichung.
+ */
+function quellenText(quellenAus: QuellenId[]) {
+  const an = QUELLEN.filter((q) => !quellenAus.includes(q))
+  const name = (liste: QuellenId[]) => liste.map((q) => GESAMMELT[q].name).join(' und ')
+  if (an.length === 0) return null
+  if (an.length <= 2) return `nur ${name(an)}`
+  const dazu = QUELLEN.filter((q) => !FILTER_LEER.quellenAus.includes(q) && quellenAus.includes(q))
+  const wieder = QUELLEN.filter((q) => FILTER_LEER.quellenAus.includes(q) && !quellenAus.includes(q))
+  return [dazu.length ? `ohne ${name(dazu)}` : null, wieder.length ? `mit ${name(wieder)}` : null].filter(Boolean).join(', ') || null
+}
 
 /** Ein Name aus den Filtern, damit man das Abo in der Mail und in der Liste wiedererkennt. */
 export function aboName(f: Filter, kreis?: Kreis) {
@@ -14,6 +32,7 @@ export function aboName(f: Filter, kreis?: Kreis) {
     f.flaecheMin != null ? `ab ${f.flaecheMin} m²` : null,
     f.dauer === 'unbefristet' ? 'unbefristet' : f.dauer === 'befristet' ? 'befristet' : null,
     f.gebiete.length ? `${f.gebiete.length} ${f.gebiete.length === 1 ? 'Gebiet' : 'Gebiete'}` : null,
+    quellenText(f.quellenAus),
     f.text.trim() ? `«${f.text.trim()}»` : null,
   ].filter(Boolean)
   return teile.length ? teile.join(', ') : 'Alle Wohnungen in Zürich'
@@ -32,12 +51,14 @@ function aboFilter(f: Filter, kreis?: Kreis): Record<string, unknown> {
  * gehen an die Adresse des Kontos.
  */
 export function SuchaboDialog({
-  k, filter, kreis, schliessen,
+  k, filter, kreis, schliessen, anwenden,
 }: {
   k: ReturnType<typeof useKonto>
   filter: Filter
   kreis?: Kreis
   schliessen: () => void
+  /** Übernimmt die Filter eines gespeicherten Abos in die Ansicht. */
+  anwenden: (f: Partial<Filter>) => void
 }) {
   const { abos, anlegen, loeschen, umschalten } = useSuchabos(k.nutzer)
   const [name, setName] = useState(() => aboName(filter, kreis))
@@ -129,7 +150,17 @@ export function SuchaboDialog({
                 <ul className="mt-2 flex flex-col gap-1.5">
                   {abos.map((a) => (
                     <li key={a.id} className="flex items-center gap-2 rounded-xl border border-[var(--ab-linie)] px-3 py-2">
-                      <span className={`min-w-0 flex-1 truncate ${a.aktiv ? '' : 'text-[var(--ab-leise)] line-through'}`}>{a.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          anwenden(a.filter as Partial<Filter>)
+                          schliessen()
+                        }}
+                        title="Diese Filter in der Ansicht anwenden"
+                        className={`min-w-0 flex-1 truncate text-left underline decoration-[var(--ab-linie)] underline-offset-2 ${a.aktiv ? '' : 'text-[var(--ab-leise)] line-through'}`}
+                      >
+                        {a.name}
+                      </button>
                       <button type="button" onClick={() => umschalten(a.id, !a.aktiv)} className="shrink-0 text-[12px] underline underline-offset-2">
                         {a.aktiv ? 'Pausieren' : 'Fortsetzen'}
                       </button>

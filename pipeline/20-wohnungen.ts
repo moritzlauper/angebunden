@@ -312,7 +312,7 @@ async function ronorp(): Promise<Roh[]> {
     funde.push({
       quelle: 'ronorp',
       quellId: String(p.id),
-      url: `https://ronorp.net/zurich/market/housing/${p.slug}`,
+      url: `https://ronorp.net/market/posts/${p.slug}`,
       titel: text(p.title) ?? 'Inserat auf Ron Orp',
       art,
       strasse: ort.strasse,
@@ -546,12 +546,131 @@ function stadtgrenze(): (lon: number, lat: number) => boolean {
 
 // ─── Lauf ─────────────────────────────────────────────────────────────────
 
-/** Quellen, die nur die neuesten Inserate zeigen: Früher Gesammeltes bleibt bis `bis` stehen. */
+/**
+ * Quellen, die nur die neuesten Inserate zeigen. Was früher gesammelt wurde, prüft der Sammler
+ * einzeln auf der Detailseite (siehe `ronorpAlte`), statt es blind bis zum Ablaufdatum zu behalten.
+ */
 const SAMMELND = new Set<QuellenId>(['ronorp'])
+
+/** Eine Bestätigung «online» gilt so lange, dann wird das Inserat neu geprüft. */
+const PRUEF_FENSTER_MS = 60 * 60 * 1000
+/** Höchstens so viele Detailseiten je Lauf, damit ein Durchgang nicht ausufert. */
+const PRUEF_BUDGET = 40
+
+type Pruefung = 'lebt' | 'tot' | 'unbekannt'
+
+/**
+ * Ron Orp führt ein Inserat unter `/market/posts/<slug>`. Die Adresse unter `/zurich/market/housing/`
+ * führt auf eine Kategorieseite, nicht auf das Inserat. Gespeicherte alte Links werden beim Lesen umgeschrieben.
+ */
+function ronorpLinkNeu(url: string): string {
+  const m = url.match(/^https:\/\/ronorp\.net\/zurich\/market\/housing\/([^/?#]+)$/)
+  return m ? `https://ronorp.net/market/posts/${m[1]}` : url
+}
+
+/** Den Stand des letzten Laufs auf die neuen Ron-Orp-Links umschreiben, samt Gedächtnis und Bestätigungen. */
+function ronorpLinksUmschreiben(w: Wohnungen): void {
+  for (const i of w.inserate) for (const l of i.links) if (l.quelle === 'ronorp') l.url = ronorpLinkNeu(l.url)
+  if (w.gesehen) w.gesehen = Object.fromEntries(Object.entries(w.gesehen).map(([u, v]) => [ronorpLinkNeu(u), v]))
+  if (w.geprueft) w.geprueft = Object.fromEntries(Object.entries(w.geprueft).map(([u, v]) => [ronorpLinkNeu(u), v]))
+}
+
+/**
+ * Ist das Ron-Orp-Inserat noch online? Die Beitragsseite antwortet auf einen unbekannten Beitrag mit 410.
+ * Ein bestehendes Inserat trägt den Status 1, kein Löschdatum und ein Enddatum in der Zukunft.
+ */
+async function ronorpPruefen(url: string, id: string): Promise<Pruefung> {
+  // Nur die Nummer bleibt gleich. Ändert Ron Orp den Slug, führt der alte Link ins Leere (410).
+  if (!/^\d+$/.test(id)) return 'unbekannt'
+  try {
+    const res = await fetch(`https://ronorp.net/market/posts/${id}`, {
+      headers: { ...BROWSER, Accept: 'text/html' },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(20_000),
+    })
+    if (res.status === 404 || res.status === 410) {
+      console.log(`  entfernt ${url}: HTTP ${res.status}`)
+      return 'tot'
+    }
+    if (!res.ok) return 'unbekannt'
+    const html = await res.text()
+    const nd = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/)
+    const beitrag = nd ? JSON.parse(nd[1])?.props?.pageProps?.singlePost : null
+    if (!beitrag || typeof beitrag !== 'object') return 'unbekannt'
+    const ende = beitrag.publication_end_date ? String(beitrag.publication_end_date).slice(0, 10) : null
+    if (beitrag.status !== 1 || beitrag.deleted_at || (ende && ende < heute())) {
+      console.log(`  entfernt ${url}: status=${beitrag.status} geloescht=${beitrag.deleted_at} ende=${ende}`)
+      return 'tot'
+    }
+    return 'lebt'
+  } catch {
+    return 'unbekannt'
+  }
+}
+
+/**
+ * Die früher gesammelten Ron-Orp-Inserate, die noch online sind. Zuerst die Doppelten: Hat dieselbe
+ * Nummer inzwischen einen neuen Link, ist der alte überholt. Danach die übrigen, die am längsten
+ * nicht geprüft wurden, bis zum Budget. Kann eine Seite nicht geladen werden, bleibt das Inserat,
+ * wenn es kürzlich bestätigt war, sonst fällt es weg.
+ */
+async function ronorpAlte(
+  kandidaten: Inserat[],
+  geprueft: Map<string, string>,
+  jetzt: string,
+  aktuelle: Set<string>
+): Promise<Inserat[]> {
+  const lebend: Inserat[] = []
+  const zaehl = { gecacht: 0, lebt: 0, tot: 0, unbekannt: 0, spaeter: 0 }
+  const beispiele: string[] = []
+  let budget = PRUEF_BUDGET
+  const reihe = [...kandidaten].sort((a, b) =>
+    (geprueft.get(a.links[0].url) ?? '').localeCompare(geprueft.get(b.links[0].url) ?? '')
+  )
+  for (const i of reihe) {
+    const url = i.links[0].url
+    const id = i.id.split(':')[1]
+    if (aktuelle.has(id)) {
+      zaehl.tot++
+      geprueft.delete(url)
+      continue
+    }
+    const zuletzt = geprueft.get(url)
+    if (zuletzt && Date.parse(jetzt) - Date.parse(zuletzt) < PRUEF_FENSTER_MS) {
+      zaehl.gecacht++
+      lebend.push(i)
+      continue
+    }
+    if (budget <= 0) {
+      zaehl.spaeter++
+      continue
+    }
+    budget--
+    const r = await ronorpPruefen(url, id)
+    zaehl[r]++
+    if (r === 'tot' && beispiele.length < 3) beispiele.push(url)
+    if (r === 'lebt') {
+      geprueft.set(url, jetzt)
+      lebend.push(i)
+    } else if (r === 'unbekannt' && zuletzt) {
+      lebend.push(i)
+    } else {
+      geprueft.delete(url)
+    }
+    await warte(400)
+  }
+  console.log(
+    `Ron Orp, früher gesammelt: ${zaehl.gecacht} eben bestätigt, ${zaehl.lebt} neu bestätigt, ` +
+      `${zaehl.tot} entfernt, ${zaehl.unbekannt} unklar, ${zaehl.spaeter} auf später`
+  )
+  for (const u of beispiele) console.log(`  entfernt: ${u}`)
+  return lebend
+}
 
 async function main() {
   const jetzt = new Date().toISOString()
   const vorher: Wohnungen | null = existsSync(AUSGABE) ? JSON.parse(readFileSync(AUSGABE, 'utf8')) : null
+  if (vorher) ronorpLinksUmschreiben(vorher)
   // Seit wann ein Inserat bekannt ist, auch über Läufe hinweg, in denen es kurz fehlte: Flatfox
   // liefert nicht bei jeder Abfrage dieselben Punkte, und ohne Gedächtnis gälte ein Inserat bei
   // seiner Rückkehr als neu (und ginge jedes Mal wieder als Suchabo-Mail hinaus).
@@ -563,6 +682,8 @@ async function main() {
     }
   }
   const bekannt = new Map<string, string>([...gesehen].map(([url, [erst]]) => [url, erst]))
+  // Wann ein Ron-Orp-Inserat zuletzt auf seiner Detailseite bestätigt wurde (siehe `ronorpAlte`).
+  const geprueft = new Map<string, string>(Object.entries(vorher?.geprueft ?? {}))
 
   const quellen: [QuellenId, () => Promise<Roh[]>][] = [
     ['flatfox', flatfox],
@@ -616,8 +737,11 @@ async function main() {
         drin++
       }
       if (SAMMELND.has(id)) {
-        for (const i of alteVon(id)) {
-          if (neueUrls.has(i.links[0].url) || (i.bis && i.bis < heute())) continue
+        // Was die Liste gerade zeigt, ist online.
+        for (const r of funde) geprueft.set(r.url, jetzt)
+        const aktuelle = new Set(funde.map((r) => r.quellId))
+        const kandidaten = alteVon(id).filter((i) => !neueUrls.has(i.links[0].url) && !(i.bis && i.bis < heute()))
+        for (const i of await ronorpAlte(kandidaten, geprueft, jetzt, aktuelle)) {
           alle.push(i)
           drin++
         }
@@ -662,12 +786,17 @@ async function main() {
   const grenze = new Date(Date.parse(jetzt) - 14 * 24 * 3600 * 1000).toISOString()
   for (const [url, [, zuletzt]] of gesehen) if (zuletzt < grenze) gesehen.delete(url)
 
+  // Bestätigungen, die älter als drei Tage sind, braucht niemand mehr.
+  const altGrenze = Date.parse(jetzt) - 3 * 24 * 3600 * 1000
+  for (const [url, t] of geprueft) if (Date.parse(t) < altGrenze) geprueft.delete(url)
+
   const ergebnis: Wohnungen = {
     erstellt: jetzt,
     haeuser: haeuser.length,
     quellen: stand,
     inserate,
     gesehen: Object.fromEntries(gesehen),
+    geprueft: Object.fromEntries(geprueft),
   }
   mkdirSync(path.dirname(AUSGABE), { recursive: true })
   writeFileSync(AUSGABE, JSON.stringify(ergebnis))

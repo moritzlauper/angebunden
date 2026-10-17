@@ -866,7 +866,18 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
     </div>
   )
 
-  const dialog = aboOffen && <SuchaboDialog k={k} filter={filter} kreis={kreis} schliessen={() => setAboOffen(false)} />
+  const dialog = aboOffen && (
+    <SuchaboDialog
+      k={k}
+      filter={filter}
+      kreis={kreis}
+      schliessen={() => setAboOffen(false)}
+      anwenden={(f) => {
+        // Alles ersetzen, nicht zusammenlegen: Die Filter sind genau die des Abos. Sortierung bleibt.
+        aendern({ ...FILTER_LEER, ...nachgefuehrt(f), sorte: filter.sorte, nurAusschnitt: false, nurGemerkt: false, nurNeu: false })
+      }}
+    />
+  )
 
   if (breit) {
     return (
