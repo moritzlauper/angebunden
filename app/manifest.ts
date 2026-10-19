@@ -1,15 +1,15 @@
 import type { MetadataRoute } from 'next'
-import { SITE_NAME, SITE_TAGLINE } from './site'
+import { SITE_NAME } from './site'
+import { VELO_BESCHREIBUNG } from './velonavi/seo'
 
 // Ohne das kann `pnpm export` (output: 'export') die Route nicht vorrendern.
 export const dynamic = 'force-static'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: `${SITE_NAME} · ${SITE_TAGLINE}`,
-    short_name: SITE_NAME,
-    description:
-      'Für jedes Haus in Zürich, Basel und Bern die mittlere ÖV-Reisezeit zu einer beliebigen Adresse der Stadt.',
+    name: `Velonavi Zürich · ${SITE_NAME}`,
+    short_name: 'Velonavi Zürich',
+    description: VELO_BESCHREIBUNG,
     start_url: '/',
     display: 'standalone',
     background_color: '#f7f7f5',

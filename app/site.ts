@@ -8,7 +8,7 @@
  * Beim Deployen auf eine andere Domain `NEXT_PUBLIC_SITE_URL` setzen.
  */
 export const SITE_URL = (
-  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://angebunden.ch'
+  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://www.angebunden.ch'
 ).replace(/\/$/, '')
 
 export const SITE_NAME = 'angebunden'

@@ -5,21 +5,24 @@ import { ladeMeta } from './meta'
 import { STADT_LISTE } from './staedte'
 import { SITE_URL } from './site'
 import { KREISE } from './wohnungen/kreise'
+import { VELO_INHALT_AKTUALISIERT } from './velonavi/seo'
 
 // Ohne das kann `pnpm export` (output: 'export') die Route nicht vorrendern.
 export const dynamic = 'force-static'
 
 /**
- * Wann das Velonetz zuletzt gerechnet wurde. Das ist das ehrlichere `lastmod`
- * für den Velonavi als der Zeitpunkt des Builds: Ein Deploy ohne neue Daten
- * soll Google nicht zum Neuindexieren einladen.
+ * Änderungen am Velonetz und am Seiteninhalt zählen beide für `lastmod`.
+ * Ein reiner Deploy verändert dieses Datum nicht.
  */
 async function veloErstellt(): Promise<Date> {
   const roh = await readFile(
     path.join(process.cwd(), 'public', 'data', 'zuerich', 'velo.json'),
     'utf8'
   )
-  return new Date(JSON.parse(roh).erstellt)
+  return new Date(Math.max(
+    new Date(JSON.parse(roh).erstellt).getTime(),
+    new Date(VELO_INHALT_AKTUALISIERT).getTime(),
+  ))
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

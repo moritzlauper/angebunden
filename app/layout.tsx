@@ -1,37 +1,22 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
-import { SITE_NAME, SITE_TAGLINE, SITE_URL } from './site'
+import { SITE_NAME, SITE_URL } from './site'
+import { VELO_TITEL } from './velonavi/seo'
 import { BesucherZaehler } from './besucher-zaehler'
 import './globals.css'
 
 const BESCHREIBUNG =
-  'Für jedes Haus in Zürich, Basel und Bern: die mittlere Reisezeit mit Tram, ' +
-  'Bus und Bahn zu einer beliebigen Adresse der Stadt, und wie es um die ' +
-  'Kulturvielfalt in Velo- oder Gehweite steht.'
+  'Velonavi Zürich, Wohnungen in Zürich und ÖV-Erreichbarkeitskarten für Zürich, Basel und Bern: ' +
+  'Plane deine Veloroute, finde eine Wohnung und vergleiche Reisezeiten und Kulturangebote.'
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: `${SITE_NAME} · ${SITE_TAGLINE}`,
+    default: `${VELO_TITEL} · ${SITE_NAME}`,
     template: `%s · ${SITE_NAME}`,
   },
   description: BESCHREIBUNG,
   applicationName: SITE_NAME,
-  keywords: [
-    'ÖV-Erreichbarkeit',
-    'öffentlicher Verkehr',
-    'Erreichbarkeit',
-    'Reisezeit',
-    'Zürich',
-    'Basel',
-    'Bern',
-    'Tram',
-    'S-Bahn',
-    'Wohnungssuche',
-    'Pendeln',
-    'Kulturvielfalt',
-    'Isochrone',
-  ],
   authors: [{ name: SITE_NAME }],
   creator: SITE_NAME,
   publisher: SITE_NAME,
@@ -42,12 +27,12 @@ export const metadata: Metadata = {
     locale: 'de_CH',
     siteName: SITE_NAME,
     url: '/',
-    title: `${SITE_NAME} · ${SITE_TAGLINE}`,
+    title: `${VELO_TITEL} · ${SITE_NAME}`,
     description: BESCHREIBUNG,
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${SITE_NAME} · ${SITE_TAGLINE}`,
+    title: `${VELO_TITEL} · ${SITE_NAME}`,
     description: BESCHREIBUNG,
   },
   robots: {

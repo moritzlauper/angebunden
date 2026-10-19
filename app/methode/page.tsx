@@ -4,17 +4,24 @@ import { ladeMeta } from '../meta'
 import { Wortmarke } from '../marke'
 import { KONTO_MOEGLICH } from '../velonavi/konto'
 
+const BESCHREIBUNG =
+  'So berechnet angebunden Velorouten in Zürich, ÖV-Erreichbarkeit und Kulturvielfalt: ' +
+  'Datenquellen, Formeln und Gewichtung von Verkehr, Steigungen und Ampeln.'
+
 export const metadata: Metadata = {
-  title: 'Wie das gerechnet ist',
-  description:
-    'Die Formeln, Parameter und Datenquellen hinter der Erreichbarkeitskarte: RAPTOR auf dem GTFS-Fahrplan, steigungsabhängige Fuss- und Velowege, Kulturvielfalt als wurzel-gewichteter Index.',
+  title: 'Methode: Velonavi und Erreichbarkeitskarten',
+  description: BESCHREIBUNG,
   alternates: { canonical: '/methode' },
   openGraph: {
     type: 'article',
-    title: 'Wie das gerechnet ist · angebunden',
-    description:
-      'Die Formeln, Parameter und Datenquellen hinter der Erreichbarkeitskarte.',
+    title: 'Methode: Velonavi und Erreichbarkeitskarten · angebunden',
+    description: BESCHREIBUNG,
     url: '/methode',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Methode: Velonavi und Erreichbarkeitskarten · angebunden',
+    description: BESCHREIBUNG,
   },
 }
 
@@ -93,14 +100,17 @@ export default async function Methode() {
             href="/"
             className="text-[13px] text-zinc-500 underline underline-offset-2 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
-            Zurück zum Velonavi
+            Zum Velonavi Zürich
           </Link>
         </div>
 
         <p className="mt-8">
-          angebunden färbt jedes Haus in Zürich, Basel und Bern nach zwei Kennzahlen ein: Wie gut
-          es an Tram, Bus und Bahn angebunden ist, und wie breit das Kulturangebot in Geh- oder
-          Veloweite liegt.
+          Auf der Startseite von angebunden findest du das <Aus href="/">Velonavi Zürich</Aus>:
+          einen Veloroutenplaner für schnelle und komfortable Strecken durch die Stadt.
+          Die <Aus href="/erreichbarkeitskarte">Erreichbarkeitskarte Zürich</Aus> und die Karten
+          für <Aus href="/basel">Basel</Aus> und <Aus href="/bern">Bern</Aus> zeigen, wie gut
+          jedes Haus an Tram, Bus und Bahn angebunden ist und welches Kulturangebot in Geh-
+          oder Veloweite liegt. Dazu kommt die <Aus href="/wohnungen">Wohnungssuche in Zürich</Aus>.
         </p>
 
         <p className="mt-4">
@@ -119,7 +129,12 @@ export default async function Methode() {
           Das ganze Projekt ist <Aus href="#open-source">Open Source</Aus>.
         </p>
 
-        <H2>Erreichbarkeit</H2>
+        <p className="mt-4">
+          Direkt zur <Aus href="#velonavi">Berechnung der Velorouten</Aus> oder zur{' '}
+          <Aus href="#erreichbarkeit">Berechnung der ÖV-Erreichbarkeit</Aus>.
+        </p>
+
+        <H2 id="erreichbarkeit">Erreichbarkeit</H2>
         <p className="mt-4">
           Die Kennzahl ist die mittlere Reisezeit von diesem Haus zu einer beliebigen Adresse der
           Stadt, Türe zu Türe. Man zieht gedanklich eine zufällige Zürcher Adresse und fragt, wie

@@ -21,6 +21,7 @@ const nextConfig: NextConfig = {
     : {
         async redirects() {
           return [
+            { source: '/velonavi', destination: '/', permanent: true },
             { source: '/whatshouldistudy', destination: WSIS, permanent: true },
             { source: '/whatshouldistudy/:path*', destination: `${WSIS}/:path*`, permanent: true },
           ]

@@ -293,7 +293,7 @@ const prozent = (teil: number, ganz: number) => `${Math.round((100 * teil) / Mat
 
 // ---------------------------------------------------------------- Komponente
 
-export default function Velonavi() {
+export default function Velonavi({ children }: { children: React.ReactNode }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const markerRef = useRef<{ start: Marker | null; ziel: Marker | null }>({ start: null, ziel: null })
@@ -1643,6 +1643,7 @@ export default function Velonavi() {
           Erreichbarkeitskarte
         </Link>
       </p>
+      {children}
     </div>
   )
 

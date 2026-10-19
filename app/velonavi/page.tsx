@@ -1,7 +1,7 @@
 /**
  * Der Velonavi liegt seit der Umstellung auf der Startseite. Diese Adresse
- * bleibt als Alias bestehen, damit geteilte Links weiter funktionieren; die
- * canonical-Angabe zeigt auf «/». Bei einem statischen Export lassen sich
- * keine Weiterleitungen einrichten, deshalb ein Alias statt eines Redirects.
+ * leitet über next.config.ts dauerhaft auf «/» weiter. Für den statischen
+ * Export bleibt dieser Alias mit canonical «/», damit geteilte Links auch
+ * ohne Server-Weiterleitung funktionieren.
  */
 export { default, metadata } from '../page'

@@ -46,7 +46,7 @@ export function SeoInhalt({ stadt, meta }: { stadt: Stadt; meta: Meta }) {
   return (
     <>
       <section className="sr-only">
-        <h1>Erreichbarkeit für jedes Haus in {stadt.name}</h1>
+        <h1>Erreichbarkeitskarte {stadt.name}: ÖV und Kultur für jedes Haus</h1>
         <p>
           Die Karte färbt jedes der {nf(meta.buildings)} Häuser in {stadt.name} danach ein, wie
           lange man von dort mit {verkehr} im Schnitt zu einer beliebigen Adresse der Stadt
@@ -65,6 +65,10 @@ export function SeoInhalt({ stadt, meta }: { stadt: Stadt; meta: Meta }) {
         <p>
           <Link href="/methode">Wie das gerechnet ist</Link>: die Formeln, Parameter und
           Datenquellen hinter der Karte.
+        </p>
+        <p>
+          Für Velorouten in der Stadt Zürich gibt es das <Link href="/">Velonavi Zürich</Link>.
+          Freie Mietwohnungen und WG-Zimmer findest du unter <Link href="/wohnungen">Wohnungen Zürich</Link>.
         </p>
       </section>
 

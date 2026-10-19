@@ -1,75 +1,115 @@
 import Link from 'next/link'
 import { SITE_NAME, SITE_URL, nf } from '../site'
+import { VELO_BESCHREIBUNG } from './seo'
 import type { VeloMeta } from './router'
 
-/**
- * Der crawlbare Teil des Velonavi. Die Karte und das Bedienfeld liegen in einer
- * Client-Komponente, die beim Vorrendern in der Mobilvariante landet und dort
- * weder Überschrift noch Fliesstext enthält. Google, WhatsApp und Screenreader
- * sähen also nur die Legende. Hier steht dasselbe in Worten, dazu die
- * JSON-LD-Auszeichnung und der Ausweg für Browser ohne JavaScript.
- *
- * `sr-only` blendet den Block optisch aus, lässt ihn aber im DOM und im
- * Accessibility-Baum. Die einzige `<h1>` der Seite steht hier; das Bedienfeld
- * im Velonavi führt seinen Titel deshalb als `<h2>`.
- */
+/** Serverseitig gerenderte Erklärung im Bedienfeld, auf Handy und Desktop lesbar. */
 export function SeoInhalt({ statistik }: { statistik: VeloMeta['statistik'] }) {
   const jsonLd = {
     '@context': 'https://schema.org',
-    '@type': 'WebApplication',
-    name: `${SITE_NAME} · Velonavi Zürich`,
-    url: `${SITE_URL}/`,
-    applicationCategory: 'TravelApplication',
-    operatingSystem: 'Web',
-    browserRequirements: 'Requires JavaScript',
-    inLanguage: 'de-CH',
-    isAccessibleForFree: true,
-    offers: { '@type': 'Offer', price: '0', priceCurrency: 'CHF' },
-    publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
-    featureList: [
-      'Veloroute zwischen zwei Adressen in Zürich',
-      'Variante Schnell und Variante Komfort',
-      'Zwischenziele',
-      'Route als GPX herunterladen',
-      'Velonetz nach Fahrgefühl eingefärbt',
+    '@graph': [
+      {
+        '@type': 'WebSite',
+        '@id': `${SITE_URL}/#website`,
+        name: SITE_NAME,
+        url: `${SITE_URL}/`,
+        inLanguage: 'de-CH',
+        description:
+          'Velonavi Zürich, Wohnungssuche in Zürich und ÖV-Erreichbarkeitskarten für Zürich, Basel und Bern.',
+      },
+      {
+        '@type': 'WebPage',
+        '@id': `${SITE_URL}/#webpage`,
+        name: 'Velonavi Zürich – Veloroutenplaner',
+        url: `${SITE_URL}/`,
+        isPartOf: { '@id': `${SITE_URL}/#website` },
+        mainEntity: { '@id': `${SITE_URL}/#velonavi` },
+        description: VELO_BESCHREIBUNG,
+        inLanguage: 'de-CH',
+      },
+      {
+        '@type': 'WebApplication',
+        '@id': `${SITE_URL}/#velonavi`,
+        name: 'Velonavi Zürich',
+        url: `${SITE_URL}/`,
+        applicationCategory: 'TravelApplication',
+        operatingSystem: 'Web',
+        browserRequirements: 'Requires JavaScript',
+        inLanguage: 'de-CH',
+        isAccessibleForFree: true,
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'CHF' },
+        publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+        areaServed: { '@type': 'City', name: 'Zürich' },
+        featureList: [
+          'Veloroute zwischen Adressen in der Stadt Zürich planen',
+          'Schnelle und komfortable Velorouten vergleichen',
+          'Zwischenziele hinzufügen',
+          'Route als GPX herunterladen oder als Link teilen',
+          'Velokarte nach Fahrgefühl eingefärbt',
+        ],
+        description: VELO_BESCHREIBUNG,
+      },
     ],
-    description:
-      `Veloroutenplaner für Zürich auf ${nf(statistik.veloKm)} km Velonetz. Rechnet Verkehr, ` +
-      `Velostreifen, Tramgleise, Belag, Steigung und die Wartezeit an Ampeln mit.`,
   }
 
   return (
-    <>
-      <section className="sr-only">
-        <h1>Velonavi Zürich: Veloroutenplaner nach Fahrgefühl</h1>
-        <p>
-          Der Velonavi sucht die Veloroute zwischen zwei Adressen in Zürich und rechnet dabei mit,
-          wie sich eine Strecke fährt. Grundlage sind {nf(statistik.veloKm)} km Fuss- und Velowegnetz
-          der Stadt. Jedes Wegstück trägt das signalisierte Tempo, die Strassenklasse, den Belag,
-          Tramgleise in der Fahrbahn, die Höhenmeter und die Zugehörigkeit zum Vorzugs- oder
-          Hauptnetz der städtischen Velonetzplanung. Dazu kommen {nf(statistik.ampelKnoten)}{' '}
-          Kreuzungen mit Ampel und {nf(statistik.verbote)} Abbiegeverbote.
+    <section aria-labelledby="velonavi-titel" className="text-[12px] leading-relaxed">
+      <h1 id="velonavi-titel" className="text-[14px] font-semibold">
+        Velonavi Zürich – dein Veloroutenplaner
+      </h1>
+      <p className="mt-2">
+        Plane deine Veloroute durch die Stadt Zürich: Start und Ziel eingeben, eine schnelle
+        oder komfortable Strecke wählen und auf der Velokarte vergleichen. Der Velonavi von
+        angebunden ist kostenlos und funktioniert direkt im Browser.
+      </p>
+      <details className="mt-3">
+        <summary className="cursor-pointer font-medium">Mehr über das Velonavi Zürich</summary>
+        <h2 className="mt-3 font-semibold">Schnell oder komfortabel mit dem Velo durch Zürich</h2>
+        <p className="mt-1">
+          «Schnell» gewichtet die Fahrzeit stärker. «Komfort» bevorzugt angenehmere Strecken
+          und nimmt dafür Umwege in Kauf. In die Berechnung fliessen Verkehr, Velowege,
+          Velostreifen, Tramgleise, Kopfsteinpflaster, Steigungen und Wartezeiten an Ampeln ein.
+          Die Farben der Route zeigen das Fahrgefühl der einzelnen Abschnitte.
         </p>
-        <p>
-          Gerechnet werden immer zwei Varianten. «Schnell» achtet fast nur auf die Fahrzeit.
-          «Komfort» meidet Verkehr, Tramgleise, Kopfsteinpflaster und Steigungen und nimmt dafür
-          rund 7% mehr Fahrzeit in Kauf. Die Route wird nach Fahrgefühl eingefärbt, von einem
-          abgetrennten Veloweg bis zum Mischverkehr auf Tempo 50. Zwischenziele lassen sich setzen,
-          die fertige Route als GPX herunterladen oder als Link teilen.
+        <h2 className="mt-3 font-semibold">Velorouten mit Zwischenzielen und GPX-Export</h2>
+        <p className="mt-1">
+          Ob Arbeitsweg, Fahrt zur Uni oder zum See: Füge Zwischenziele hinzu, teile die
+          fertige Route als Link oder lade sie als GPX-Datei für dein Velonavi-Gerät oder
+          eine andere App herunter. Adresssuche und Routenberechnung laufen auf deinem Gerät.
         </p>
-        <p>
-          Gesucht wird im Browser, Start und Ziel verlassen das Gerät nicht.{' '}
-          Fahrten lassen sich aufzeichnen, auswerten und vergleichen, und der Velonavi passt seine Fahrzeiten daran an.{' '}
-          An Ampeln zählt
-          die Wartezeit danach, ob man geradeaus über die Kreuzung muss oder nur abbiegt. Pfosten,
-          Schranken und Drängelgitter kosten Sekunden.
+        <h2 className="mt-3 font-semibold">Velokarte und Velonetz der Stadt Zürich</h2>
+        <p className="mt-1">
+          Grundlage sind {nf(statistik.veloKm)} km Fuss- und Velowegnetz, ergänzt um
+          Daten der Stadt Zürich und OpenStreetMap. Berücksichtigt werden auch das Vorzugs-
+          und Hauptnetz der städtischen Velonetzplanung, {nf(statistik.ampelKnoten)} Kreuzungen
+          mit Ampeln und {nf(statistik.verbote)} Abbiegeverbote. Wie die Daten gewichtet werden,
+          erklärt die <Link href="/methode#velonavi" className="underline underline-offset-2">
+            Methode des Velonavi Zürich
+          </Link>.
         </p>
-        <p>
-          <Link href="/methode#velonavi">Wie das gerechnet ist</Link>: die Formeln, Parameter und
-          Datenquellen hinter dem Velonavi.
+        <h2 className="mt-3 font-semibold">Weitere Karten von angebunden</h2>
+        <p className="mt-1">
+          Die <Link href="/erreichbarkeitskarte" className="underline underline-offset-2">
+            Erreichbarkeitskarte Zürich
+          </Link> zeigt ÖV-Reisezeiten und Kulturangebote für jedes Haus. Sie gibt es auch
+          für <Link href="/basel" className="underline underline-offset-2">Basel</Link> und{' '}
+          <Link href="/bern" className="underline underline-offset-2">Bern</Link>.
+          Unter <Link href="/wohnungen" className="underline underline-offset-2">
+            Wohnungen Zürich
+          </Link> findest du Mietwohnungen und WG-Zimmer auf einer Karte.
         </p>
-      </section>
+      </details>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+      />
+    </section>
+  )
+}
 
+/** Liegt ausserhalb des Bedienfelds und bleibt auch ohne JavaScript sichtbar. */
+export function OhneJavascript() {
+  return (
       <noscript>
         <div
           style={{
@@ -102,11 +142,5 @@ export function SeoInhalt({ statistik }: { statistik: VeloMeta['statistik'] }) {
           </div>
         </div>
       </noscript>
-
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
-      />
-    </>
   )
 }

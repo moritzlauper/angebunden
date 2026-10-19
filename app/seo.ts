@@ -17,12 +17,11 @@ const VERKEHR: Record<string, string> = {
  * Vorschaubild kommt aus `opengraph-image.tsx` im selben Ordner dazu.
  */
 export function stadtMetadata(stadt: Stadt, meta: Meta): Metadata {
-  const titel = `Erreichbarkeit ${stadt.name}`
+  const titel = `Erreichbarkeitskarte ${stadt.name}: ÖV und Kultur`
   const verkehr = VERKEHR[stadt.schluessel] ?? 'Tram, Bus und Bahn'
   const beschreibung =
-    `Für jedes der ${nf(meta.buildings)} Häuser in ${stadt.name}: die mittlere ` +
-    `Reisezeit mit ${verkehr} zu einer beliebigen Adresse der Stadt, und wie es ` +
-    `um die Kulturvielfalt in der Nähe steht.`
+    `Vergleiche ${nf(meta.buildings)} Häuser in ${stadt.name} auf der Erreichbarkeitskarte: ` +
+    `mittlere Reisezeiten mit ${verkehr} und Kulturangebote in Geh- oder Veloweite.`
   const sozial = `${SITE_NAME} · Wie gut ist dein Haus in ${stadt.name} angebunden?`
 
   return {

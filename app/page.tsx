@@ -3,21 +3,18 @@ import path from 'node:path'
 import type { Metadata } from 'next'
 import { SITE_NAME } from './site'
 import Velonavi from './velonavi/velonavi'
-import { SeoInhalt } from './velonavi/seo-inhalt'
+import { SeoInhalt, OhneJavascript } from './velonavi/seo-inhalt'
+import { VELO_TITEL, VELO_BESCHREIBUNG } from './velonavi/seo'
 import type { VeloMeta } from './velonavi/router'
 
-const BESCHREIBUNG =
-  'Veloroutenplaner für Zürich in zwei Varianten, schnell oder komfortabel. Rechnet Verkehr, ' +
-  'Velostreifen, Tramgleise, Kopfsteinpflaster, Steigung und die Wartezeit an Ampeln mit, ' +
-  'je nach Abbiegerichtung. Mit Zwischenzielen, GPX-Export und teilbarem Link.'
-
-const SOZIAL = `Velonavi Zürich · ${SITE_NAME}`
+const SOZIAL = `${VELO_TITEL} · ${SITE_NAME}`
 
 export const metadata: Metadata = {
-  title: 'Velonavi Zürich',
-  description: BESCHREIBUNG,
+  title: { absolute: SOZIAL },
+  description: VELO_BESCHREIBUNG,
   keywords: [
     'Velonavi',
+    'Velonavi Zürich',
     'Veloroutenplaner',
     'Velorouten Zürich',
     'Velokarte Zürich',
@@ -35,12 +32,12 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     url: '/',
     title: SOZIAL,
-    description: BESCHREIBUNG,
+    description: VELO_BESCHREIBUNG,
   },
   twitter: {
     card: 'summary_large_image',
     title: SOZIAL,
-    description: BESCHREIBUNG,
+    description: VELO_BESCHREIBUNG,
   },
 }
 
@@ -71,8 +68,10 @@ export default async function Page() {
   return (
     <>
       <script dangerouslySetInnerHTML={{ __html: THEMA_SKRIPT }} />
-      <SeoInhalt statistik={meta.statistik} />
-      <Velonavi />
+      <OhneJavascript />
+      <Velonavi>
+        <SeoInhalt statistik={meta.statistik} />
+      </Velonavi>
     </>
   )
 }
