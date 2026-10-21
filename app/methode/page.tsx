@@ -525,6 +525,9 @@ vielfalt(Haus) =  Σ  √( n(Sorte) )   über die gewählten Sorten`}</Formel>
           Moritz Lauper, <Aus href="mailto:moritz.lauper@hispeed.ch">moritz.lauper@hispeed.ch</Aus>{' '}
           oder <Aus href="https://ch.linkedin.com/in/moritz-lauper">LinkedIn</Aus>.
         </p>
+        <p className="mt-3 text-xs text-zinc-600 dark:text-zinc-400">
+          Studienwahl: <Aus href="https://wasstudieren.ch">wasstudieren.ch</Aus>
+        </p>
       </main>
     </div>
   )
