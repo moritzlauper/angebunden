@@ -1,5 +1,5 @@
 {
-  "aktualisiert": "2026-10-27T09:49:56.203Z",
+  "aktualisiert": "2026-10-30T10:52:35.047Z",
   "quelle": "goatcounter/angebunden (stats/total)",
   "hinweis": "besucher = Besuche pro Tag, cookielos gezählt (8-Stunden-Sitzung, pro Seite einmal). Näherung nach oben für die Zahl verschiedener Leute. Zeitzone Europe/Zurich.",
   "tage": {
@@ -52,6 +52,9 @@
     "2026-10-23": 0,
     "2026-10-24": 0,
     "2026-10-25": 0,
-    "2026-10-26": 0
+    "2026-10-26": 0,
+    "2026-10-27": 0,
+    "2026-10-28": 0,
+    "2026-10-29": 0
   }
 }
