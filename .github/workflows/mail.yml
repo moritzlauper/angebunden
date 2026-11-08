@@ -9,6 +9,9 @@ on:
       lookup:
         description: Page to read contact addresses from
         required: false
+      sent:
+        description: List this many of the last sent mails with their delivery state (addresses masked)
+        required: false
       to:
         description: Recipient (empty = check only)
         required: false
@@ -43,6 +46,7 @@ jobs:
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           LOOKUP: ${{ inputs.lookup }}
+          SENT: ${{ inputs.sent }}
           TO: ${{ inputs.to }}
           FROM: ${{ inputs.from }}
           REPLY_TO: ${{ inputs.reply_to }}

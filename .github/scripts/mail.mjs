@@ -2,12 +2,20 @@
 // the key works (never printed), which domains Resend may send from, and the
 // addresses on the LOOKUP page, so the recipient comes from the publisher's
 // own imprint before anything goes out.
-const { RESEND_API_KEY: KEY, LOOKUP, TO, FROM, REPLY_TO, BCC, SUBJECT, BODY } = process.env
+const { RESEND_API_KEY: KEY, LOOKUP, SENT, TO, FROM, REPLY_TO, BCC, SUBJECT, BODY } = process.env
 if (!KEY) throw new Error('RESEND_API_KEY is not set')
 const api = (path, init = {}) => fetch(`https://api.resend.com${path}`, { ...init, headers: { Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' } })
 
 const domains = await api('/domains')
 console.log(`Resend domains: HTTP ${domains.status} ${domains.ok ? (await domains.json()).data.map((d) => `${d.name} (${d.status})`).join(', ') : ''}`)
+
+// The last sent mails with their delivery state. The logs of this repository are public, so addresses are masked.
+if (SENT) {
+  const mask = (a) => a.replace(/^(.).*?(.)?@(.).*?(\.[^.]+)$/, (_, f, l, d, t) => `${f}***${l ?? ''}@${d}***${t}`)
+  const res = await api(`/emails?limit=${Math.min(100, Number(SENT) || 20)}`)
+  if (!res.ok) console.log(`Sent mails: HTTP ${res.status} ${await res.text()}`)
+  else for (const m of (await res.json()).data) console.log(`${m.created_at}  ${m.last_event ?? '?'}  ${m.from}  →  ${m.to.map(mask).join(', ')}  «${m.subject}»`)
+}
 
 if (LOOKUP) {
   const html = await (await fetch(LOOKUP, { headers: { 'User-Agent': 'Mozilla/5.0' } })).text()
