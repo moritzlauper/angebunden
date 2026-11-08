@@ -4,7 +4,7 @@
  * damit eine Mail genau das bringt, was die Seite mit denselben Filtern zeigt.
  * Kein React, kein Browser.
  */
-import type { Inserat, QuellenId, Art } from './typen'
+import type { Inserat, QuellenId, Art, Merkmal } from './typen'
 import type { Suche } from './quellen'
 
 export const SORTEN = {
@@ -27,8 +27,15 @@ export type Filter = Suche & {
   nurNeu: boolean
   nurGemerkt: boolean
   nurAusschnitt: boolean
-  /** Befristet oder nicht, erkannt vom Sammler aus Feldern und Text. */
-  dauer: 'alle' | 'unbefristet' | 'befristet'
+  /**
+   * Befristet oder nicht, erkannt vom Sammler aus Feldern und Text. `lang`: unbefristet
+   * oder befristet bis mindestens ein Jahr nach heute.
+   */
+  dauer: 'alle' | 'unbefristet' | 'lang' | 'befristet'
+  /** Nur Inserate mit all dieser Ausstattung (vom Modell aus dem Text gelesen). Fehlt in älteren Filtern. */
+  merkmale?: Merkmal[]
+  /** Tauschinserate und Inserate mit Betrugszeichen ausblenden. */
+  ohneZweifel?: boolean
   /** Auf der Karte gezeichnete Kreise: Mittelpunkt und Radius in Metern. */
   gebiete: Gebiet[]
   /** Nur diese Postleitzahlen; setzt ein Suchabo, das auf einer Kreisseite angelegt wurde. */
@@ -53,6 +60,8 @@ export const FILTER_LEER: Filter = {
   nurGemerkt: false,
   nurAusschnitt: false,
   dauer: 'alle',
+  merkmale: [],
+  ohneZweifel: false,
   gebiete: [],
   sorte: 'neu',
   fassung: 2,
@@ -73,6 +82,16 @@ export function nachgefuehrt(f: Partial<Filter>): Partial<Filter> {
 }
 
 export const TAG = 24 * 3600 * 1000
+
+/** Die Ausstattung in der Reihenfolge der Filter, mit Namen für Seite und Mail. */
+export const MERKMAL_NAMEN: Record<Merkmal, string> = {
+  balkon: 'Balkon',
+  waschmaschine: 'Eigene Waschmaschine',
+  geschirrspueler: 'Geschirrspüler',
+  lift: 'Lift',
+  haustiere: 'Haustiere erlaubt',
+  hindernisfrei: 'Hindernisfrei',
+}
 
 /**
  * Ein auf der Karte gezeichnetes Gebiet: eine von Hand umfahrene Fläche
@@ -122,6 +141,10 @@ export function passt(i: Inserat, f: Filter, gemerkt: Set<string>, jetzt: number
   if (f.nurNeu && jetzt - Date.parse(i.erstGesehen) > TAG) return false
   if (f.dauer === 'befristet' && !i.befristet) return false
   if (f.dauer === 'unbefristet' && i.befristet) return false
+  // Ohne bekanntes Ende zählt eine Befristung als kurz.
+  if (f.dauer === 'lang' && i.befristet && !(i.befristetBis && Date.parse(i.befristetBis) - jetzt >= 365 * TAG)) return false
+  if (f.merkmale?.length && !f.merkmale.every((m) => i.merkmale?.includes(m))) return false
+  if (f.ohneZweifel && (i.tausch || i.vorsicht)) return false
   if (f.plz?.length && !(i.plz && f.plz.includes(i.plz))) return false
   if (f.gebiete.length) {
     if (i.lon == null || i.lat == null) return false

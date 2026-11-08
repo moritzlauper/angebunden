@@ -20,6 +20,7 @@ export const GESAMMELT: Record<QuellenId, { name: string; url: string }> = {
   woko: { name: 'WOKO', url: 'https://www.woko.ch/unser-angebot/freie-objekte' },
   pwg: { name: 'Stiftung PWG', url: 'https://www.pwg.ch/liegenschaften/zu-vermieten' },
   abz: { name: 'ABZ', url: 'https://www.abz.ch/wohnen/mieten/' },
+  gen: { name: 'Genossenschaften', url: 'https://www.wbg-zh.ch/verband-page/plattform-wohnungssuche/' },
 }
 
 type Verweis = { name: string; was: string; url: (s: Suche) => string }

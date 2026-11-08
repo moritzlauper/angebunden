@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FILTER_LEER, type Filter } from './filter'
+import { FILTER_LEER, MERKMAL_NAMEN, type Filter } from './filter'
 import type { Kreis } from './kreise'
 import { AnmeldeFormular, useSuchabos, type Suchabo, type useKonto } from './konto'
 import { GESAMMELT } from './quellen'
@@ -30,7 +30,8 @@ export function aboName(f: Filter, kreis?: Kreis) {
     f.zimmerMin != null ? `ab ${String(f.zimmerMin).replace('.5', '½')} Zi.` : null,
     f.mieteMax != null ? `bis CHF ${f.mieteMax}` : null,
     f.flaecheMin != null ? `ab ${f.flaecheMin} m²` : null,
-    f.dauer === 'unbefristet' ? 'unbefristet' : f.dauer === 'befristet' ? 'befristet' : null,
+    f.dauer === 'unbefristet' ? 'unbefristet' : f.dauer === 'lang' ? 'ab 1 Jahr' : f.dauer === 'befristet' ? 'befristet' : null,
+    f.merkmale?.length ? `mit ${f.merkmale.map((m) => MERKMAL_NAMEN[m]).join(', ')}` : null,
     f.gebiete.length ? `${f.gebiete.length} ${f.gebiete.length === 1 ? 'Gebiet' : 'Gebiete'}` : null,
     quellenText(f.quellenAus),
     f.text.trim() ? `«${f.text.trim()}»` : null,

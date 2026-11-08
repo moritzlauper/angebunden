@@ -34,6 +34,7 @@ on:
       - 'pipeline/20-wohnungen.ts'
       - 'pipeline/21-suchabos.ts'
       - 'pipeline/lib/inserat-text.ts'
+      - 'pipeline/lib/ki.ts'
       - '.github/workflows/wohnungen.yml'
 
 concurrency:
@@ -55,9 +56,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Die pnpm-Version kommt aus «packageManager» in package.json.
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
+
+      # Für das Anthropic-SDK, mit dem der Sammler Inserate und Genossenschaftsseiten auswertet.
+      - name: Abhängigkeiten
+        run: pnpm install --frozen-lockfile
 
       - name: Sammeln und Suchabos verschicken
         env:
@@ -68,6 +77,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           SUCHABO_ABSENDER: ${{ vars.SUCHABO_ABSENDER || secrets.SUCHABO_ABSENDER }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           set -uo pipefail
           mkdir -p ausgabe

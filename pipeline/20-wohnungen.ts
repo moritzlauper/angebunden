@@ -21,6 +21,9 @@
  *   früher gesammelte Inserate bis zu ihrem Ablaufdatum stehen.
  * * WOKO (Zimmer für Studierende) und Stiftung PWG: HTML der Liste freier Objekte.
  * * ABZ: WordPress-Schnittstelle, Beitragstyp `wohnung`.
+ * * Genossenschaften: die Vermietungsseiten einiger Zürcher Genossenschaften.
+ *   Jede ist anders aufgebaut; Claude liest die freien Wohnungen aus dem Text
+ *   (`lib/ki.ts`), und zwar nur, wenn sich eine Seite geändert hat.
  *
  * Nicht dabei, weil sie automatische Abrufe sperren (Cloudflare, auch mit
  * echtem Browser) oder eine Anmeldung verlangen: Homegate, ImmoScout24 direkt,
@@ -30,11 +33,18 @@
  * Danach werden Doppelte zusammengelegt und jedes Inserat bekommt die ÖV- und
  * Kulturwerte des nächsten Hauses der Karte. Wo eine Quelle keine Koordinaten
  * liefert, steht die Adresse für die Suche nach dem Haus.
+ *
+ * Mit `ANTHROPIC_API_KEY` liest Claude zusätzlich die Beschreibung neuer
+ * Inserate: Befristung samt Enddatum, WG-Zimmer, Fläche, Ausstattung,
+ * Tauschinserate und Betrugszeichen. Ohne Schlüssel gelten die Regeln aus
+ * `lib/inserat-text.ts` allein.
  */
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 import { pointInRings } from './lib/geo.ts'
 import { istBefristet, istWgZimmer } from './lib/inserat-text.ts'
+import { inserateAuswerten, kiBereit, kiVerbrauch, seiteAuslesen, type InseratText } from './lib/ki.ts'
 import type { Art, Inserat, QuellenId, QuellenStand, Wohnungen } from '../app/wohnungen/typen.ts'
 
 const DATEN = 'public/data/zuerich'
@@ -65,7 +75,32 @@ const NAMEN: Record<QuellenId, string> = {
   woko: 'WOKO',
   pwg: 'Stiftung PWG',
   abz: 'ABZ',
+  gen: 'Genossenschaften',
 }
+
+/**
+ * Vermietungsseiten von Genossenschaften in der Stadt, geprüft im November 2026. Die meisten
+ * melden die meiste Zeit «keine freien Wohnungen»; wenn doch etwas frei wird, steht es hier zuerst.
+ * Viele weitere Genossenschaften inserieren direkt auf Flatfox oder Homegate.
+ */
+const GENOSSENSCHAFTEN = [
+  { name: 'BEP', url: 'https://www.bep-zuerich.ch/vermietung/freie-objekte' },
+  { name: 'FGZ', url: 'https://fgzzh.ch/freie-objekte/' },
+  { name: 'Hagenbrünneli', url: 'https://hagenbruenneli.ch/freie-objekte/' },
+  { name: 'Kraftwerk1', url: 'https://kraftwerk1.ch/freie-objekte' },
+  { name: 'mehr als wohnen', url: 'https://www.mehralswohnen.ch/freie-objekte' },
+  { name: 'Rotach', url: 'https://www.rotach.ch/portfolio/vermietung' },
+  { name: 'Sonnengarten', url: 'https://www.bg-sonnengarten.ch/freie-wohnungen' },
+  { name: 'Sunnige Hof', url: 'https://sunnigehof.ch/siedlungen/freie-objekte/' },
+  { name: 'WOGENO', url: 'https://www.wogeno-zuerich.ch/genossenschaft/freie-wohnungen-und-objekte/' },
+]
+
+/** So viele Inserate wertet das Modell je Lauf höchstens aus, die neuesten zuerst. Der Rest folgt in den nächsten Läufen. */
+const KI_BUDGET = Number(process.env.KI_BUDGET) || 40
+/** Eine geänderte Vermietungsseite geht höchstens so oft ans Modell. */
+const SEITE_PAUSE_MS = 60 * 60 * 1000
+
+const pruefsumme = (s: string) => createHash('sha1').update(s).digest('base64url').slice(0, 12)
 
 /** Ein Fund, bevor er zusammengelegt und eingeordnet ist. */
 type Roh = Omit<Inserat, 'id' | 'links' | 'erstGesehen' | 'oev' | 'oevRang' | 'kultur' | 'kulturRang'> & {
@@ -442,6 +477,94 @@ async function abz(): Promise<Roh[]> {
   })
 }
 
+// ─── Genossenschaften ─────────────────────────────────────────────────────
+
+/**
+ * Der lesbare Text einer Seite für das Modell: ohne Skripte, Stile, Menüs und Fusszeile,
+ * Absätze als Zeilen, Links als [Text](Adresse) mit vollständiger Adresse.
+ */
+function seitenText(html: string, basis: string): string {
+  const ohne = html
+    .replace(/<head[\s\S]*?<\/head>/gi, ' ')
+    .replace(/<(script|style|noscript|svg|nav|footer|iframe)\b[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+  const mitLinks = ohne.replace(/<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi, (_, href: string, inhalt: string) => {
+    const t = klartext(inhalt)
+    if (/^(#|javascript:|mailto:|tel:)/i.test(href)) return ` ${t} `
+    try {
+      return ` [${t}](${new URL(href.replace(/&amp;/g, '&'), basis).href}) `
+    } catch {
+      return ` ${t} `
+    }
+  })
+  return mitLinks
+    .replace(/<\/(p|div|li|h\d|tr|section|article|table|ul|ol)>|<br\s*\/?>/gi, '\n')
+    .split('\n')
+    .map(klartext)
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, 40_000)
+}
+
+/**
+ * Die freien Wohnungen der Genossenschaften. Eine Seite geht nur ans Modell, wenn ihr Text sich
+ * seit der letzten Auswertung geändert hat und diese mindestens eine Stunde her ist; sonst gilt das
+ * letzte Ergebnis. Fällt eine Seite aus, bleibt ihr letztes Ergebnis drei Tage stehen.
+ */
+async function genossenschaften(seiten: NonNullable<Wohnungen['seiten']>, jetzt: string): Promise<Roh[]> {
+  const funde: Roh[] = []
+  let erreicht = 0
+  let ausgewertet = 0
+  for (const g of GENOSSENSCHAFTEN) {
+    const alt = seiten[g.url]
+    let stand: typeof alt | undefined = alt
+    try {
+      const text = seitenText(await holen(g.url, false), g.url)
+      erreicht++
+      const h = pruefsumme(text)
+      const pause = alt && Date.parse(jetzt) - Date.parse(alt.t) < SEITE_PAUSE_MS
+      if ((!alt || alt.h !== h) && !pause && kiBereit()) {
+        const neu = await seiteAuslesen(`Seite der Genossenschaft ${g.name}: ${g.url}\n\n${text}`, heute())
+        if (neu) {
+          stand = { h, t: jetzt, funde: neu }
+          ausgewertet++
+        }
+      }
+    } catch (e) {
+      console.warn(`  ${g.name}: ${e instanceof Error ? e.message : e}`)
+      if (alt && Date.parse(jetzt) - Date.parse(alt.t) > HALTEN_MS) stand = undefined
+    }
+    if (stand) seiten[g.url] = stand
+    else delete seiten[g.url]
+    for (const f of stand?.funde ?? []) {
+      const quellId = pruefsumme(`${g.url}|${f.link ?? ''}|${f.strasse ?? ''}|${f.zimmer ?? ''}|${f.titel}`)
+      funde.push({
+        quelle: 'gen',
+        quellId,
+        url: f.link ?? `${g.url}#${quellId}`,
+        titel: `${g.name}: ${f.titel}`,
+        art: f.art,
+        strasse: f.strasse,
+        plz: f.plz,
+        ort: f.ort,
+        lon: null,
+        lat: null,
+        zimmer: f.zimmer,
+        flaeche: f.flaeche,
+        miete: f.miete,
+        bezug: bezugsdatum(f.bezug),
+        bild: null,
+        befristet: f.befristet,
+      })
+    }
+    await warte(300)
+  }
+  if (erreicht === 0) throw new Error('keine Seite erreichbar')
+  if (!kiBereit() && Object.keys(seiten).length === 0) throw new Error('ohne ANTHROPIC_API_KEY keine Auswertung')
+  console.log(`  Genossenschaften: ${erreicht} von ${GENOSSENSCHAFTEN.length} Seiten erreicht, ${ausgewertet} neu ausgewertet`)
+  return funde
+}
+
 // ─── Zusammenführen ───────────────────────────────────────────────────────
 
 /** Meter zwischen zwei Punkten, flach gerechnet; reicht innerhalb der Stadt. */
@@ -672,6 +795,60 @@ async function ronorpAlte(
   return lebend
 }
 
+/**
+ * Lässt das Modell die Inserate lesen, deren Text es noch nicht kennt (neueste zuerst, bis zum
+ * Budget), und trägt alle bekannten Ergebnisse ein. Was die Quelle ausdrücklich sagt, geht vor:
+ * eine WG bleibt eine WG, ein als befristet markiertes Inserat bleibt befristet.
+ */
+async function auswerten(
+  inserate: Inserat[],
+  texte: Map<string, string>,
+  vonQuelle: Map<string, { art: Art; befristet?: boolean }>,
+  alt: NonNullable<Wohnungen['ki']>
+): Promise<NonNullable<Wohnungen['ki']>> {
+  const ki: NonNullable<Wohnungen['ki']> = {}
+  const offen: (InseratText & { h: string })[] = []
+  for (const i of inserate) {
+    const vorher = alt[i.id]
+    const t = texte.get(i.id)
+    // Ohne Text (früher gesammelte Ron-Orp-Inserate) gilt die letzte Auswertung weiter.
+    if (vorher) ki[i.id] = vorher
+    if (!t) continue
+    const h = pruefsumme(t)
+    if (vorher?.h !== h) offen.push({ id: i.id, text: t, h })
+  }
+  if (offen.length && kiBereit()) {
+    const auswahl = offen.slice(0, KI_BUDGET)
+    const start = Date.now()
+    const neu = await inserateAuswerten(auswahl, heute())
+    for (const o of auswahl) {
+      const w = neu.get(o.id)
+      if (w) ki[o.id] = { h: o.h, w }
+    }
+    console.log(
+      `KI: ${neu.size} von ${auswahl.length} Inseraten ausgewertet in ${Math.round((Date.now() - start) / 1000)} s, ` +
+        `${offen.length - auswahl.length} warten auf die nächsten Läufe`
+    )
+  }
+
+  for (const i of inserate) {
+    const w = ki[i.id]?.w
+    if (!w) continue
+    const q = vonQuelle.get(i.id)
+    // Nur was in diesem Lauf frisch von der Quelle kam, wird neu eingeordnet; der Rest trägt den letzten Stand.
+    if (q) {
+      if (q.art !== 'wg' && q.art !== 'haus') i.art = w.wgZimmer ? 'wg' : q.art
+      i.befristet = q.befristet ?? w.befristet
+    }
+    i.befristetBis = i.befristet ? w.befristetBis : null
+    if (i.flaeche == null) i.flaeche = w.flaeche
+    i.merkmale = w.merkmale
+    i.tausch = w.tausch || undefined
+    i.vorsicht = w.vorsicht || undefined
+  }
+  return ki
+}
+
 async function main() {
   const jetzt = new Date().toISOString()
   const vorher: Wohnungen | null = existsSync(AUSGABE) ? JSON.parse(readFileSync(AUSGABE, 'utf8')) : null
@@ -689,6 +866,8 @@ async function main() {
   const bekannt = new Map<string, string>([...gesehen].map(([url, [erst]]) => [url, erst]))
   // Wann ein Ron-Orp-Inserat zuletzt auf seiner Detailseite bestätigt wurde (siehe `ronorpAlte`).
   const geprueft = new Map<string, string>(Object.entries(vorher?.geprueft ?? {}))
+  // Letzte Auswertung der Genossenschaftsseiten; `genossenschaften` schreibt sie fort.
+  const seiten: NonNullable<Wohnungen['seiten']> = { ...(vorher?.seiten ?? {}) }
 
   const quellen: [QuellenId, () => Promise<Roh[]>][] = [
     ['flatfox', flatfox],
@@ -696,6 +875,7 @@ async function main() {
     ['woko', woko],
     ['pwg', pwg],
     ['abz', abz],
+    ['gen', () => genossenschaften(seiten, jetzt)],
   ]
 
   const inStadt = stadtgrenze()
@@ -710,13 +890,20 @@ async function main() {
 
   const stand: QuellenStand[] = []
   const alle: Inserat[] = []
+  // Für die Auswertung durch das Modell: der Text je Inserat und was die Quelle selbst über Art und Befristung sagt.
+  const texte = new Map<string, string>()
+  const vonQuelle = new Map<string, { art: Art; befristet?: boolean }>()
   for (const [id, abruf] of quellen) {
     const alt = vorher?.quellen.find((q) => q.id === id)
     try {
       const funde = await abruf()
       let drin = 0
       const neueUrls = new Set<string>()
-      for (const r of funde.map(deuten)) {
+      for (const roh of funde) {
+        const kennung = `${roh.quelle}:${roh.quellId}`
+        if (roh.text?.trim()) texte.set(kennung, `${roh.titel}\n${roh.text.trim()}`)
+        vonQuelle.set(kennung, { art: roh.art, befristet: roh.befristet })
+        const r = deuten(roh)
         // Ohne Koordinaten über die Adresse zum Haus der Karte.
         if (r.lon == null || r.lat == null) {
           const h = finde(r.strasse)
@@ -726,7 +913,9 @@ async function main() {
           }
         }
         const mitOrt = r.lon != null && r.lat != null
-        if (mitOrt ? !inStadt(r.lon!, r.lat!) : !(r.plz && PLZ_STADT.has(r.plz))) continue
+        // Genossenschaften nennen auf der Übersicht oft keine Adresse. Ohne anderen Ort gilt Zürich.
+        const ohneAdresseInStadt = r.quelle === 'gen' && !r.plz && (!r.ort || /zürich/i.test(r.ort))
+        if (mitOrt ? !inStadt(r.lon!, r.lat!) : !((r.plz && PLZ_STADT.has(r.plz)) || ohneAdresseInStadt)) continue
         const { quelle, quellId, url, ...rest } = r
         neueUrls.add(url)
         alle.push({
@@ -781,6 +970,7 @@ async function main() {
     i.kulturRang = h.kr
   }
   inserate.sort((a, b) => b.erstGesehen.localeCompare(a.erstGesehen))
+  const ki = await auswerten(inserate, texte, vonQuelle, vorher?.ki ?? {})
 
   if (inserate.length === 0 && (vorher?.inserate.length ?? 0) > 0) {
     throw new Error('Keine einzige Quelle hat geliefert, die alte Datei bleibt stehen.')
@@ -802,11 +992,16 @@ async function main() {
     inserate,
     gesehen: Object.fromEntries(gesehen),
     geprueft: Object.fromEntries(geprueft),
+    ki,
+    seiten,
   }
   mkdirSync(path.dirname(AUSGABE), { recursive: true })
   writeFileSync(AUSGABE, JSON.stringify(ergebnis))
   const doppelt = alle.length - inserate.length
   console.log(`${inserate.length} Wohnungen geschrieben (${doppelt} Doppelte zusammengelegt) → ${AUSGABE}`)
+  if (kiVerbrauch.anfragen) {
+    console.log(`KI: ${kiVerbrauch.anfragen} Anfragen, ${kiVerbrauch.eingabe} Tokens Eingabe, ${kiVerbrauch.ausgabe} Ausgabe`)
+  }
 }
 
 await main()

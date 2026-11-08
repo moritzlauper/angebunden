@@ -89,7 +89,9 @@ const eckdaten = (i: Inserat) =>
     i.zimmer != null ? `${String(i.zimmer).replace('.5', '½')} Zi.` : null,
     i.flaeche != null ? `${Math.round(i.flaeche)} m²` : null,
     [i.strasse, i.plz].filter(Boolean).join(', ') || null,
-    i.befristet ? 'befristet' : null,
+    i.befristet ? (i.befristetBis ? `befristet bis ${i.befristetBis.split('-').reverse().join('.')}` : 'befristet') : null,
+    i.tausch ? 'Wohnungstausch' : null,
+    i.vorsicht ? 'Vorsicht: Zeichen für Betrug' : null,
   ].filter(Boolean)
 
 /** Ein Inserat in der Textfassung der Mail. */

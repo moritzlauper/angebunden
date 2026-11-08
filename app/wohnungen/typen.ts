@@ -9,9 +9,12 @@
  * nur über Flatfox drin: Flatfox gehört zur SMG und führt einen Teil ihrer
  * Inserate mit. Direkt sperren beide automatische Abrufe.
  */
-export type QuellenId = 'flatfox' | 'ronorp' | 'woko' | 'pwg' | 'abz'
+export type QuellenId = 'flatfox' | 'ronorp' | 'woko' | 'pwg' | 'abz' | 'gen'
 
 export type Art = 'wohnung' | 'wg' | 'studio' | 'haus' | 'moebliert'
+
+/** Ausstattung, die das Modell aus dem Inseratetext liest (`pipeline/lib/ki.ts`). */
+export type Merkmal = 'balkon' | 'waschmaschine' | 'geschirrspueler' | 'lift' | 'haustiere' | 'hindernisfrei'
 
 export type Inserat = {
   /** Stabil über Läufe: `quelle:id` des ersten Fundes. */
@@ -46,6 +49,14 @@ export type Inserat = {
    * erkannt («Untermiete», «December only», «bis Ende März»).
    */
   befristet?: boolean
+  /** Ende der Befristung (JJJJ-MM-TT), vom Modell aus dem Text gelesen. */
+  befristetBis?: string | null
+  /** Ausstattung laut Text. Fehlt, solange das Inserat nicht ausgewertet ist. */
+  merkmale?: Merkmal[]
+  /** Wohnungstausch: Die Wohnung gibt es nur gegen eine andere. */
+  tausch?: boolean
+  /** Deutliche Zeichen für ein Betrugsinserat (Vermieter im Ausland, Zahlung vor Besichtigung). */
+  vorsicht?: boolean
   /** Von Homegate oder ImmoScout24 an Flatfox weitergereicht. */
   smg?: boolean
   /**
@@ -88,4 +99,41 @@ export type Wohnungen = {
    * (je Link, ISO). Ältere Bestätigungen gelten nicht mehr und werden neu geprüft.
    */
   geprueft?: Record<string, string>
+  /**
+   * Auswertungen des Modells je Inserat-Kennung: Prüfsumme des Textes und
+   * Ergebnis. Ändert sich der Text, wird neu ausgewertet.
+   */
+  ki?: Record<string, { h: string; w: KiWerte }>
+  /**
+   * Vermietungsseiten der Genossenschaften: Prüfsumme des Seitentextes, Zeitpunkt
+   * der Auswertung und die gefundenen Wohnungen. Nur eine geänderte Seite geht
+   * erneut ans Modell.
+   */
+  seiten?: Record<string, { h: string; t: string; funde: SeitenFund[] }>
+}
+
+/** Was das Modell aus einem Inserat liest. */
+export type KiWerte = {
+  wgZimmer: boolean
+  befristet: boolean
+  befristetBis: string | null
+  flaeche: number | null
+  merkmale: Merkmal[]
+  tausch: boolean
+  vorsicht: boolean
+}
+
+/** Eine freie Wohnung, wie sie auf einer Vermietungsseite steht. */
+export type SeitenFund = {
+  titel: string
+  art: Art
+  strasse: string | null
+  plz: string | null
+  ort: string | null
+  zimmer: number | null
+  flaeche: number | null
+  miete: number | null
+  bezug: string | null
+  befristet: boolean
+  link: string | null
 }

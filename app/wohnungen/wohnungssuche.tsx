@@ -14,7 +14,7 @@ import { Anmeldung, useAbmeldelink, useKonto, useMerklisteImKonto } from './kont
 import { SuchaboDialog } from './suchabo'
 import type { Art, Inserat, QuellenId, Wohnungen } from './typen'
 import type { Kreis } from './kreise'
-import { FILTER_LEER, SORTEN, TAG, nachgefuehrt, passt, umriss, type Filter, type Gebiet, type Sorte } from './filter'
+import { FILTER_LEER, MERKMAL_NAMEN, SORTEN, TAG, nachgefuehrt, passt, umriss, type Filter, type Gebiet, type Sorte } from './filter'
 
 /**
  * Woher die Inserate kommen. Der Workflow `wohnungen.yml` legt die Datei
@@ -1048,6 +1048,12 @@ function Segment<T extends string>({ wahl, setzen, optionen }: { wahl: T; setzen
   )
 }
 
+/** «2027-03-31» → «31.3.27». */
+const befristetText = (d: string) => {
+  const [j, m, t] = d.split('-')
+  return `${Number(t)}.${Number(m)}.${j.slice(2)}`
+}
+
 const ZIMMER = [1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6]
 
 /** Wie viele Filter von der Grundeinstellung abweichen, für «Filter (3)» und «Zurücksetzen». */
@@ -1058,10 +1064,12 @@ function aktiveFilter(f: Filter) {
     f.zimmerMin != null || f.zimmerMax != null,
     f.arten.length !== FILTER_LEER.arten.length,
     f.dauer !== 'alle',
+    (f.merkmale?.length ?? 0) > 0,
     [...f.quellenAus].sort().join() !== [...FILTER_LEER.quellenAus].sort().join(),
     f.oevMax != null,
     f.nurNeu,
     f.nurGemerkt,
+    Boolean(f.ohneZweifel),
     f.gebiete.length > 0,
     f.text.trim() !== '',
   ].filter(Boolean).length
@@ -1096,7 +1104,8 @@ function Filterfeld({
   )
   const kippe = <T,>(liste: T[], x: T) => (liste.includes(x) ? liste.filter((y) => y !== x) : [...liste, x])
   const anzahl = aktiveFilter(f)
-  const mehrAktiv = [f.text.trim() !== '', f.oevMax != null, f.nurNeu, f.nurGemerkt].filter(Boolean).length
+  const mehrAktiv = [f.text.trim() !== '', f.oevMax != null, f.nurNeu, f.nurGemerkt, Boolean(f.ohneZweifel)].filter(Boolean).length
+  const merkmale = f.merkmale ?? []
 
   return (
     <section className="mx-3 rounded-[20px] border border-[var(--ab-linie)] bg-[var(--ab-blatt)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:mx-4">
@@ -1167,9 +1176,21 @@ function Filterfeld({
             optionen={[
               ['alle', 'Alle'],
               ['unbefristet', 'Unbefristet'],
-              ['befristet', 'Befristet / Untermiete'],
+              ['lang', 'Ab 1 Jahr'],
+              ['befristet', 'Befristet'],
             ] as const}
           />
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[10.5px] font-medium tracking-wide text-[var(--ab-leise)] uppercase">Ausstattung laut Inserat</span>
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.keys(MERKMAL_NAMEN) as (keyof typeof MERKMAL_NAMEN)[]).map((m) => (
+                <Chip key={m} an={merkmale.includes(m)} onClick={() => aendern({ merkmale: kippe(merkmale, m) })}>
+                  {MERKMAL_NAMEN[m]}
+                </Chip>
+              ))}
+            </div>
+          </div>
 
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
@@ -1224,6 +1245,10 @@ function Filterfeld({
                 <label className="flex cursor-pointer items-center gap-1.5">
                   <input type="checkbox" checked={f.nurGemerkt} onChange={(e) => aendern({ nurGemerkt: e.target.checked })} />
                   Nur gemerkte
+                </label>
+                <label className="flex cursor-pointer items-center gap-1.5">
+                  <input type="checkbox" checked={Boolean(f.ohneZweifel)} onChange={(e) => aendern({ ohneZweifel: e.target.checked })} />
+                  Ohne Tausch und Verdächtige
                 </label>
               </div>
               <div className="mt-1">
@@ -1344,7 +1369,20 @@ function Karteikarte({
               {proM2 != null && <span className="ml-1.5 text-[11px] font-normal text-[var(--ab-leise)]">{proM2.toFixed(0)}/m²</span>}
               {i.befristet && (
                 <span className="ml-1.5 rounded-full bg-[var(--ab-weich)] px-1.5 py-0.5 align-middle text-[10.5px] font-medium text-[var(--ab-leise)]">
-                  befristet
+                  {i.befristetBis ? `befristet bis ${befristetText(i.befristetBis)}` : 'befristet'}
+                </span>
+              )}
+              {i.tausch && (
+                <span className="ml-1.5 rounded-full bg-[var(--ab-weich)] px-1.5 py-0.5 align-middle text-[10.5px] font-medium text-[var(--ab-leise)]">
+                  Tausch
+                </span>
+              )}
+              {i.vorsicht && (
+                <span
+                  title="Das Inserat zeigt Zeichen eines Betrugs, etwa Vermieter im Ausland oder Zahlung vor der Besichtigung."
+                  className="ml-1.5 rounded-full bg-[var(--ab-karmin)] px-1.5 py-0.5 align-middle text-[10.5px] font-medium text-white"
+                >
+                  Vorsicht
                 </span>
               )}
             </div>

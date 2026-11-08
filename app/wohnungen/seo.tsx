@@ -49,14 +49,16 @@ const FRAGEN = (k?: Kreis): [string, string][] => [
     `Woher kommen die Wohnungen in ${ort(k)}?`,
     'Ein Sammler fragt alle fünf Minuten Flatfox ab (dort steht auch ein Teil der Inserate von Homegate ' +
       'und ImmoScout24), dazu den Wohnungsmarkt von Ron Orp, die freien Zimmer der WOKO und die freien ' +
-      'Wohnungen der Stiftung PWG und der ABZ. Steht dieselbe Wohnung auf mehreren Portalen, erscheint sie ' +
+      'Wohnungen der Stiftung PWG und der ABZ sowie die Vermietungsseiten weiterer Genossenschaften. Steht ' +
+      'dieselbe Wohnung auf mehreren Portalen, erscheint sie ' +
       'einmal, mit allen Links.',
   ],
   [
     'Wie finde ich unbefristete Wohnungen und keine Zwischenmiete?',
-    'Unter «Dauer» auf «Unbefristet» stellen. Ob ein Inserat befristet ist, steht selten in einem Feld; ' +
-      'die Seite liest es aus Titel und Beschreibung («Untermiete», «bis Ende März», «December only»). ' +
-      'Genauso erkennt sie WG-Zimmer, die als Wohnung inseriert sind.',
+    'Unter «Dauer» auf «Unbefristet» stellen, oder auf «Ab 1 Jahr», wenn auch längere Befristungen in ' +
+      'Frage kommen. Ob und bis wann ein Inserat befristet ist, steht selten in einem Feld; die Seite liest ' +
+      'es aus Titel und Beschreibung («Untermiete», «bis Ende März», «December only»). Genauso erkennt sie ' +
+      'WG-Zimmer, die als Wohnung inseriert sind, und Ausstattung wie Balkon oder eigene Waschmaschine.',
   ],
   [
     'Kann ich nur in bestimmten Quartieren suchen?',
