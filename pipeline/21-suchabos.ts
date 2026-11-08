@@ -84,13 +84,20 @@ async function db(pfad: string, init: RequestInit = {}) {
 const html = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 const nf = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '’')
 
-function zeile(i: Inserat): string {
-  const eck = [
+const eckdaten = (i: Inserat) =>
+  [
     i.zimmer != null ? `${String(i.zimmer).replace('.5', '½')} Zi.` : null,
     i.flaeche != null ? `${Math.round(i.flaeche)} m²` : null,
     [i.strasse, i.plz].filter(Boolean).join(', ') || null,
     i.befristet ? 'befristet' : null,
   ].filter(Boolean)
+
+/** Ein Inserat in der Textfassung der Mail. */
+const textzeile = (i: Inserat) =>
+  `${i.miete != null ? `CHF ${nf(i.miete)}` : 'Preis auf Anfrage'}, ${i.titel}\n${eckdaten(i).join(' · ')}\n${i.links[0].url}`
+
+function zeile(i: Inserat): string {
+  const eck = eckdaten(i)
   const bild = i.bild
     ? `<img src="${html(i.bild)}" width="96" height="72" alt="" style="display:block;width:96px;height:72px;object-fit:cover;border-radius:8px;background:#eeeeeb">`
     : `<div style="width:96px;height:72px;border-radius:8px;background:#eeeeeb"></div>`
@@ -114,7 +121,7 @@ function zeile(i: Inserat): string {
   </tr>`
 }
 
-function mail(abo: Abo, inserate: Inserat[], bestaetigung: boolean): { betreff: string; inhalt: string } {
+function mail(abo: Abo, inserate: Inserat[], bestaetigung: boolean): { betreff: string; inhalt: string; klartext: string } {
   const abmelden = `${SITE}/wohnungen?abmelden=${abo.abmelde_token}`
   // Bei einer einzigen Wohnung sagt schon der Betreff, welche: Preis, Zimmer, Strasse.
   const eine = inserate[0]
@@ -157,10 +164,19 @@ function mail(abo: Abo, inserate: Inserat[], bestaetigung: boolean): { betreff: 
       <a href="${abmelden}" style="color:#71717a">Abmelden</a> · <a href="${SITE}/wohnungen" style="color:#71717a">Suchabos verwalten</a>
     </p>
   </div></body></html>`
-  return { betreff: titel, inhalt }
+  // Dieselbe Mail als reiner Text. Spamfilter werten Mails ohne Textteil ab.
+  const klartext = [
+    titel,
+    text,
+    ...liste.map(textzeile),
+    ...(mehr > 0 ? [`und ${mehr} weitere.`] : []),
+    `Alle auf der Karte ansehen: ${SITE}/wohnungen`,
+    `Du bekommst diese Mail, weil du auf ${SITE.replace(/^https?:\/\//, '')} das Suchabo «${abo.name}» angelegt hast.\nAbmelden: ${abmelden}`,
+  ].join('\n\n')
+  return { betreff: titel, inhalt, klartext }
 }
 
-async function senden(an: string, betreff: string, inhalt: string, abmelden: string) {
+async function senden(an: string, betreff: string, inhalt: string, klartext: string, abmelden: string) {
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND}`, 'Content-Type': 'application/json' },
@@ -169,6 +185,7 @@ async function senden(an: string, betreff: string, inhalt: string, abmelden: str
       to: [an],
       subject: betreff,
       html: inhalt,
+      text: klartext,
       headers: { 'List-Unsubscribe': `<${abmelden}>` },
     }),
   })
@@ -222,9 +239,9 @@ async function main() {
       }
 
       if (!abo.bestaetigt || neu.length) {
-        const { betreff, inhalt } = mail(abo, neu, !abo.bestaetigt)
+        const { betreff, inhalt, klartext } = mail(abo, neu, !abo.bestaetigt)
         try {
-          await senden(abo.email, betreff, inhalt, `${SITE}/wohnungen?abmelden=${abo.abmelde_token}`)
+          await senden(abo.email, betreff, inhalt, klartext, `${SITE}/wohnungen?abmelden=${abo.abmelde_token}`)
           mails++
         } catch (e) {
           // Versand gescheitert: den alten Stand zurück, damit es der nächste Lauf noch einmal versucht.
