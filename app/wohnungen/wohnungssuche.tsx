@@ -719,20 +719,6 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
           </button>
         </div>
       )}
-      <button
-        type="button"
-        onClick={() => setAboOffen(true)}
-        className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-[var(--ab-linie)] bg-[var(--ab-blatt)] px-3.5 py-2.5 text-left hover:bg-[var(--ab-weich)]"
-      >
-        <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[var(--ab-tinte)] text-[14px] text-[var(--ab-papier)]">
-          ✉
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-[13.5px] font-medium">Suchabo per E-Mail</span>
-          <span className="block truncate text-[12px] text-[var(--ab-leise)]">Mail, sobald eine neue Wohnung zu diesen Filtern passt</span>
-        </span>
-        <span aria-hidden className="text-[var(--ab-leise)]">→</span>
-      </button>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-1 pt-4 pb-2.5">
         <div className="text-[15px] font-semibold tracking-tight">
           {daten ? `${nf(treffer.length)} ${treffer.length === 1 ? 'Wohnung' : 'Wohnungen'}` : ladefehler ? '' : 'Lade Inserate …'}
@@ -742,7 +728,15 @@ export default function Wohnungssuche({ kreis, unten }: { kreis?: Kreis; unten?:
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3 text-[12px] text-[var(--ab-leise)]">
+        <div className="flex items-center gap-2 text-[12px] text-[var(--ab-leise)]">
+          <button
+            type="button"
+            onClick={() => setAboOffen(true)}
+            title="Mail, sobald eine neue Wohnung zu diesen Filtern passt"
+            className="flex items-center gap-1.5 rounded-full border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-2.5 py-1 text-[12px] font-medium text-[var(--ab-tinte)] hover:bg-[var(--ab-weich)]"
+          >
+            <span aria-hidden>✉</span> Suchabo
+          </button>
           {breit && (
             <label className="flex shrink-0 cursor-pointer items-center gap-1.5">
               <input type="checkbox" checked={filter.nurAusschnitt} onChange={(e) => aendern({ nurAusschnitt: e.target.checked })} />
@@ -980,13 +974,19 @@ function Chip({ an, onClick, children }: { an: boolean; onClick: () => void; chi
       type="button"
       onClick={onClick}
       aria-pressed={an}
-      className="rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors"
+      className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors"
       style={
+        // Ausgewählt: Umriss mit Häkchen auf hellem Grund. Schwarze Flächen machten an und aus schwer unterscheidbar.
         an
-          ? { background: 'var(--ab-tinte)', color: 'var(--ab-papier)', borderColor: 'var(--ab-tinte)' }
+          ? { background: 'var(--ab-weich)', color: 'var(--ab-tinte)', borderColor: 'var(--ab-tinte)' }
           : { borderColor: 'var(--ab-linie)', color: 'var(--ab-leise)' }
       }
     >
+      {an && (
+        <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden className="shrink-0">
+          <path d="m2.5 6.5 2.3 2.3 4.7-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      )}
       {children}
     </button>
   )
@@ -1104,45 +1104,76 @@ function Filterfeld({
   )
   const kippe = <T,>(liste: T[], x: T) => (liste.includes(x) ? liste.filter((y) => y !== x) : [...liste, x])
   const anzahl = aktiveFilter(f)
-  const mehrAktiv = [f.text.trim() !== '', f.oevMax != null, f.nurNeu, f.nurGemerkt, Boolean(f.ohneZweifel)].filter(Boolean).length
   const merkmale = f.merkmale ?? []
+  const quellenGeaendert = [...f.quellenAus].sort().join() !== [...FILTER_LEER.quellenAus].sort().join()
+  // Hinter «Mehr Filter» liegt alles ausser Gebiet, Miete, Fläche, Zimmer und Art.
+  const mehrAktiv = [
+    f.dauer !== 'alle', merkmale.length > 0, quellenGeaendert,
+    f.text.trim() !== '', f.oevMax != null, f.nurNeu, f.nurGemerkt, Boolean(f.ohneZweifel),
+  ].filter(Boolean).length
+  const mitInseraten = zaehlen.filter((q) => q.anzahl > 0 || f.quellenAus.includes(q.id))
+  const leer = zaehlen.filter((q) => q.anzahl === 0 && !f.quellenAus.includes(q.id))
+  const gebietText = zeichnetGerade
+    ? 'Jetzt auf der Karte umfahren …'
+    : f.gebiete.length
+      ? `${f.gebiete.length === 1 ? '1 Gebiet' : `${f.gebiete.length} Gebiete`} eingezeichnet`
+      : 'Gebiet einzeichnen'
+  const kurz = zusammenfassung(f, zaehlen)
 
   return (
     <section className="mx-3 rounded-[20px] border border-[var(--ab-linie)] bg-[var(--ab-blatt)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] sm:mx-4">
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={gebietZeichnen}
-          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full border px-3.5 py-2 text-left transition-colors"
+        <div
+          className="flex min-w-0 flex-1 items-center rounded-full border transition-colors"
           style={
             zeichnetGerade
               ? { background: 'var(--ab-tinte)', color: 'var(--ab-papier)', borderColor: 'var(--ab-tinte)' }
               : { background: 'var(--ab-aktiv)', borderColor: 'var(--ab-linie)' }
           }
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
-            <path d="M4 15c0-5 4-10 9-10 4 0 7 2 7 6 0 5-5 8-10 8-2 0-3-1-3-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="3 3" />
-            <path d="m14 20 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          <span className="min-w-0 flex-1 truncate text-[14px] font-medium">
-            {zeichnetGerade
-              ? 'Jetzt auf der Karte umfahren …'
-              : f.gebiete.length
-                ? `${f.gebiete.length === 1 ? '1 Gebiet' : `${f.gebiete.length} Gebiete`} · weiteres einzeichnen`
-                : 'Gebiet auf der Karte einzeichnen'}
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={gebietZeichnen}
+            title={f.gebiete.length && !zeichnetGerade ? 'Weiteres Gebiet einzeichnen' : undefined}
+            className="flex min-w-0 flex-1 items-center gap-2.5 px-3.5 py-2 text-left"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
+              <path d="M4 15c0-5 4-10 9-10 4 0 7 2 7 6 0 5-5 8-10 8-2 0-3-1-3-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray="3 3" />
+              <path d="m14 20 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{gebietText}</span>
+            {f.gebiete.length > 0 && !zeichnetGerade && <span aria-hidden className="shrink-0 text-[15px] leading-none text-[var(--ab-leise)]">+</span>}
+          </button>
+          {f.gebiete.length > 0 && !zeichnetGerade && (
+            <button
+              type="button"
+              onClick={() => aendern({ gebiete: [] })}
+              aria-label={f.gebiete.length === 1 ? 'Gebiet löschen' : 'Gebiete löschen'}
+              className="mr-1 grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] text-[var(--ab-leise)] hover:bg-[var(--ab-weich)] hover:text-[var(--ab-tinte)]"
+            >
+              ✕
+            </button>
+          )}
+        </div>
         {umklappen && (
           <button
             type="button"
             onClick={umklappen}
+            aria-expanded={offen}
             className="shrink-0 rounded-full border border-[var(--ab-linie)] px-3.5 py-2 text-[13px] font-medium"
-            style={anzahl ? { background: 'var(--ab-tinte)', color: 'var(--ab-papier)', borderColor: 'var(--ab-tinte)' } : undefined}
+            style={anzahl && !offen ? { background: 'var(--ab-tinte)', color: 'var(--ab-papier)', borderColor: 'var(--ab-tinte)' } : undefined}
           >
-            {offen ? 'Fertig' : anzahl ? `Filter · ${anzahl}` : 'Filter'}
+            {anzahl && !offen ? `Filter · ${anzahl}` : 'Filter'} {offen ? '▴' : '▾'}
           </button>
         )}
       </div>
+
+      {/* Zugeklappt sagt eine Zeile, was gerade gilt; ein Tipp öffnet die Filter. */}
+      {!offen && umklappen && kurz && (
+        <button type="button" onClick={umklappen} className="mt-2 block w-full truncate px-1 text-left text-[12.5px] text-[var(--ab-leise)]">
+          {kurz}
+        </button>
+      )}
 
       {offen && (
         <div className="mt-3 flex flex-col gap-3 text-[13px]">
@@ -1170,60 +1201,53 @@ function Filterfeld({
             ))}
           </div>
 
-          <Segment
-            wahl={f.dauer}
-            setzen={(dauer) => aendern({ dauer })}
-            optionen={[
-              ['alle', 'Alle'],
-              ['unbefristet', 'Unbefristet'],
-              ['lang', 'Ab 1 Jahr'],
-              ['befristet', 'Befristet'],
-            ] as const}
-          />
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[10.5px] font-medium tracking-wide text-[var(--ab-leise)] uppercase">Ausstattung laut Inserat</span>
-            <div className="flex flex-wrap gap-1.5">
-              {(Object.keys(MERKMAL_NAMEN) as (keyof typeof MERKMAL_NAMEN)[]).map((m) => (
-                <Chip key={m} an={merkmale.includes(m)} onClick={() => aendern({ merkmale: kippe(merkmale, m) })}>
-                  {MERKMAL_NAMEN[m]}
-                </Chip>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10.5px] font-medium tracking-wide text-[var(--ab-leise)] uppercase">Quellen</span>
-              {f.quellenAus.length > 0 && (
-                <button type="button" onClick={() => aendern({ quellenAus: [] })} className="text-[11.5px] text-[var(--ab-leise)] underline underline-offset-2">
-                  alle
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {zaehlen.map((q) => (
-                <Chip key={q.id} an={!f.quellenAus.includes(q.id)} onClick={() => aendern({ quellenAus: kippe(f.quellenAus, q.id) })}>
-                  {q.name}
-                  <span className="ml-1 opacity-60 tabular-nums">{nf(q.anzahl)}</span>
-                </Chip>
-              ))}
-            </div>
-          </div>
-
-          {f.gebiete.length > 0 && (
-            <div className="flex items-center justify-between rounded-xl bg-[var(--ab-weich)] px-3 py-2">
-              <span>
-                Nur in {f.gebiete.length === 1 ? 'dem gezeichneten Gebiet' : `${f.gebiete.length} gezeichneten Gebieten`}
-              </span>
-              <button type="button" onClick={() => aendern({ gebiete: [] })} className="text-[12px] underline underline-offset-2">
-                aufheben
-              </button>
-            </div>
-          )}
-
           {mehr && (
-            <div className="flex flex-col gap-2.5 border-t border-[var(--ab-linie)] pt-3">
+            <div className="flex flex-col gap-3 border-t border-[var(--ab-linie)] pt-3">
+              <Segment
+                wahl={f.dauer}
+                setzen={(dauer) => aendern({ dauer })}
+                optionen={[
+                  ['alle', 'Alle'],
+                  ['unbefristet', 'Unbefristet'],
+                  ['lang', 'Ab 1 Jahr'],
+                  ['befristet', 'Befristet'],
+                ] as const}
+              />
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10.5px] font-medium tracking-wide text-[var(--ab-leise)] uppercase">Ausstattung laut Inserat</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(Object.keys(MERKMAL_NAMEN) as (keyof typeof MERKMAL_NAMEN)[]).map((m) => (
+                    <Chip key={m} an={merkmale.includes(m)} onClick={() => aendern({ merkmale: kippe(merkmale, m) })}>
+                      {MERKMAL_NAMEN[m]}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10.5px] font-medium tracking-wide text-[var(--ab-leise)] uppercase">Quellen</span>
+                  {f.quellenAus.length > 0 && (
+                    <button type="button" onClick={() => aendern({ quellenAus: [] })} className="text-[11.5px] text-[var(--ab-leise)] underline underline-offset-2">
+                      alle
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {mitInseraten.map((q) => (
+                    <Chip key={q.id} an={!f.quellenAus.includes(q.id)} onClick={() => aendern({ quellenAus: kippe(f.quellenAus, q.id) })}>
+                      {q.name}
+                      <span className="opacity-60 tabular-nums">{nf(q.anzahl)}</span>
+                    </Chip>
+                  ))}
+                </div>
+                {/* Quellen ohne Inserate als Chip mit «0» machten das Feld nur länger. */}
+                {leer.length > 0 && (
+                  <span className="text-[11.5px] text-[var(--ab-leise)]">Zurzeit ohne freie Wohnungen: {leer.map((q) => q.name).join(', ')}</span>
+                )}
+              </div>
+
               <label className="flex items-center gap-2 rounded-full border border-[var(--ab-linie)] bg-[var(--ab-aktiv)] px-3.5 py-1.5 focus-within:border-[var(--ab-leise)]">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0 text-[var(--ab-leise)]">
                   <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
@@ -1295,7 +1319,7 @@ function Filterfeld({
           )}
 
           <div className="flex items-center justify-between text-[12px]">
-            <button type="button" onClick={() => setMehr((m) => !m)} className="font-medium text-[var(--ab-leise)] hover:text-[var(--ab-tinte)]">
+            <button type="button" onClick={() => setMehr((m) => !m)} aria-expanded={mehr} className="font-medium text-[var(--ab-leise)] hover:text-[var(--ab-tinte)]">
               {mehr ? 'Weniger Filter ▴' : `Mehr Filter${mehrAktiv ? ` · ${mehrAktiv}` : ''} ▾`}
             </button>
             {anzahl > 0 && (
@@ -1312,6 +1336,36 @@ function Filterfeld({
       )}
     </section>
   )
+}
+
+/** Eine Zeile für das zugeklappte Filterfeld: «bis CHF 1’700 · 2–4 Zi. · 4 von 5 Arten · ohne Flatfox». */
+function zusammenfassung(f: Filter, quellen: Wohnungen['quellen']): string {
+  const zimmer =
+    f.zimmerMin != null && f.zimmerMax != null
+      ? `${zimmerText(f.zimmerMin)}–${zimmerText(f.zimmerMax)} Zi.`
+      : f.zimmerMin != null
+        ? `ab ${zimmerText(f.zimmerMin)} Zi.`
+        : f.zimmerMax != null
+          ? `bis ${zimmerText(f.zimmerMax)} Zi.`
+          : null
+  const arten = f.arten.length === ARTEN.length ? null : f.arten.length <= 2 ? ARTEN.filter((a) => f.arten.includes(a.id)).map((a) => a.name).join(', ') : `${f.arten.length} von ${ARTEN.length} Arten`
+  const aus = quellen.filter((q) => q.anzahl > 0 && f.quellenAus.includes(q.id)).map((q) => q.name)
+  const dauer = { alle: null, unbefristet: 'unbefristet', lang: 'ab 1 Jahr', befristet: 'befristet' }[f.dauer]
+  return [
+    f.mieteMax != null ? `bis CHF ${nf(f.mieteMax)}` : null,
+    zimmer,
+    f.flaecheMin != null ? `ab ${f.flaecheMin} m²` : null,
+    arten,
+    dauer,
+    (f.merkmale?.length ?? 0) > 0 ? f.merkmale!.map((m) => MERKMAL_NAMEN[m]).join(', ') : null,
+    aus.length ? `ohne ${aus.join(', ')}` : null,
+    f.oevMax != null ? `ÖV bis ${f.oevMax} Min.` : null,
+    f.text.trim() ? `«${f.text.trim()}»` : null,
+    f.nurNeu ? 'nur neue' : null,
+    f.nurGemerkt ? 'nur gemerkte' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 }
 
 function Karteikarte({
