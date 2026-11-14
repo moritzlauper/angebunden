@@ -1,0 +1,40 @@
+name: Lernapp prüfen
+
+# Tests, Typen und Build der Lern-Webapp in lernapp/. Läuft nur, wenn sich dort
+# etwas ändert. Zieht die App in ein eigenes Repo um: Datei mitnehmen und die
+# working-directory-Zeilen streichen.
+
+on:
+  pull_request:
+    paths: ['lernapp/**', '.github/workflows/lernapp-pruefen.yml']
+  push:
+    branches: [main]
+    paths: ['lernapp/**', '.github/workflows/lernapp-pruefen.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: lernapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: lernapp/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: lernapp/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Tests
+        run: pnpm test
+      - name: Typen
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build

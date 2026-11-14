@@ -1,0 +1,42 @@
+{
+  "name": "lernapp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Klickerfragen aus dem Obsidian-Vault, abgefragt nach FSRS. Claude steuert die App über MCP.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "next typegen && tsc --noEmit -p tsconfig.json",
+    "test": "node --test test/*.test.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node scripts/migrate.ts",
+    "seed": "node scripts/seed.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.16",
+    "drizzle-orm": "^0.45.4",
+    "next": "16.3.4",
+    "pg": "^8.23.1",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
+    "ts-fsrs": "^6.0.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^22",
+    "@types/pg": "^8",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.11",
+    "tailwindcss": "^4",
+    "typescript": "^5.9"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "packageManager": "pnpm@10.30.1"
+}
