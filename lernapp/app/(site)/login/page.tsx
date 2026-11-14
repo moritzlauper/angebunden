@@ -1,4 +1,4 @@
-import { login } from '../actions.ts'
+import { login } from '../../actions.ts'
 
 export default async function Login({ searchParams }: PageProps<'/login'>) {
   const sp = await searchParams

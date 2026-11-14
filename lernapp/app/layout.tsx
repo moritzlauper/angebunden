@@ -1,28 +1,29 @@
 import type { Metadata, Viewport } from 'next'
-import Link from 'next/link'
 import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Klicker',
   description: 'Klickerfragen aus dem Vault, abgefragt nach Wiederholungsplan',
   robots: { index: false, follow: false },
+  // Auf dem Handy «Zum Home-Bildschirm» → öffnet ohne Browserleiste wie eine App.
+  appleWebApp: { capable: true, title: 'Klicker', statusBarStyle: 'black-translucent' },
 }
 
-export const viewport: Viewport = { width: 'device-width', initialScale: 1 }
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fafaf9' },
+    { media: '(prefers-color-scheme: dark)', color: '#0c0a09' },
+  ],
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="de-CH">
-      <body className="min-h-screen antialiased">
-        <header className="border-b" style={{ borderColor: 'var(--line)' }}>
-          <nav className="mx-auto flex max-w-3xl items-center gap-5 px-4 py-3 text-sm">
-            <Link href="/" className="font-bold">
-              Klicker
-            </Link>
-          </nav>
-        </header>
-        <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>
-      </body>
+    // Browser-Erweiterungen hängen Attribute ans <html>; die Warnung dazu ist kein Fehler der App.
+    <html lang="de-CH" suppressHydrationWarning>
+      <body className="min-h-dvh antialiased">{children}</body>
     </html>
   )
 }

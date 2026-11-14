@@ -1,6 +1,6 @@
 import { getDb } from '@/lib/db/index.ts'
 import { listInbox } from '@/lib/service.ts'
-import { review } from '../actions.ts'
+import { review } from '../../actions.ts'
 
 export const dynamic = 'force-dynamic'
 

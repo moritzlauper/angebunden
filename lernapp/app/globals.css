@@ -27,9 +27,15 @@
   }
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   background: var(--bg);
   color: var(--fg);
+  -webkit-tap-highlight-color: transparent;
 }
 
 .card {
@@ -48,9 +54,14 @@ body {
   gap: 0.4rem;
   border-radius: 0.5rem;
   padding: 0.5rem 0.9rem;
+  min-height: 2.75rem;
   font-weight: 600;
   background: var(--fg);
   color: var(--bg);
+  touch-action: manipulation;
+}
+.btn:disabled {
+  opacity: 0.6;
 }
 .btn:hover {
   opacity: 0.9;
@@ -60,8 +71,10 @@ body {
   align-items: center;
   border-radius: 0.5rem;
   padding: 0.35rem 0.7rem;
+  min-height: 2.5rem;
   border: 1px solid var(--line);
   font-size: 0.875rem;
+  touch-action: manipulation;
 }
 .btn-quiet:hover {
   background: var(--line);
@@ -101,4 +114,22 @@ a.link {
 /* schon gesehen, aber noch nicht sicher */
 .bar > span.seen {
   background: color-mix(in srgb, var(--color-ok) 35%, var(--line));
+}
+
+/* iOS zoomt beim Antippen in Felder mit weniger als 16px Schrift. */
+@media (max-width: 640px) {
+  input[type='text'],
+  input[type='date'],
+  input[type='number'],
+  input[type='password'],
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Angekreuzte Antwort deutlich markieren, auch ohne Blick auf das Kästchen. */
+label.card:has(input[name='marked']:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
 }

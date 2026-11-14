@@ -22,11 +22,32 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
   const next = view.questions.find((q) => !q.answered)
   const back = `${base}/ueben/${id}${shown ? `?q=${shown.id}` : ''}`
 
-  const header = (
-    <p className="muted text-sm">
-      {view.subject.name} · bis UE {view.session.ueLimit}
-      {view.session.examMode ? ' · Prüfungsmodus' : ''} · {view.score.answered} von {view.score.total} beantwortet
-    </p>
+  const header = (q?: { id: number; position: number; unitNumber: number | null; unitTitle: string | null }) => (
+    <div className="space-y-1.5">
+      <p className="muted flex justify-between gap-3 text-xs">
+        <span className="truncate">
+          {q ? `Frage ${q.position} von ${view.score.total}` : `${view.score.answered} von ${view.score.total} beantwortet`}
+          {q?.unitNumber != null ? ` · UE ${q.unitNumber}${q.unitTitle ? ` ${q.unitTitle}` : ''}` : ''}
+        </span>
+        <span className="shrink-0">
+          bis UE {view.session.ueLimit}
+          {view.session.examMode ? ' · Prüfung' : ''}
+        </span>
+      </p>
+      {/* Fortschritt über die Fragen der Sitzung: grün = komplett richtig, rot = nicht ganz, hell = offen */}
+      <div className="flex gap-1" aria-hidden>
+        {view.questions.map((x) => (
+          <span
+            key={x.id}
+            className="h-1 flex-1 rounded-full"
+            style={{
+              background: !x.answered ? 'var(--line)' : x.allCorrect ? 'var(--color-ok)' : 'var(--color-bad)',
+              outline: q?.id === x.id ? '1px solid var(--fg)' : undefined,
+            }}
+          />
+        ))}
+      </div>
+    </div>
   )
 
   // Steht unten rechts fix am Bildschirmrand, damit man nie scrollen muss.
@@ -43,12 +64,8 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
   if (shown) {
     return (
       <div className="space-y-4">
-        {header}
-        <h1 className="text-lg font-bold">
-          Frage {shown.position}
-          {shown.unitNumber != null ? ` (UE ${shown.unitNumber}${shown.unitTitle ? `: ${shown.unitTitle}` : ''})` : ''}
-        </h1>
-        <p className="font-medium">{shown.stem}</p>
+        {header(shown)}
+        <h1 className="font-semibold">{shown.stem}</h1>
         <p className={`font-semibold ${shown.allCorrect ? 'text-ok' : 'text-bad'}`}>
           {shown.allCorrect ? 'Komplett richtig.' : 'Nicht ganz.'} Richtig:{' '}
           {shown.results!.filter((r) => r.truth === 'R').map((r) => r.letter).join(', ') || 'keine'}
@@ -68,18 +85,14 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
   if (next) {
     return (
       <form action={answer} className="space-y-4">
-        {header}
-        <h1 className="text-lg font-bold">
-          Frage {next.position}
-          {next.unitNumber != null ? ` (UE ${next.unitNumber}${next.unitTitle ? `: ${next.unitTitle}` : ''})` : ''}
-        </h1>
-        <p className="font-medium">{next.stem}</p>
+        {header(next)}
+        <h1 className="font-semibold">{next.stem}</h1>
         <input type="hidden" name="questionId" value={next.id} />
         <ul className="space-y-2">
           {next.options.map((o) => (
             <li key={o.letter}>
               <label className="card flex cursor-pointer gap-3 p-3 has-[:checked]:border-[var(--accent)]">
-                <input type="checkbox" name="marked" value={o.letter} className="mt-1 size-4 shrink-0" />
+                <input type="checkbox" name="marked" value={o.letter} className="mt-0.5 size-5 shrink-0" />
                 <span>
                   <b>{o.letter})</b> {o.text}
                 </span>
@@ -103,7 +116,7 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
   const summary = await sessionSummary(db, Number(id))
   return (
     <div className="space-y-5">
-      {header}
+      {header()}
       <h1 className="text-2xl font-bold">
         {summary.score.fullyCorrect} von {summary.score.total} komplett richtig
       </h1>
@@ -137,7 +150,7 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
 function ActionBar({ children, align }: { children: React.ReactNode; align: 'start' | 'end' }) {
   return (
     <div
-      className={`sticky bottom-0 -mx-4 flex items-center gap-4 border-t px-4 py-3 ${align === 'end' ? 'justify-end' : ''}`}
+      className={`sticky bottom-0 -mx-4 flex items-center gap-4 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${align === 'end' ? 'justify-end' : ''}`}
       style={{ background: 'var(--bg)', borderColor: 'var(--line)' }}
     >
       {children}

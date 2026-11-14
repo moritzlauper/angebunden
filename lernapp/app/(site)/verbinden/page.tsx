@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { getDb } from '@/lib/db/index.ts'
 import { listSubjects } from '@/lib/service.ts'
-import { createSubject, importBank } from '../actions.ts'
+import { createSubject, importBank } from '../../actions.ts'
 
 export const dynamic = 'force-dynamic'
 

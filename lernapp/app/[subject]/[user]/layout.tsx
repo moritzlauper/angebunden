@@ -1,15 +1,13 @@
 import Link from 'next/link'
 import { learnerContext } from '@/lib/learner.ts'
+import { TopBar } from '../../topbar.tsx'
 
 /** Kopfzeile der persönlichen Seite: wer lernt, und für den Besitzer die Verwaltung. */
 export default async function LernerLayout({ children, params }: LayoutProps<'/[subject]/[user]'>) {
   const { subj, user, base, isOwner } = await learnerContext(params)
   return (
-    <div className="space-y-5">
-      <nav className="flex flex-wrap items-center gap-4 text-sm">
-        <Link href={base} className="font-semibold">
-          {subj.shortName ?? subj.name} · {user}
-        </Link>
+    <>
+      <TopBar brand={`${subj.shortName ?? subj.name} · ${user}`} brandHref={base}>
         <Link href={`${base}/stand`}>Details</Link>
         {isOwner ? (
           <>
@@ -18,10 +16,10 @@ export default async function LernerLayout({ children, params }: LayoutProps<'/[
           </>
         ) : null}
         <Link href={`/${subj.slug}`} className="muted ml-auto">
-          Andere Person
+          Wechseln
         </Link>
-      </nav>
-      {children}
-    </div>
+      </TopBar>
+      <main className="mx-auto max-w-3xl px-4 py-4 sm:py-6">{children}</main>
+    </>
   )
 }

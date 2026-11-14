@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { learnerContext } from '@/lib/learner.ts'
 import { listSubjects, subjectOverview } from '@/lib/service.ts'
 import { startSession } from '../../actions.ts'
@@ -7,7 +6,7 @@ import { Progress, UeOptions } from '../../ui.tsx'
 export const dynamic = 'force-dynamic'
 
 export default async function Lernen({ params, searchParams }: PageProps<'/[subject]/[user]'>) {
-  const { db, subj, user, base } = await learnerContext(params)
+  const { db, subj, user } = await learnerContext(params)
   const sp = await searchParams
   const s = (await listSubjects(db, new Date(), user)).find((x) => x.id === subj.id)!
   const us = (await subjectOverview(db, subj.id, new Date(), user)).units
@@ -18,7 +17,7 @@ export default async function Lernen({ params, searchParams }: PageProps<'/[subj
   return (
     <div className="space-y-6">
       {typeof sp.fehler === 'string' ? <p className="card border-bad p-3 text-sm text-bad">{sp.fehler}</p> : null}
-      <section className="card space-y-4 p-5">
+      <section className="card space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
             <h1 className="text-lg font-bold">{s.name}</h1>
@@ -45,20 +44,17 @@ export default async function Lernen({ params, searchParams }: PageProps<'/[subj
           ))}
         </dl>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <form action={startSession} className="flex flex-wrap items-center gap-2 text-sm">
-            <input type="hidden" name="subjectId" value={s.id} />
-            <input type="hidden" name="user" value={user} />
-            <button className="btn">{s.questionsPerSession} Fragen</button>
-            <label htmlFor="ue-limit">bis</label>
-            <select id="ue-limit" name="ueLimit" defaultValue={s.ueLimit} className="!w-auto">
-              <UeOptions units={us} ueLimit={s.ueLimit} />
-            </select>
-          </form>
-          <Link href={`${base}/stand`} className="muted ml-auto text-sm underline underline-offset-2">
-            Details
-          </Link>
-        </div>
+        <form action={startSession} className="flex items-center gap-2 text-sm">
+          <input type="hidden" name="subjectId" value={s.id} />
+          <input type="hidden" name="user" value={user} />
+          <button className="btn shrink-0">{s.questionsPerSession} Fragen</button>
+          <label htmlFor="ue-limit" className="shrink-0">
+            bis
+          </label>
+          <select id="ue-limit" name="ueLimit" defaultValue={s.ueLimit} className="min-w-0 flex-1 sm:max-w-xs">
+            <UeOptions units={us} ueLimit={s.ueLimit} />
+          </select>
+        </form>
 
         <div className="space-y-3">
           <Progress
@@ -68,13 +64,14 @@ export default async function Lernen({ params, searchParams }: PageProps<'/[subj
             label={`Stand bis UE ${s.ueLimit}${accuracy != null ? ` · ${accuracy}% richtig beantwortet` : ''}`}
           />
           {inLimit.length > 1 ? (
-            <ul className="space-y-1 text-sm">
+            <ul className="space-y-2 text-sm sm:space-y-1">
               {inLimit.map((u) => (
-                <li key={u.id} className="grid grid-cols-[minmax(0,10rem)_1fr_5rem] items-center gap-3">
+                // Handy: Name und Quote oben, Balken darunter in voller Breite. Ab sm: alles in einer Zeile.
+                <li key={u.id} className="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-1 sm:grid-cols-[minmax(0,10rem)_1fr_5rem]">
                   <span className="truncate" title={u.title}>
                     UE {u.number} {u.title !== `UE ${u.number}` ? u.title : ''}
                   </span>
-                  <div className="bar" title={`${u.safe} von ${u.total} sicher · ${u.seen} gesehen`}>
+                  <div className="bar order-last col-span-2 sm:order-none sm:col-span-1" title={`${u.safe} von ${u.total} sicher · ${u.seen} gesehen`}>
                     <span style={{ width: `${u.total ? (u.safe / u.total) * 100 : 0}%` }} />
                     <span className="seen" style={{ width: `${u.total ? ((u.seen - u.safe) / u.total) * 100 : 0}%` }} />
                   </div>
@@ -85,10 +82,13 @@ export default async function Lernen({ params, searchParams }: PageProps<'/[subj
               ))}
             </ul>
           ) : null}
-          <p className="muted text-xs">
-            Hell = schon gesehen, dunkel = sicher. Sicher wird eine Aussage erst, wenn du sie an mehreren Tagen richtig beantwortet hast und sie erst in über drei
-            Wochen wiederkommt. Am ersten Tag steht darum überall 0% sicher, die Trefferquote rechts zeigt, wie gut es schon klappt.
-          </p>
+          <details className="muted text-xs">
+            <summary className="cursor-pointer">Was heisst «sicher»?</summary>
+            <p className="mt-1">
+              Hell = schon gesehen, dunkel = sicher. Sicher wird eine Aussage erst, wenn du sie an mehreren Tagen richtig beantwortet hast und sie erst in über drei
+              Wochen wiederkommt. Am ersten Tag steht darum überall 0% sicher, die Trefferquote rechts zeigt, wie gut es schon klappt.
+            </p>
+          </details>
         </div>
       </section>
     </div>
