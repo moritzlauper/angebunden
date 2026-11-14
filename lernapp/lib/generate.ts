@@ -1,6 +1,6 @@
 import 'server-only'
 import Anthropic from '@anthropic-ai/sdk'
-import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod'
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod/v4'
 import type { Db } from './db/index.ts'
 import { MANIPULATION_TYPES } from './core/quality.ts'
@@ -15,9 +15,8 @@ import { addStatements, AppError, getUnitMaterial, reviewStatement, submitChecks
  * freigegeben, sonst landet sie in der Inbox.
  */
 
-const MODEL = 'claude-opus-5-5'
-// Bei einer Ablehnung durch die Sicherheitsfilter springt serverseitig ein anderes Modell ein.
-const FALLBACK = { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }
+// Bewusst nur Haiku: günstig genug, um viele Fragen zu erzeugen (Vorgabe des Besitzers).
+const MODEL = 'claude-haiku-5-5'
 
 const Generated = z.object({
   statements: z.array(
@@ -84,11 +83,10 @@ export async function generateForUnit(db: Db, subjectId: number, unitNumber: num
     ? material.styleExamples.map((e) => `${e.stem}\n${e.options.map((o) => `  - ${o.text}`).join('\n')}`).join('\n\n')
     : ''
 
-  const gen = await anthropic.beta.messages.parse({
+  const gen = await anthropic.messages.parse({
     model: MODEL,
     max_tokens: 16000,
-    ...FALLBACK,
-    output_config: { effort: 'medium', format: betaZodOutputFormat(Generated) },
+    output_config: { effort: 'medium', format: zodOutputFormat(Generated) },
     system: GENERATE_SYSTEM,
     messages: [
       {
@@ -122,11 +120,10 @@ export async function generateForUnit(db: Db, subjectId: number, unitNumber: num
 
   // Blinde Gegenprüfung: nur Aussage und Zitat, ohne Label.
   const byId = new Map(added.saved.map((s) => [s.id, statements[s.index]]))
-  const check = await anthropic.beta.messages.parse({
+  const check = await anthropic.messages.parse({
     model: MODEL,
     max_tokens: 8000,
-    ...FALLBACK,
-    output_config: { effort: 'low', format: betaZodOutputFormat(Checked) },
+    output_config: { effort: 'low', format: zodOutputFormat(Checked) },
     system: CHECK_SYSTEM,
     messages: [
       {

@@ -113,7 +113,7 @@ export default async function Stand({ params, searchParams }: PageProps<'/[subje
           <section id="generieren" className="scroll-mt-4 space-y-3">
             <h2 className="text-lg font-semibold">Neue Fragen generieren</h2>
             <p className="muted text-sm">
-              Claude schreibt aus deinen Notes neue Aussagen mit wörtlichem Beleg. Eine zweite, blinde Prüfung entscheidet nur aus dem Zitat. Einwandfreie
+              Claude Haiku schreibt aus deinen Notes neue Aussagen mit wörtlichem Beleg. Eine zweite, blinde Prüfung entscheidet nur aus dem Zitat. Einwandfreie
               Aussagen sind sofort für alle zum Üben da, unsichere landen in der Inbox.
             </p>
             {typeof sp.generiert === 'string' ? <p className="card p-3 text-sm">{sp.generiert}</p> : null}
