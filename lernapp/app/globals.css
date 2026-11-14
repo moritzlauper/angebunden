@@ -87,6 +87,7 @@ a.link {
 }
 
 .bar {
+  display: flex;
   height: 0.5rem;
   border-radius: 999px;
   background: var(--line);
@@ -96,4 +97,8 @@ a.link {
   display: block;
   height: 100%;
   background: var(--color-ok);
+}
+/* schon gesehen, aber noch nicht sicher */
+.bar > span.seen {
+  background: color-mix(in srgb, var(--color-ok) 35%, var(--line));
 }

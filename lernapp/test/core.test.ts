@@ -7,6 +7,7 @@ import { chunkMarkdown, parseBank, splitNotesByUnit, splitReasonAndRef, topicFro
 import { checkStatement } from '../lib/core/quality.ts'
 import { gradeFor, review } from '../lib/core/schedule.ts'
 import { BANK } from '../data/seed/klinische-biopsychologie.ts'
+import { containsQuote } from '../lib/core/text.ts'
 
 function seeded(seed = 1) {
   let x = seed
@@ -50,6 +51,8 @@ test('Notes nach # UE n zerlegen und in Stücke teilen', () => {
   const md = `Vorspann\n# UE 1 Einführung\n## Begriffe\nText eins.\n\nText zwei.\n# UE 2: Schlaf\n## Prozess S\nAdenosin steigt.`
   const sec = splitNotesByUnit(md)
   assert.deepEqual(sec.map((s) => [s.unitNumber, s.title]), [[1, 'Einführung'], [2, 'Schlaf']])
+  // Ohne Titel bleibt er leer, damit ein bestehender UE-Titel nicht überschrieben wird.
+  assert.deepEqual(splitNotesByUnit('# UE 6\nText\n# UE3 Stress\nText').map((s) => [s.unitNumber, s.title]), [[6, ''], [3, 'Stress']])
   const chunks = chunkMarkdown(sec[0].markdown)
   assert.equal(chunks[0].heading, 'Begriffe')
   assert.match(chunks[0].text, /Text zwei/)
@@ -155,4 +158,15 @@ test('Parallelformen: deutlich abweichende Variante', async () => {
   assert.equal(variantDiverges({ answers: 5, correct: 5 }, { answers: 5, correct: 0 }), true)
   assert.equal(variantDiverges({ answers: 5, correct: 4 }, { answers: 5, correct: 3 }), false)
   assert.equal(variantDiverges({ answers: 2, correct: 2 }, { answers: 2, correct: 0 }), false)
+})
+
+test('Zitatprüfung ignoriert Hervorhebungen aus den Notes', () => {
+  const chunk = 'Bei **Jungen** ist es <u>umgekehrt</u>: Sie halten sich für *fähiger*.'
+  assert.equal(containsQuote(chunk, 'Bei Jungen ist es umgekehrt: Sie halten sich für fähiger'), true)
+  assert.equal(containsQuote(chunk, 'Bei Mädchen ist es umgekehrt'), false)
+})
+
+test('Bezeichnungen wie GLP-1 oder ICD-11 gelten nicht als Zahlen', () => {
+  const r = checkStatement({ text: 'GLP-1 steht im ICD-11 bei 25% der Fälle, 5–10 Tage.', truth: 'R', quote: 'GLP-1 bei 25% der Fälle, 5–10 Tage' })
+  assert.deepEqual(r.flags.filter((f) => f.startsWith('zahl')), [])
 })

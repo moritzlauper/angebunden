@@ -41,9 +41,13 @@ export async function logout() {
 export async function startSession(fd: FormData) {
   await guard()
   const db = await getDb()
+  const subjectId = num(fd, 'subjectId')
+  // Die Auswahl «bis UE n» neben dem Start-Knopf gilt ab jetzt als Grenze des Fachs.
+  const ueLimit = num(fd, 'ueLimit')
+  if (Number.isInteger(ueLimit) && ueLimit > 0) await svc.updateSubject(db, subjectId, { ueLimit })
   let id: number
   try {
-    const view = await svc.startSession(db, num(fd, 'subjectId'), {
+    const view = await svc.startSession(db, subjectId, {
       channel: 'web',
       examMode: str(fd, 'examMode') === '1' ? true : undefined,
     })
@@ -88,11 +92,14 @@ export async function updateSubject(fd: FormData) {
   redirect(`/fach/${id}?gespeichert=1`)
 }
 
-export async function setUeLimit(fd: FormData) {
+export async function saveUnit(fd: FormData) {
   await guard()
-  await svc.updateSubject(await getDb(), num(fd, 'subjectId'), { ueLimit: num(fd, 'ueLimit') })
-  revalidatePath('/')
-  redirect(str(fd, 'back') || '/')
+  const id = num(fd, 'subjectId')
+  const number = num(fd, 'number')
+  const title = str(fd, 'title')
+  if (Number.isInteger(number) && number > 0 && title) await svc.upsertUnit(await getDb(), id, number, title)
+  revalidatePath(`/fach/${id}`)
+  redirect(`/fach/${id}?gespeichert=1#einstellungen`)
 }
 
 export async function review(fd: FormData) {

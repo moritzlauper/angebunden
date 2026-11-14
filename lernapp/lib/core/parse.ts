@@ -214,6 +214,7 @@ export function parseBank(markdown: string): ParsedBank {
   }
 }
 
+/** title ist leer, wenn die Überschrift nur «# UE n» lautet. */
 export type NotesSection = { unitNumber: number; title: string; markdown: string }
 
 /** Zerlegt Notes.md nach «# UE n». Text vor der ersten UE wird ignoriert. */
@@ -225,7 +226,7 @@ export function splitNotesByUnit(markdown: string): NotesSection[] {
     const m = line.match(/^#\s+UE\s*(\d+)\s*[:–—-]?\s*(.*)$/i)
     if (m) {
       if (cur) out.push(cur)
-      cur = { unitNumber: Number(m[1]), title: m[2].trim() || `UE ${m[1]}`, markdown: '' }
+      cur = { unitNumber: Number(m[1]), title: m[2].trim(), markdown: '' }
       continue
     }
     if (cur) cur.markdown += `${line}\n`

@@ -17,10 +17,15 @@ export function normalize(text: string): string {
 }
 
 /** Steht das Zitat (normalisiert) im Text? */
+/** Hervorhebungen aus Obsidian-Notes (**fett**, *kursiv*, <u>unterstrichen</u>) zählen beim Zitatvergleich nicht. */
+function stripEmphasis(text: string): string {
+  return text.replace(/<\/?u>/gi, '').replace(/\*\*|__/g, '').replace(/(^|[\s(])\*([^*\s][^*]*?)\*/g, '$1$2')
+}
+
 export function containsQuote(haystack: string, quote: string): boolean {
-  const q = normalize(quote).replace(/[.…]+$/, '').trim()
+  const q = normalize(stripEmphasis(quote)).replace(/[.…]+$/, '').trim()
   if (!q) return false
-  return normalize(haystack).includes(q)
+  return normalize(stripEmphasis(haystack)).includes(q)
 }
 
 export function slugify(text: string): string {

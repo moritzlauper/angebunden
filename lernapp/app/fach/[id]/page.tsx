@@ -1,7 +1,8 @@
 import { notFound } from 'next/navigation'
 import { getDb } from '@/lib/db/index.ts'
 import { AppError, history, listSources, listStatements, subjectOverview } from '@/lib/service.ts'
-import { updateSubject } from '../../actions.ts'
+import { saveUnit, updateSubject } from '../../actions.ts'
+import { Progress, UeOptions } from '../../ui.tsx'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,12 +45,7 @@ export default async function Fach({ params, searchParams }: PageProps<'/fach/[i
                   {u.accuracy != null ? ` · Trefferquote ${u.accuracy} %` : ''}
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-sm">
-                <div className="bar flex-1" title={`${u.safe} von ${u.total} sicher`}>
-                  <span style={{ width: `${u.safePct}%` }} />
-                </div>
-                <span className="w-24 text-right">{u.safePct} % sicher</span>
-              </div>
+              <Progress safe={u.safe} seen={u.seen} total={u.total} />
               <details className="text-sm">
                 <summary className="muted cursor-pointer">Abdeckung: Fundstelle × Aussagen{u.chunks ? `, ${u.chunks} Textstücke` : ''}</summary>
                 <ul className="mt-2 flex flex-wrap gap-2">
@@ -106,7 +102,7 @@ export default async function Fach({ params, searchParams }: PageProps<'/fach/[i
         </section>
       ) : null}
 
-      <section className="space-y-3">
+      <section id="einstellungen" className="scroll-mt-4 space-y-3">
         <h2 className="text-lg font-semibold">Einstellungen</h2>
         {sp.gespeichert ? <p className="text-sm text-ok">Gespeichert.</p> : null}
         <form action={updateSubject} className="card grid gap-3 p-4 text-sm sm:grid-cols-2">
@@ -114,11 +110,7 @@ export default async function Fach({ params, searchParams }: PageProps<'/fach/[i
           <label className="space-y-1">
             <span>Abfragen bis</span>
             <select name="ueLimit" defaultValue={s.ueLimit}>
-              {ov.units.map((u) => (
-                <option key={u.id} value={u.number}>
-                  UE {u.number} {u.title}
-                </option>
-              ))}
+              <UeOptions units={ov.units} ueLimit={s.ueLimit} />
             </select>
           </label>
           <label className="space-y-1">
@@ -158,6 +150,19 @@ export default async function Fach({ params, searchParams }: PageProps<'/fach/[i
           <div className="sm:col-span-2">
             <button className="btn">Speichern</button>
           </div>
+        </form>
+
+        <form action={saveUnit} className="card flex flex-wrap items-end gap-3 p-4 text-sm">
+          <input type="hidden" name="subjectId" value={s.id} />
+          <label className="w-20 space-y-1">
+            <span>UE</span>
+            <input type="number" name="number" min={1} max={30} required defaultValue={Math.max(0, ...ov.units.map((u) => u.number)) + 1} />
+          </label>
+          <label className="min-w-40 flex-1 space-y-1">
+            <span>Titel</span>
+            <input type="text" name="title" required placeholder="z. B. Sexualität" />
+          </label>
+          <button className="btn-quiet">UE anlegen oder umbenennen</button>
         </form>
       </section>
 

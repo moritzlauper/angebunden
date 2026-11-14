@@ -19,7 +19,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="font-bold">
               Klicker
             </Link>
-            <Link href="/">Heute</Link>
             <Link href="/inbox">Inbox</Link>
             <Link href="/verbinden">Claude &amp; Import</Link>
           </nav>

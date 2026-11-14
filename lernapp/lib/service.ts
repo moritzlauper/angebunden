@@ -153,10 +153,12 @@ export async function listSubjects(db: Db, now = new Date()) {
     let due = 0
     let fresh = 0
     let safe = 0
+    let seen = 0
     for (const id of activeInLimit) {
       const st = states.get(id)
       if (!st) fresh++
       else {
+        seen++
         if (st.due <= now) due++
         if (isSafe(st)) safe++
       }
@@ -170,6 +172,7 @@ export async function listSubjects(db: Db, now = new Date()) {
         inbox: rows.filter((r) => r.status === 'inbox' || r.status === 'flagged').length,
         due,
         new: fresh,
+        seen,
         safe,
       },
       streak,
@@ -348,7 +351,8 @@ export async function syncSource(db: Db, subjectId: number, input: SyncInput) {
     const sections = splitNotesByUnit(input.content)
     if (sections.length === 0) throw new AppError('Keine «# UE n»-Überschriften gefunden. Gib unit an oder ergänze die Überschriften.')
     for (const sec of sections) {
-      const u = await upsertUnit(db, subjectId, sec.unitNumber, sec.title)
+      // Ohne Titel in der Überschrift bleibt ein bestehender Titel erhalten.
+      const u = await upsertUnit(db, subjectId, sec.unitNumber, sec.title || null)
       const h = sha256(sec.markdown)
       if (u.notesHash === h) {
         results.push({ unit: u.number, title: u.title, changed: false })
@@ -724,6 +728,8 @@ export type StatementResult = {
   marked: boolean
   correct: boolean
   reason: string | null
+  /** Wörtlicher Beleg aus den Notes, als Erklärung auch bei richtigen Aussagen */
+  quote: string | null
   sourceRef: string | null
   links: { label: string; url: string | null }[]
 }
@@ -762,6 +768,7 @@ export async function getSessionView(db: Db, sessionId: number) {
           marked: a?.marked ?? false,
           correct: a?.correct ?? false,
           reason: st.reason,
+          quote: st.quote,
           sourceRef: st.sourceRef,
           links: sourceLinks(st.sourceRef, subj),
         }

@@ -48,8 +48,9 @@ function words(text: string): string[] {
   return normalize(text).split(/[^a-zäöüéèà0-9]+/i).filter(Boolean)
 }
 
+/** Zahlen im Text. Teile von Bezeichnungen wie «GLP-1», «ICD-11» oder «VL4» zählen nicht. */
 export function numbersIn(text: string): string[] {
-  return [...text.matchAll(/\d+(?:[.,]\d+)?/g)].map((m) => m[0].replace(',', '.'))
+  return [...text.matchAll(/(?<!\p{L}-?)(?<![\d.,])\d+(?:[.,]\d+)?/gu)].map((m) => m[0].replace(',', '.'))
 }
 
 export function checkStatement(input: QualityInput): QualityResult {

@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { getDb } from '@/lib/db/index.ts'
 import { AppError, getSessionView, sessionSummary, type StatementResult } from '@/lib/service.ts'
 import { answer, reportError } from '../../actions.ts'
+import { PrimaryShortcut } from '../../shortcut.tsx'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +27,17 @@ export default async function Ueben({ params, searchParams }: PageProps<'/ueben/
     </p>
   )
 
+  // Steht unten rechts fix am Bildschirmrand, damit man nie scrollen muss.
+  const nextLink = next ? (
+    <Link className="btn" href={`/ueben/${id}`} autoFocus data-shortcut="primary">
+      Nächste Frage →
+    </Link>
+  ) : (
+    <Link className="btn" href={`/ueben/${id}?ende=1`} autoFocus data-shortcut="primary">
+      Zur Auswertung →
+    </Link>
+  )
+
   if (shown) {
     return (
       <div className="space-y-4">
@@ -45,17 +57,8 @@ export default async function Ueben({ params, searchParams }: PageProps<'/ueben/
             <Result key={r.letter} r={r} back={back} />
           ))}
         </ul>
-        <div className="pt-2">
-          {next ? (
-            <Link className="btn" href={`/ueben/${id}`}>
-              Nächste Frage
-            </Link>
-          ) : (
-            <Link className="btn" href={`/ueben/${id}?ende=1`}>
-              Zur Auswertung
-            </Link>
-          )}
-        </div>
+        <ActionBar align="end">{nextLink}</ActionBar>
+        <PrimaryShortcut />
       </div>
     )
   }
@@ -82,12 +85,15 @@ export default async function Ueben({ params, searchParams }: PageProps<'/ueben/
             </li>
           ))}
         </ul>
-        <div className="flex flex-wrap items-center gap-4">
-          <button className="btn">Abgeben</button>
+        <ActionBar align="start">
+          <button className="btn" data-shortcut="primary" title="Cmd+Enter">
+            Abgeben
+          </button>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="guessed" value="1" /> war geraten
           </label>
-        </div>
+        </ActionBar>
+        <PrimaryShortcut />
       </form>
     )
   }
@@ -123,6 +129,18 @@ export default async function Ueben({ params, searchParams }: PageProps<'/ueben/
   )
 }
 
+/** Knopfleiste, die beim Scrollen am unteren Bildschirmrand kleben bleibt. */
+function ActionBar({ children, align }: { children: React.ReactNode; align: 'start' | 'end' }) {
+  return (
+    <div
+      className={`sticky bottom-0 -mx-4 flex items-center gap-4 border-t px-4 py-3 ${align === 'end' ? 'justify-end' : ''}`}
+      style={{ background: 'var(--bg)', borderColor: 'var(--line)' }}
+    >
+      {children}
+    </div>
+  )
+}
+
 function Result({ r, back }: { r: StatementResult; back: string }) {
   return (
     <li className="card space-y-1 p-3" style={{ borderColor: r.correct ? 'var(--color-ok)' : 'var(--color-bad)' }}>
@@ -133,6 +151,11 @@ function Result({ r, back }: { r: StatementResult; back: string }) {
         {r.truth === 'R' ? 'richtig' : 'falsch'} · {r.marked ? 'angekreuzt' : 'nicht angekreuzt'} · {r.correct ? '✓' : '✗'}
       </p>
       {r.reason ? <p className="text-sm">{r.reason}</p> : null}
+      {r.quote ? (
+        <blockquote className="muted border-l-2 pl-3 text-sm" style={{ borderColor: 'var(--line)' }}>
+          «{r.quote.replace(/\*\*|<\/?u>/g, '')}»
+        </blockquote>
+      ) : null}
       <div className="flex flex-wrap items-center gap-3 text-sm">
         {r.links.map((l) =>
           l.url ? (
