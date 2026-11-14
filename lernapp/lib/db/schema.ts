@@ -154,7 +154,7 @@ export const practiceSession = pgTable('practice_session', {
   subjectId: integer('subject_id')
     .notNull()
     .references(() => subject.id, { onDelete: 'cascade' }),
-  userId: text('user_id').notNull().default('me'),
+  userId: text('user_id').notNull().default('moritz'),
   /** web | mcp */
   channel: text('channel').notNull().default('web'),
   ueLimit: integer('ue_limit').notNull(),
@@ -184,7 +184,7 @@ export const answer = pgTable(
     statementId: integer('statement_id')
       .notNull()
       .references(() => statement.id, { onDelete: 'cascade' }),
-    userId: text('user_id').notNull().default('me'),
+    userId: text('user_id').notNull().default('moritz'),
     marked: boolean('marked').notNull(),
     correct: boolean('correct').notNull(),
     guessed: boolean('guessed').notNull().default(false),
@@ -196,7 +196,7 @@ export const answer = pgTable(
 export const cardState = pgTable(
   'card_state',
   {
-    userId: text('user_id').notNull().default('me'),
+    userId: text('user_id').notNull().default('moritz'),
     statementId: integer('statement_id')
       .notNull()
       .references(() => statement.id, { onDelete: 'cascade' }),
@@ -218,11 +218,28 @@ export const report = pgTable('report', {
   statementId: integer('statement_id')
     .notNull()
     .references(() => statement.id, { onDelete: 'cascade' }),
-  userId: text('user_id').notNull().default('me'),
+  userId: text('user_id').notNull().default('moritz'),
   comment: text('comment'),
   resolved: boolean('resolved').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/**
+ * Persönliche Einstellungen pro Person und Fach. Alle lernen mit denselben Aussagen,
+ * aber mit eigener UE-Grenze und eigenem Lernstand (user_id in Sitzung, Antwort, card_state).
+ */
+export const learnerSetting = pgTable(
+  'learner_setting',
+  {
+    userId: text('user_id').notNull(),
+    subjectId: integer('subject_id')
+      .notNull()
+      .references(() => subject.id, { onDelete: 'cascade' }),
+    ueLimit: integer('ue_limit').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.subjectId] })],
+)
 
 /** Hochgeladene OLAT-Klickerfragen und Altprüfungen als Vorlage für Stil und Schwierigkeit. */
 export const styleExample = pgTable('style_example', {

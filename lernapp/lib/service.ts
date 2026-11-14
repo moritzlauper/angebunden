@@ -15,7 +15,38 @@ import { containsQuote, formatDateCH, LETTERS, normalize, sha256, slugify, type 
  * man im Browser kann.
  */
 
-export const USER = 'me'
+/** Besitzer der Unterlagen. Claude über MCP und alte Daten laufen unter diesem Namen. */
+export const OWNER = process.env.OWNER_USER?.trim() || 'moritz'
+
+const RESERVED_NAMES = new Set(['api', 'inbox', 'verbinden', 'login', 'ueben', 'stand', 'fach', 'neu'])
+
+/** «David M.» → «david-m». null, wenn der Name nicht taugt. */
+export function learnerSlug(name: string): string | null {
+  const slug = slugify(name).slice(0, 30)
+  if (slug.length < 2 || RESERVED_NAMES.has(slug)) return null
+  return slug
+}
+
+/** Persönliche UE-Grenze. Der Besitzer nutzt die Grenze des Fachs, alle anderen ihre eigene (Start: die des Fachs). */
+export async function learnerUeLimit(db: Db, user: string, subj: s.Subject): Promise<number> {
+  if (user === OWNER) return subj.ueLimit
+  const [row] = await db
+    .select({ ueLimit: s.learnerSetting.ueLimit })
+    .from(s.learnerSetting)
+    .where(and(eq(s.learnerSetting.userId, user), eq(s.learnerSetting.subjectId, subj.id)))
+  return row?.ueLimit ?? subj.ueLimit
+}
+
+export async function setLearnerUeLimit(db: Db, user: string, subjectId: number, ueLimit: number) {
+  if (user === OWNER) {
+    await updateSubject(db, subjectId, { ueLimit })
+    return
+  }
+  await db
+    .insert(s.learnerSetting)
+    .values({ userId: user, subjectId, ueLimit })
+    .onConflictDoUpdate({ target: [s.learnerSetting.userId, s.learnerSetting.subjectId], set: { ueLimit } })
+}
 
 export class AppError extends Error {}
 
@@ -111,7 +142,7 @@ type StatementStats = {
   lastAnswered: Date | null
 }
 
-async function answerStats(db: Db, statementIds: number[]): Promise<Map<number, StatementStats>> {
+async function answerStats(db: Db, statementIds: number[], user = OWNER): Promise<Map<number, StatementStats>> {
   const out = new Map<number, StatementStats>()
   if (statementIds.length === 0) return out
   const rows = await db
@@ -122,7 +153,7 @@ async function answerStats(db: Db, statementIds: number[]): Promise<Map<number, 
       last: sql<string | null>`max(${s.answer.answeredAt})`,
     })
     .from(s.answer)
-    .where(and(eq(s.answer.userId, USER), inArray(s.answer.statementId, statementIds)))
+    .where(and(eq(s.answer.userId, user), inArray(s.answer.statementId, statementIds)))
     .groupBy(s.answer.statementId)
   for (const r of rows) {
     out.set(r.statementId, { answers: r.answers, wrong: r.wrong, lastAnswered: r.last ? new Date(r.last) : null })
@@ -130,26 +161,27 @@ async function answerStats(db: Db, statementIds: number[]): Promise<Map<number, 
   return out
 }
 
-async function cardStates(db: Db, statementIds: number[]): Promise<Map<number, s.CardStateRow>> {
+async function cardStates(db: Db, statementIds: number[], user = OWNER): Promise<Map<number, s.CardStateRow>> {
   if (statementIds.length === 0) return new Map()
   const rows = await db
     .select()
     .from(s.cardState)
-    .where(and(eq(s.cardState.userId, USER), inArray(s.cardState.statementId, statementIds)))
+    .where(and(eq(s.cardState.userId, user), inArray(s.cardState.statementId, statementIds)))
   return new Map(rows.map((r) => [r.statementId, r]))
 }
 
-export async function listSubjects(db: Db, now = new Date()) {
+export async function listSubjects(db: Db, now = new Date(), user = OWNER) {
   const subjects = await db.select().from(s.subject).orderBy(asc(s.subject.id))
   const out = []
-  for (const subj of subjects) {
+  for (const subjRow of subjects) {
+    const subj = { ...subjRow, ueLimit: await learnerUeLimit(db, user, subjRow) }
     const rows = await db
       .select({ id: s.statement.id, status: s.statement.status, unitNumber: s.unit.number })
       .from(s.statement)
       .innerJoin(s.unit, eq(s.statement.unitId, s.unit.id))
       .where(eq(s.unit.subjectId, subj.id))
     const activeInLimit = rows.filter((r) => r.status === 'active' && r.unitNumber <= subj.ueLimit).map((r) => r.id)
-    const states = await cardStates(db, activeInLimit)
+    const states = await cardStates(db, activeInLimit, user)
     let due = 0
     let fresh = 0
     let safe = 0
@@ -163,7 +195,7 @@ export async function listSubjects(db: Db, now = new Date()) {
         if (isSafe(st)) safe++
       }
     }
-    const streak = await streakDays(db, subj.id, now)
+    const streak = await streakDays(db, subj.id, now, user)
     out.push({
       ...subj,
       counts: {
@@ -183,12 +215,12 @@ export async function listSubjects(db: Db, now = new Date()) {
 }
 
 /** Aufeinanderfolgende Tage (bis heute oder gestern) mit mindestens einer beantworteten Frage. */
-async function streakDays(db: Db, subjectId: number, now: Date): Promise<number> {
+async function streakDays(db: Db, subjectId: number, now: Date, user = OWNER): Promise<number> {
   const rows = await db
     .select({ day: sql<string>`to_char(${s.question.answeredAt} at time zone 'Europe/Zurich', 'YYYY-MM-DD')` })
     .from(s.question)
     .innerJoin(s.practiceSession, eq(s.question.sessionId, s.practiceSession.id))
-    .where(and(eq(s.practiceSession.subjectId, subjectId), sql`${s.question.answeredAt} is not null`))
+    .where(and(eq(s.practiceSession.subjectId, subjectId), eq(s.practiceSession.userId, user), sql`${s.question.answeredAt} is not null`))
     .groupBy(sql`1`)
   const days = new Set(rows.map((r) => r.day))
   const fmt = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Zurich' }).format(d)
@@ -202,16 +234,17 @@ async function streakDays(db: Db, subjectId: number, now: Date): Promise<number>
   return streak
 }
 
-export async function subjectOverview(db: Db, subjectId: number, now = new Date()) {
-  const [subj] = await db.select().from(s.subject).where(eq(s.subject.id, subjectId))
-  if (!subj) throw new AppError('Fach nicht gefunden')
+export async function subjectOverview(db: Db, subjectId: number, now = new Date(), user = OWNER) {
+  const [subjRow] = await db.select().from(s.subject).where(eq(s.subject.id, subjectId))
+  if (!subjRow) throw new AppError('Fach nicht gefunden')
+  const subj = { ...subjRow, ueLimit: await learnerUeLimit(db, user, subjRow) }
   const units = await db.select().from(s.unit).where(eq(s.unit.subjectId, subjectId)).orderBy(asc(s.unit.number))
   const stmts = await db
     .select()
     .from(s.statement)
     .where(inArray(s.statement.unitId, units.length ? units.map((u) => u.id) : [-1]))
   const ids = stmts.map((x) => x.id)
-  const [states, stats] = await Promise.all([cardStates(db, ids), answerStats(db, ids)])
+  const [states, stats] = await Promise.all([cardStates(db, ids, user), answerStats(db, ids, user)])
 
   const chunks = units.length
     ? await db
@@ -605,10 +638,10 @@ export async function reviewStatement(
   return row
 }
 
-export async function reportError(db: Db, statementId: number, comment: string | null) {
+export async function reportError(db: Db, statementId: number, comment: string | null, user = OWNER) {
   const [st] = await db.select().from(s.statement).where(eq(s.statement.id, statementId))
   if (!st) throw new AppError(`Aussage ${statementId} nicht gefunden`)
-  await db.insert(s.report).values({ statementId, comment, userId: USER })
+  await db.insert(s.report).values({ statementId, comment, userId: user })
   const flags = [...new Set([...(st.flags ?? []), 'gemeldet'])]
   await db.update(s.statement).set({ status: 'flagged', flags, updatedAt: new Date() }).where(eq(s.statement.id, statementId))
   return { statementId, status: 'flagged' }
@@ -667,12 +700,13 @@ export async function importBank(db: Db, subjectId: number, markdown: string, st
 export async function startSession(
   db: Db,
   subjectId: number,
-  opts: { channel?: 'web' | 'mcp'; nQuestions?: number; ueLimit?: number; examMode?: boolean; now?: Date; rng?: () => number } = {},
+  opts: { channel?: 'web' | 'mcp'; nQuestions?: number; ueLimit?: number; examMode?: boolean; now?: Date; rng?: () => number; user?: string } = {},
 ) {
   const now = opts.now ?? new Date()
+  const user = opts.user ?? OWNER
   const [subj] = await db.select().from(s.subject).where(eq(s.subject.id, subjectId))
   if (!subj) throw new AppError('Fach nicht gefunden')
-  const ueLimit = opts.ueLimit ?? subj.ueLimit
+  const ueLimit = opts.ueLimit ?? (await learnerUeLimit(db, user, subj))
   const examMode = opts.examMode ?? subj.examMode
   const rows = await db
     .select({ st: s.statement, unitNumber: s.unit.number, unitTitle: s.unit.title })
@@ -680,7 +714,7 @@ export async function startSession(
     .innerJoin(s.unit, eq(s.statement.unitId, s.unit.id))
     .where(and(eq(s.unit.subjectId, subjectId), eq(s.statement.status, 'active'), lte(s.unit.number, ueLimit)))
   const ids = rows.map((r) => r.st.id)
-  const [states, stats] = await Promise.all([cardStates(db, ids), answerStats(db, ids)])
+  const [states, stats] = await Promise.all([cardStates(db, ids, user), answerStats(db, ids, user)])
   const candidates: Candidate[] = rows.map((r) => {
     const cs = states.get(r.st.id)
     const st = stats.get(r.st.id)
@@ -712,7 +746,7 @@ export async function startSession(
   }
   const [sess] = await db
     .insert(s.practiceSession)
-    .values({ subjectId, channel: opts.channel ?? 'web', ueLimit, examMode, startedAt: now })
+    .values({ subjectId, userId: user, channel: opts.channel ?? 'web', ueLimit, examMode, startedAt: now })
     .returning()
   await db.insert(s.question).values(
     composed.map((q, i) => ({ sessionId: sess.id, position: i + 1, stem: q.stem, unitNumber: q.unitNumber, statementIds: q.statementIds })),
@@ -806,16 +840,18 @@ export async function answerQuestion(
   const now = opts.now ?? new Date()
   const [q] = await db.select().from(s.question).where(eq(s.question.id, questionId))
   if (!q) throw new AppError(`Frage ${questionId} nicht gefunden`)
+  const [sess] = await db.select({ userId: s.practiceSession.userId }).from(s.practiceSession).where(eq(s.practiceSession.id, q.sessionId))
+  const user = sess?.userId ?? OWNER
   if (!q.answeredAt) {
     const markedSet = new Set(marked.map((m) => m.toUpperCase()))
     const stmts = await db.select().from(s.statement).where(inArray(s.statement.id, q.statementIds))
-    const states = await cardStates(db, q.statementIds)
+    const states = await cardStates(db, q.statementIds, user)
     for (const [i, id] of q.statementIds.entries()) {
       const st = stmts.find((x) => x.id === id)
       if (!st) continue
       const isMarked = markedSet.has(LETTERS[i])
       const correct = isMarked === (st.truth === 'R')
-      await db.insert(s.answer).values({ questionId, statementId: id, userId: USER, marked: isMarked, correct, guessed: !!opts.guessed, answeredAt: now })
+      await db.insert(s.answer).values({ questionId, statementId: id, userId: user, marked: isMarked, correct, guessed: !!opts.guessed, answeredAt: now })
       const prev = states.get(id)
       const prevFields: CardFields | null = prev
         ? {
@@ -833,7 +869,7 @@ export async function answerQuestion(
       const next = review(prevFields, gradeFor(correct, !!opts.guessed), now)
       await db
         .insert(s.cardState)
-        .values({ userId: USER, statementId: id, ...next })
+        .values({ userId: user, statementId: id, ...next })
         .onConflictDoUpdate({ target: [s.cardState.userId, s.cardState.statementId], set: next })
     }
     await db.update(s.question).set({ answeredAt: now }).where(eq(s.question.id, questionId))
@@ -869,7 +905,7 @@ export async function sessionSummary(db: Db, sessionId: number) {
   const view = await getSessionView(db, sessionId)
   const wrong = view.questions.flatMap((q) => (q.results ?? []).filter((r) => !r.correct))
   const ids = wrong.map((w) => w.statementId)
-  const states = await cardStates(db, ids)
+  const states = await cardStates(db, ids, view.session.userId)
   const repeat = wrong
     .sort((a, b) => (states.get(b.statementId)?.lapses ?? 0) - (states.get(a.statementId)?.lapses ?? 0))
     .slice(0, 2)
@@ -877,7 +913,7 @@ export async function sessionSummary(db: Db, sessionId: number) {
 }
 
 /** Wie viele Fragen pro Tag, für die Auswertung. */
-export async function history(db: Db, subjectId: number, days = 30) {
+export async function history(db: Db, subjectId: number, days = 30, user = OWNER) {
   return db
     .select({
       day: sql<string>`to_char(${s.answer.answeredAt} at time zone 'Europe/Zurich', 'YYYY-MM-DD')`,
@@ -888,7 +924,7 @@ export async function history(db: Db, subjectId: number, days = 30) {
     .from(s.answer)
     .innerJoin(s.statement, eq(s.answer.statementId, s.statement.id))
     .innerJoin(s.unit, eq(s.statement.unitId, s.unit.id))
-    .where(and(eq(s.unit.subjectId, subjectId), sql`${s.answer.answeredAt} > now() - make_interval(days => ${days})`))
+    .where(and(eq(s.unit.subjectId, subjectId), eq(s.answer.userId, user), sql`${s.answer.answeredAt} > now() - make_interval(days => ${days})`))
     .groupBy(sql`1`, s.unit.number)
     .orderBy(sql`1`)
 }

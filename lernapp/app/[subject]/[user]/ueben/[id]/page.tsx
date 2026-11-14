@@ -1,24 +1,26 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getDb } from '@/lib/db/index.ts'
+import { learnerContext } from '@/lib/learner.ts'
 import { AppError, getSessionView, sessionSummary, type StatementResult } from '@/lib/service.ts'
-import { answer, reportError } from '../../actions.ts'
-import { PrimaryShortcut } from '../../shortcut.tsx'
+import { answer, reportError } from '../../../../actions.ts'
+import { PrimaryShortcut } from '../../../../shortcut.tsx'
 
 export const dynamic = 'force-dynamic'
 
-export default async function Ueben({ params, searchParams }: PageProps<'/ueben/[id]'>) {
+export default async function Ueben({ params, searchParams }: PageProps<'/[subject]/[user]/ueben/[id]'>) {
   const { id } = await params
+  const { db, user, base, isOwner } = await learnerContext(params, `/ueben/${id}`)
   const sp = await searchParams
-  const db = await getDb()
   const view = await getSessionView(db, Number(id)).catch((e) => {
     if (e instanceof AppError) notFound()
     throw e
   })
+  // Fremde Sitzungen nicht zeigen: jede Person sieht nur ihre eigenen.
+  if (view.session.userId !== user) notFound()
   const shownId = Number(sp.q)
   const shown = view.questions.find((q) => q.id === shownId && q.answered)
   const next = view.questions.find((q) => !q.answered)
-  const back = `/ueben/${id}${shown ? `?q=${shown.id}` : ''}`
+  const back = `${base}/ueben/${id}${shown ? `?q=${shown.id}` : ''}`
 
   const header = (
     <p className="muted text-sm">
@@ -29,11 +31,11 @@ export default async function Ueben({ params, searchParams }: PageProps<'/ueben/
 
   // Steht unten rechts fix am Bildschirmrand, damit man nie scrollen muss.
   const nextLink = next ? (
-    <Link className="btn" href={`/ueben/${id}`} autoFocus data-shortcut="primary">
+    <Link className="btn" href={`${base}/ueben/${id}`} autoFocus data-shortcut="primary">
       Nächste Frage →
     </Link>
   ) : (
-    <Link className="btn" href={`/ueben/${id}?ende=1`} autoFocus data-shortcut="primary">
+    <Link className="btn" href={`${base}/ueben/${id}?ende=1`} autoFocus data-shortcut="primary">
       Zur Auswertung →
     </Link>
   )
@@ -54,7 +56,7 @@ export default async function Ueben({ params, searchParams }: PageProps<'/ueben/
         </p>
         <ul className="space-y-3">
           {shown.results!.map((r) => (
-            <Result key={r.letter} r={r} back={back} />
+            <Result key={r.letter} r={r} back={back} user={user} />
           ))}
         </ul>
         <ActionBar align="end">{nextLink}</ActionBar>
@@ -110,7 +112,7 @@ export default async function Ueben({ params, searchParams }: PageProps<'/ueben/
           <h2 className="font-semibold">Zum Wiederholen</h2>
           <ul className="space-y-3">
             {summary.repeat.map((r) => (
-              <Result key={r.statementId} r={r} back={`/ueben/${id}?ende=1`} />
+              <Result key={r.statementId} r={r} back={`${base}/ueben/${id}?ende=1`} user={user} />
             ))}
           </ul>
         </section>
@@ -118,12 +120,14 @@ export default async function Ueben({ params, searchParams }: PageProps<'/ueben/
         <p>Nichts falsch, nichts zu wiederholen.</p>
       )}
       <div className="flex flex-wrap gap-3">
-        <Link className="btn" href="/">
+        <Link className="btn" href={base}>
           Fertig
         </Link>
-        <a className="btn-quiet" href={`/api/export?subject=${view.subject.id}&session=${id}`} target="_blank">
-          Als Markdown für Exercises
-        </a>
+        {isOwner ? (
+          <a className="btn-quiet" href={`/api/export?subject=${view.subject.id}&session=${id}`} target="_blank">
+            Als Markdown für Exercises
+          </a>
+        ) : null}
       </div>
     </div>
   )
@@ -141,7 +145,7 @@ function ActionBar({ children, align }: { children: React.ReactNode; align: 'sta
   )
 }
 
-function Result({ r, back }: { r: StatementResult; back: string }) {
+function Result({ r, back, user }: { r: StatementResult; back: string; user: string }) {
   return (
     <li className="card space-y-1 p-3" style={{ borderColor: r.correct ? 'var(--color-ok)' : 'var(--color-bad)' }}>
       <p>
@@ -173,6 +177,7 @@ function Result({ r, back }: { r: StatementResult; back: string }) {
           <form action={reportError} className="mt-2 flex gap-2">
             <input type="hidden" name="statementId" value={r.statementId} />
             <input type="hidden" name="back" value={back} />
+            <input type="hidden" name="user" value={user} />
             <input type="text" name="comment" placeholder="Was stimmt nicht?" />
             <button className="btn-quiet">Melden</button>
           </form>

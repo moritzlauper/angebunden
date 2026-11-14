@@ -19,8 +19,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="font-bold">
               Klicker
             </Link>
-            <Link href="/inbox">Inbox</Link>
-            <Link href="/verbinden">Claude &amp; Import</Link>
           </nav>
         </header>
         <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>

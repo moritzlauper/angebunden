@@ -123,3 +123,28 @@ test('UE-Grenze, Fehler melden, Fehlermeldungen', async () => {
   await assert.rejects(call('get_subject', { subject: 'Psychopathologie' }), /nicht gefunden/)
   await assert.rejects(call('add_statements', { subject: 'KliBio', statements: [] }), /Ungültige Eingabe/)
 })
+
+test('Freunde lernen mit denselben Aussagen, aber eigenem Lernstand und eigener UE-Grenze', async () => {
+  const db = await getDb()
+  assert.equal(svc.learnerSlug('David M.'), 'david-m')
+  assert.equal(svc.learnerSlug('inbox'), null)
+  assert.equal(svc.learnerSlug('x'), null)
+
+  const ownerBefore = (await svc.listSubjects(db))[0]
+  await svc.setLearnerUeLimit(db, 'david', subjectId, 2)
+  const [david] = await svc.listSubjects(db, new Date(), 'david')
+  assert.equal(david.ueLimit, 2)
+  assert.equal(david.counts.seen, 0)
+  // Die Grenze des Besitzers bleibt unberührt.
+  assert.equal((await svc.listSubjects(db))[0].ueLimit, ownerBefore.ueLimit)
+
+  const view = await svc.startSession(db, subjectId, { user: 'david', nQuestions: 1 })
+  assert.equal(view.session.userId, 'david')
+  assert.ok(view.questions.every((q) => (q.unitNumber ?? 0) <= 2))
+  await svc.answerQuestion(db, view.questions[0].id, ['A'])
+
+  const [davidAfter] = await svc.listSubjects(db, new Date(), 'david')
+  assert.equal(davidAfter.counts.seen, 5)
+  const [ownerAfter] = await svc.listSubjects(db)
+  assert.equal(ownerAfter.counts.seen, ownerBefore.counts.seen)
+})

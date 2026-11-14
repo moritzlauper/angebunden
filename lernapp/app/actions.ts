@@ -38,43 +38,73 @@ export async function logout() {
   redirect('/login')
 }
 
+/** Person aus dem Formular, auf die gültige Kurzform gebracht. Ohne Angabe: der Besitzer. */
+function userOf(fd: FormData): string {
+  return svc.learnerSlug(str(fd, 'user')) ?? svc.OWNER
+}
+
+/** Pfad /<fach>/<person> zu einer Fach-ID. */
+async function basePath(subjectId: number, user: string): Promise<string> {
+  const subj = await svc.resolveSubject(await getDb(), subjectId)
+  return `/${subj.slug}/${user}`
+}
+
+/** Fach-Einstellungen und UEs ändert nur der Besitzer der Unterlagen. */
+function ownerOnly(fd: FormData) {
+  if (userOf(fd) !== svc.OWNER) throw new Error('Nur der Besitzer der Unterlagen kann das ändern.')
+}
+
+/** /klibio: Name eingeben → /klibio/<name> */
+export async function enterName(fd: FormData) {
+  const subject = svc.learnerSlug(str(fd, 'subject')) ?? ''
+  const name = svc.learnerSlug(str(fd, 'name'))
+  if (!name) redirect(`/${subject}?fehler=1`)
+  redirect(`/${subject}/${name}`)
+}
+
 export async function startSession(fd: FormData) {
   await guard()
   const db = await getDb()
   const subjectId = num(fd, 'subjectId')
-  // Die Auswahl «bis UE n» neben dem Start-Knopf gilt ab jetzt als Grenze des Fachs.
+  const user = userOf(fd)
+  const base = await basePath(subjectId, user)
+  // Die Auswahl «bis UE n» neben dem Start-Knopf gilt ab jetzt als persönliche Grenze.
   const ueLimit = num(fd, 'ueLimit')
-  if (Number.isInteger(ueLimit) && ueLimit > 0) await svc.updateSubject(db, subjectId, { ueLimit })
+  if (Number.isInteger(ueLimit) && ueLimit > 0) await svc.setLearnerUeLimit(db, user, subjectId, ueLimit)
   let id: number
   try {
     const view = await svc.startSession(db, subjectId, {
       channel: 'web',
+      user,
       examMode: str(fd, 'examMode') === '1' ? true : undefined,
     })
     id = view.session.id
   } catch (e) {
-    if (e instanceof svc.AppError) redirect(`/?fehler=${encodeURIComponent(e.message)}`)
+    if (e instanceof svc.AppError) redirect(`${base}?fehler=${encodeURIComponent(e.message)}`)
     throw e
   }
-  redirect(`/ueben/${id}`)
+  redirect(`${base}/ueben/${id}`)
 }
 
 export async function answer(fd: FormData) {
   await guard()
   const marked = fd.getAll('marked').filter((v): v is Letter => typeof v === 'string' && (LETTERS as readonly string[]).includes(v))
-  const r = await svc.answerQuestion(await getDb(), num(fd, 'questionId'), marked, { guessed: str(fd, 'guessed') === '1' })
-  redirect(`/ueben/${r.sessionId}?q=${num(fd, 'questionId')}`)
+  const db = await getDb()
+  const r = await svc.answerQuestion(db, num(fd, 'questionId'), marked, { guessed: str(fd, 'guessed') === '1' })
+  const view = await svc.getSessionView(db, r.sessionId)
+  redirect(`/${view.subject.slug}/${view.session.userId}/ueben/${r.sessionId}?q=${num(fd, 'questionId')}`)
 }
 
 export async function reportError(fd: FormData) {
   await guard()
-  await svc.reportError(await getDb(), num(fd, 'statementId'), str(fd, 'comment') || null)
+  await svc.reportError(await getDb(), num(fd, 'statementId'), str(fd, 'comment') || null, userOf(fd))
   const back = str(fd, 'back')
-  redirect(back.startsWith('/') ? back : '/')
+  redirect(back.startsWith('/') && !back.startsWith('//') ? back : '/')
 }
 
 export async function updateSubject(fd: FormData) {
   await guard()
+  ownerOnly(fd)
   const id = num(fd, 'subjectId')
   await svc.updateSubject(await getDb(), id, {
     ueLimit: num(fd, 'ueLimit'),
@@ -88,18 +118,21 @@ export async function updateSubject(fd: FormData) {
     slidesPattern: str(fd, 'slidesPattern') || null,
     zmPath: str(fd, 'zmPath') || null,
   })
-  revalidatePath(`/fach/${id}`)
-  redirect(`/fach/${id}?gespeichert=1`)
+  const base = await basePath(id, svc.OWNER)
+  revalidatePath(base, 'layout')
+  redirect(`${base}/stand?gespeichert=1#einstellungen`)
 }
 
 export async function saveUnit(fd: FormData) {
   await guard()
+  ownerOnly(fd)
   const id = num(fd, 'subjectId')
   const number = num(fd, 'number')
   const title = str(fd, 'title')
   if (Number.isInteger(number) && number > 0 && title) await svc.upsertUnit(await getDb(), id, number, title)
-  revalidatePath(`/fach/${id}`)
-  redirect(`/fach/${id}?gespeichert=1#einstellungen`)
+  const base = await basePath(id, svc.OWNER)
+  revalidatePath(base, 'layout')
+  redirect(`${base}/stand?gespeichert=1#einstellungen`)
 }
 
 export async function review(fd: FormData) {
@@ -131,5 +164,5 @@ export async function createSubject(fd: FormData) {
     vaultPath: str(fd, 'vaultPath') || null,
     ueLimit: num(fd, 'ueLimit') || 1,
   })
-  redirect(`/fach/${subj.id}`)
+  redirect(`/${subj.slug}/${svc.OWNER}/stand`)
 }
