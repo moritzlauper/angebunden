@@ -12,6 +12,8 @@ export default async function Lernen({ params, searchParams }: PageProps<'/[subj
   const s = (await listSubjects(db, new Date(), user)).find((x) => x.id === subj.id)!
   const us = (await subjectOverview(db, subj.id, new Date(), user)).units
   const inLimit = us.filter((u) => u.inLimit)
+  const answers = inLimit.reduce((n, u) => n + u.answers, 0)
+  const accuracy = answers ? Math.round((inLimit.reduce((n, u) => n + u.correct, 0) / answers) * 100) : null
 
   return (
     <div className="space-y-6">
@@ -59,11 +61,16 @@ export default async function Lernen({ params, searchParams }: PageProps<'/[subj
         </div>
 
         <div className="space-y-3">
-          <Progress safe={s.counts.safe} seen={s.counts.seen} total={s.counts.inLimit} label={`Stand bis UE ${s.ueLimit}`} />
+          <Progress
+            safe={s.counts.safe}
+            seen={s.counts.seen}
+            total={s.counts.inLimit}
+            label={`Stand bis UE ${s.ueLimit}${accuracy != null ? ` · ${accuracy}% richtig beantwortet` : ''}`}
+          />
           {inLimit.length > 1 ? (
             <ul className="space-y-1 text-sm">
               {inLimit.map((u) => (
-                <li key={u.id} className="grid grid-cols-[minmax(0,10rem)_1fr_3rem] items-center gap-3">
+                <li key={u.id} className="grid grid-cols-[minmax(0,10rem)_1fr_5rem] items-center gap-3">
                   <span className="truncate" title={u.title}>
                     UE {u.number} {u.title !== `UE ${u.number}` ? u.title : ''}
                   </span>
@@ -71,12 +78,17 @@ export default async function Lernen({ params, searchParams }: PageProps<'/[subj
                     <span style={{ width: `${u.total ? (u.safe / u.total) * 100 : 0}%` }} />
                     <span className="seen" style={{ width: `${u.total ? ((u.seen - u.safe) / u.total) * 100 : 0}%` }} />
                   </div>
-                  <span className="muted text-right text-xs">{u.total ? `${u.safePct}%` : 'leer'}</span>
+                  <span className="muted text-right text-xs" title="Anteil richtig beantworteter Aussagen">
+                    {!u.total ? 'leer' : u.accuracy != null ? `${u.accuracy}% richtig` : 'neu'}
+                  </span>
                 </li>
               ))}
             </ul>
           ) : null}
-          <p className="muted text-xs">Sicher heisst: Du weisst es voraussichtlich auch in drei Wochen noch. Hell = schon gesehen, aber noch nicht gefestigt.</p>
+          <p className="muted text-xs">
+            Hell = schon gesehen, dunkel = sicher. Sicher wird eine Aussage erst, wenn du sie an mehreren Tagen richtig beantwortet hast und sie erst in über drei
+            Wochen wiederkommt. Am ersten Tag steht darum überall 0% sicher, die Trefferquote rechts zeigt, wie gut es schon klappt.
+          </p>
         </div>
       </section>
     </div>

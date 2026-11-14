@@ -286,6 +286,8 @@ export async function subjectOverview(db: Db, subjectId: number, now = new Date(
       due: due.length,
       new: active.length - seen.length,
       safePct: active.length ? Math.round((safe.length / active.length) * 100) : 0,
+      answers,
+      correct: answers - wrong,
       accuracy: answers ? Math.round(((answers - wrong) / answers) * 100) : null,
       coverage: [...coverage.entries()].sort((a, b) => a[0].localeCompare(b[0], 'de', { numeric: true })),
       chunks: unitChunks.length,

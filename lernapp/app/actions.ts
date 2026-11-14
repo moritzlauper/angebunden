@@ -135,6 +135,26 @@ export async function saveUnit(fd: FormData) {
   redirect(`${base}/stand?gespeichert=1#einstellungen`)
 }
 
+/** Neue Aussagen mit Claude erzeugen, für eine UE oder alle bis zur Grenze. Nur der Besitzer. */
+export async function generateQuestions(fd: FormData) {
+  await guard()
+  ownerOnly(fd)
+  const db = await getDb()
+  const subjectId = num(fd, 'subjectId')
+  const count = Math.min(20, Math.max(3, num(fd, 'count') || 10))
+  const which = str(fd, 'unit')
+  const ov = await svc.subjectOverview(db, subjectId)
+  const units = which === 'alle' ? ov.units.filter((u) => u.chunks > 0).map((u) => u.number) : [Number(which)].filter((n) => ov.units.some((u) => u.number === n))
+  const { generateForUnits } = await import('@/lib/generate.ts')
+  const results = await generateForUnits(db, subjectId, units, count)
+  const summary = results
+    .map((r) => (r.error ? `UE ${r.unit}: ${r.error}` : `UE ${r.unit}: ${r.approved} freigegeben${r.inbox ? `, ${r.inbox} in der Inbox` : ''}`))
+    .join(' · ')
+  const base = await basePath(subjectId, svc.OWNER)
+  revalidatePath(base, 'layout')
+  redirect(`${base}/stand?generiert=${encodeURIComponent(summary || 'keine UE mit Notes')}#generieren`)
+}
+
 export async function review(fd: FormData) {
   await guard()
   const action = str(fd, 'action') as svc.ReviewAction
