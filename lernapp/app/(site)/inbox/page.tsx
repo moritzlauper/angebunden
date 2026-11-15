@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { getDb } from '@/lib/db/index.ts'
 import { listInbox } from '@/lib/service.ts'
 import { review } from '../../actions.ts'
@@ -109,6 +110,9 @@ export default async function Inbox() {
           </li>
         ))}
       </ul>
+      <p className="muted text-sm">
+        Fach anlegen, Aussagen importieren oder Claude verbinden: <Link className="link" href="/verbinden">Erstellung &amp; Import</Link>
+      </p>
     </div>
   )
 }
