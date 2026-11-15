@@ -36,6 +36,8 @@ export const subject = pgTable('subject', {
   slidesPattern: text('slides_pattern').default('Slides/VL{n}.pdf'),
   /** Zusammenfassung (ZM) als PDF im Vault */
   zmPath: text('zm_path'),
+  /** Regler «von UE m» */
+  ueFrom: integer('ue_from').notNull().default(1),
   /** Regler «bis UE n» */
   ueLimit: integer('ue_limit').notNull().default(1),
   examDate: date('exam_date'),
@@ -157,6 +159,7 @@ export const practiceSession = pgTable('practice_session', {
   userId: text('user_id').notNull().default('moritz'),
   /** web | mcp */
   channel: text('channel').notNull().default('web'),
+  ueFrom: integer('ue_from').notNull().default(1),
   ueLimit: integer('ue_limit').notNull(),
   examMode: boolean('exam_mode').notNull().default(false),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
@@ -235,6 +238,7 @@ export const learnerSetting = pgTable(
     subjectId: integer('subject_id')
       .notNull()
       .references(() => subject.id, { onDelete: 'cascade' }),
+    ueFrom: integer('ue_from').notNull().default(1),
     ueLimit: integer('ue_limit').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

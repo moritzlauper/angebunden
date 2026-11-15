@@ -1,5 +1,5 @@
 import { learnerContext } from '@/lib/learner.ts'
-import { listSubjects, subjectOverview } from '@/lib/service.ts'
+import { listSubjects, subjectOverview, ueRangeLabel } from '@/lib/service.ts'
 import { startSession } from '../../actions.ts'
 import { Progress, UeOptions } from '../../ui.tsx'
 
@@ -44,16 +44,25 @@ export default async function Lernen({ params, searchParams }: PageProps<'/[subj
           ))}
         </dl>
 
-        <form action={startSession} className="flex items-center gap-2 text-sm">
+        <form action={startSession} className="flex flex-wrap items-center gap-2 text-sm">
           <input type="hidden" name="subjectId" value={s.id} />
           <input type="hidden" name="user" value={user} />
           <button className="btn shrink-0">{s.questionsPerSession} Fragen</button>
-          <label htmlFor="ue-limit" className="shrink-0">
-            bis
-          </label>
-          <select id="ue-limit" name="ueLimit" defaultValue={s.ueLimit} className="min-w-0 flex-1 sm:max-w-xs">
-            <UeOptions units={us} ueLimit={s.ueLimit} />
-          </select>
+          {/* Handy: «von … bis …» rutscht unter den Knopf, ab sm in derselben Zeile. */}
+          <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-0 sm:flex-1">
+            <label htmlFor="ue-from" className="shrink-0">
+              von
+            </label>
+            <select id="ue-from" name="ueFrom" defaultValue={s.ueFrom} className="min-w-0 flex-1 sm:max-w-xs">
+              <UeOptions units={us} ueLimit={s.ueLimit} />
+            </select>
+            <label htmlFor="ue-limit" className="shrink-0">
+              bis
+            </label>
+            <select id="ue-limit" name="ueLimit" defaultValue={s.ueLimit} className="min-w-0 flex-1 sm:max-w-xs">
+              <UeOptions units={us} ueLimit={s.ueLimit} />
+            </select>
+          </div>
         </form>
 
         <div className="space-y-3">
@@ -61,7 +70,7 @@ export default async function Lernen({ params, searchParams }: PageProps<'/[subj
             safe={s.counts.safe}
             seen={s.counts.seen}
             total={s.counts.inLimit}
-            label={`Stand bis UE ${s.ueLimit}${accuracy != null ? ` · ${accuracy}% richtig beantwortet` : ''}`}
+            label={`Stand ${ueRangeLabel(s.ueFrom, s.ueLimit)}${accuracy != null ? ` · ${accuracy}% richtig beantwortet` : ''}`}
           />
           {inLimit.length > 1 ? (
             <ul className="space-y-2 text-sm sm:space-y-1">

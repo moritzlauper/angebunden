@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, lte, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, lte, or, sql } from 'drizzle-orm'
 import type { Db } from './db/index.ts'
 import * as s from './db/schema.ts'
 import { composeSession, type Candidate } from './core/compose.ts'
@@ -27,25 +27,42 @@ export function learnerSlug(name: string): string | null {
   return slug
 }
 
-/** Persönliche UE-Grenze. Der Besitzer nutzt die Grenze des Fachs, alle anderen ihre eigene (Start: die des Fachs). */
-export async function learnerUeLimit(db: Db, user: string, subj: s.Subject): Promise<number> {
-  if (user === OWNER) return subj.ueLimit
-  const [row] = await db
-    .select({ ueLimit: s.learnerSetting.ueLimit })
-    .from(s.learnerSetting)
-    .where(and(eq(s.learnerSetting.userId, user), eq(s.learnerSetting.subjectId, subj.id)))
-  return row?.ueLimit ?? subj.ueLimit
+/** Persönlicher UE-Bereich «von m bis n». Der Besitzer nutzt den des Fachs, alle anderen ihren eigenen (Start: der des Fachs). */
+export async function learnerUeRange(db: Db, user: string, subj: s.Subject): Promise<{ ueFrom: number; ueLimit: number }> {
+  if (user !== OWNER) {
+    const [row] = await db
+      .select({ ueFrom: s.learnerSetting.ueFrom, ueLimit: s.learnerSetting.ueLimit })
+      .from(s.learnerSetting)
+      .where(and(eq(s.learnerSetting.userId, user), eq(s.learnerSetting.subjectId, subj.id)))
+    if (row) return normalizeRange(row.ueFrom, row.ueLimit)
+  }
+  return normalizeRange(subj.ueFrom, subj.ueLimit)
 }
 
-export async function setLearnerUeLimit(db: Db, user: string, subjectId: number, ueLimit: number) {
+/** Vertauscht «von» und «bis», wenn sie verkehrt herum gewählt sind. */
+export function normalizeRange(ueFrom: number, ueLimit: number) {
+  const from = Math.max(1, ueFrom || 1)
+  if (ueLimit < 1 || from <= ueLimit) return { ueFrom: Math.min(from, Math.max(1, ueLimit)), ueLimit }
+  return { ueFrom: ueLimit, ueLimit: from }
+}
+
+export async function setLearnerUeRange(db: Db, user: string, subjectId: number, ueFrom: number, ueLimit: number) {
+  const r = normalizeRange(ueFrom, ueLimit)
   if (user === OWNER) {
-    await updateSubject(db, subjectId, { ueLimit })
+    await updateSubject(db, subjectId, r)
     return
   }
   await db
     .insert(s.learnerSetting)
-    .values({ userId: user, subjectId, ueLimit })
-    .onConflictDoUpdate({ target: [s.learnerSetting.userId, s.learnerSetting.subjectId], set: { ueLimit } })
+    .values({ userId: user, subjectId, ...r })
+    .onConflictDoUpdate({ target: [s.learnerSetting.userId, s.learnerSetting.subjectId], set: r })
+}
+
+/** «bis UE 4», «UE 2–4» oder «UE 3» */
+export function ueRangeLabel(ueFrom: number, ueLimit: number) {
+  if (ueFrom <= 1) return `bis UE ${ueLimit}`
+  if (ueFrom === ueLimit) return `UE ${ueLimit}`
+  return `UE ${ueFrom}–${ueLimit}`
 }
 
 export class AppError extends Error {}
@@ -74,6 +91,7 @@ export type SubjectInput = {
   vaultName?: string | null
   slidesPattern?: string | null
   zmPath?: string | null
+  ueFrom?: number
   ueLimit?: number
   examDate?: string | null
   questionsPerSession?: number
@@ -174,13 +192,13 @@ export async function listSubjects(db: Db, now = new Date(), user = OWNER) {
   const subjects = await db.select().from(s.subject).orderBy(asc(s.subject.id))
   const out = []
   for (const subjRow of subjects) {
-    const subj = { ...subjRow, ueLimit: await learnerUeLimit(db, user, subjRow) }
+    const subj = { ...subjRow, ...(await learnerUeRange(db, user, subjRow)) }
     const rows = await db
       .select({ id: s.statement.id, status: s.statement.status, unitNumber: s.unit.number })
       .from(s.statement)
       .innerJoin(s.unit, eq(s.statement.unitId, s.unit.id))
       .where(eq(s.unit.subjectId, subj.id))
-    const activeInLimit = rows.filter((r) => r.status === 'active' && r.unitNumber <= subj.ueLimit).map((r) => r.id)
+    const activeInLimit = rows.filter((r) => r.status === 'active' && r.unitNumber >= subj.ueFrom && r.unitNumber <= subj.ueLimit).map((r) => r.id)
     const states = await cardStates(db, activeInLimit, user)
     let due = 0
     let fresh = 0
@@ -237,7 +255,7 @@ async function streakDays(db: Db, subjectId: number, now: Date, user = OWNER): P
 export async function subjectOverview(db: Db, subjectId: number, now = new Date(), user = OWNER) {
   const [subjRow] = await db.select().from(s.subject).where(eq(s.subject.id, subjectId))
   if (!subjRow) throw new AppError('Fach nicht gefunden')
-  const subj = { ...subjRow, ueLimit: await learnerUeLimit(db, user, subjRow) }
+  const subj = { ...subjRow, ...(await learnerUeRange(db, user, subjRow)) }
   const units = await db.select().from(s.unit).where(eq(s.unit.subjectId, subjectId)).orderBy(asc(s.unit.number))
   const stmts = await db
     .select()
@@ -278,7 +296,7 @@ export async function subjectOverview(db: Db, subjectId: number, now = new Date(
     const usedChunks = new Set(mine.map((m) => m.chunkId).filter(Boolean))
     return {
       ...u,
-      inLimit: u.number <= subj.ueLimit,
+      inLimit: u.number >= subj.ueFrom && u.number <= subj.ueLimit,
       total: active.length,
       inbox: mine.filter((x) => x.status === 'inbox' || x.status === 'flagged').length,
       seen: seen.length,
@@ -702,19 +720,20 @@ export async function importBank(db: Db, subjectId: number, markdown: string, st
 export async function startSession(
   db: Db,
   subjectId: number,
-  opts: { channel?: 'web' | 'mcp'; nQuestions?: number; ueLimit?: number; examMode?: boolean; now?: Date; rng?: () => number; user?: string } = {},
+  opts: { channel?: 'web' | 'mcp'; nQuestions?: number; ueFrom?: number; ueLimit?: number; examMode?: boolean; now?: Date; rng?: () => number; user?: string } = {},
 ) {
   const now = opts.now ?? new Date()
   const user = opts.user ?? OWNER
   const [subj] = await db.select().from(s.subject).where(eq(s.subject.id, subjectId))
   if (!subj) throw new AppError('Fach nicht gefunden')
-  const ueLimit = opts.ueLimit ?? (await learnerUeLimit(db, user, subj))
+  const saved = await learnerUeRange(db, user, subj)
+  const { ueFrom, ueLimit } = normalizeRange(opts.ueFrom ?? (opts.ueLimit != null ? 1 : saved.ueFrom), opts.ueLimit ?? saved.ueLimit)
   const examMode = opts.examMode ?? subj.examMode
   const rows = await db
     .select({ st: s.statement, unitNumber: s.unit.number, unitTitle: s.unit.title })
     .from(s.statement)
     .innerJoin(s.unit, eq(s.statement.unitId, s.unit.id))
-    .where(and(eq(s.unit.subjectId, subjectId), eq(s.statement.status, 'active'), lte(s.unit.number, ueLimit)))
+    .where(and(eq(s.unit.subjectId, subjectId), eq(s.statement.status, 'active'), gte(s.unit.number, ueFrom), lte(s.unit.number, ueLimit)))
   const ids = rows.map((r) => r.st.id)
   const [states, stats] = await Promise.all([cardStates(db, ids, user), answerStats(db, ids, user)])
   const candidates: Candidate[] = rows.map((r) => {
@@ -735,6 +754,7 @@ export async function startSession(
     }
   })
   const composed = composeSession(candidates, {
+    ueFrom,
     ueLimit,
     nQuestions: opts.nQuestions ?? subj.questionsPerSession,
     now,
@@ -743,12 +763,12 @@ export async function startSession(
   })
   if (composed.length === 0) {
     throw new AppError(
-      `Zu wenig aktive Aussagen bis UE ${ueLimit} (${candidates.length}). Für eine Frage braucht es mindestens 5. Neue Aussagen in der Inbox freigeben oder die UE-Grenze erhöhen.`,
+      `Zu wenig aktive Aussagen ${ueFrom > 1 ? 'in ' : ''}${ueRangeLabel(ueFrom, ueLimit)} (${candidates.length}). Für eine Frage braucht es mindestens 5. Neue Aussagen in der Inbox freigeben oder den UE-Bereich vergrössern.`,
     )
   }
   const [sess] = await db
     .insert(s.practiceSession)
-    .values({ subjectId, userId: user, channel: opts.channel ?? 'web', ueLimit, examMode, startedAt: now })
+    .values({ subjectId, userId: user, channel: opts.channel ?? 'web', ueFrom, ueLimit, examMode, startedAt: now })
     .returning()
   await db.insert(s.question).values(
     composed.map((q, i) => ({ sessionId: sess.id, position: i + 1, stem: q.stem, unitNumber: q.unitNumber, statementIds: q.statementIds })),

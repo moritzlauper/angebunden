@@ -68,9 +68,10 @@ export async function startSession(fd: FormData) {
   const subjectId = num(fd, 'subjectId')
   const user = userOf(fd)
   const base = await basePath(subjectId, user)
-  // Die Auswahl «bis UE n» neben dem Start-Knopf gilt ab jetzt als persönliche Grenze.
+  // Die Auswahl «von UE m bis UE n» neben dem Start-Knopf gilt ab jetzt als persönlicher Bereich.
   const ueLimit = num(fd, 'ueLimit')
-  if (Number.isInteger(ueLimit) && ueLimit > 0) await svc.setLearnerUeLimit(db, user, subjectId, ueLimit)
+  const ueFrom = num(fd, 'ueFrom') || 1
+  if (Number.isInteger(ueLimit) && ueLimit > 0) await svc.setLearnerUeRange(db, user, subjectId, ueFrom, ueLimit)
   let id: number
   try {
     const view = await svc.startSession(db, subjectId, {
@@ -107,7 +108,7 @@ export async function updateSubject(fd: FormData) {
   ownerOnly(fd)
   const id = num(fd, 'subjectId')
   await svc.updateSubject(await getDb(), id, {
-    ueLimit: num(fd, 'ueLimit'),
+    ...svc.normalizeRange(num(fd, 'ueFrom') || 1, num(fd, 'ueLimit')),
     examDate: str(fd, 'examDate') || null,
     examMode: str(fd, 'examMode') === '1',
     questionsPerSession: num(fd, 'questionsPerSession') || 5,
