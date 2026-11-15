@@ -12,7 +12,7 @@ export default async function LernerLayout({ children, params }: LayoutProps<'/[
         {isOwner ? (
           <>
             <Link href="/inbox">Inbox</Link>
-            <Link href="/verbinden">Claude &amp; Import</Link>
+            <Link href="/verbinden">Erstellung &amp; Import</Link>
           </>
         ) : null}
         <Link href={`/${subj.slug}`} className="muted ml-auto">

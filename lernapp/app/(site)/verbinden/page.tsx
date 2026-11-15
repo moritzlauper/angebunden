@@ -16,7 +16,7 @@ export default async function Verbinden({ searchParams }: PageProps<'/verbinden'
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold">Claude &amp; Import</h1>
+      <h1 className="text-2xl font-bold">Erstellung &amp; Import</h1>
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">Claude verbinden</h2>
