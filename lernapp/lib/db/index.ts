@@ -49,8 +49,9 @@ export async function getDb(): Promise<Db> {
   const db = await holder.db
   holder.ready ??= (async () => {
     if (process.env.SEED_ON_EMPTY !== '0') {
-      const { seedIfEmpty } = await import('../seed.ts')
+      const { applyPacks, seedIfEmpty } = await import('../seed.ts')
       await seedIfEmpty(db)
+      await applyPacks(db)
     }
   })().catch((e) => {
     holder.ready = undefined

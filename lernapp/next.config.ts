@@ -2,6 +2,8 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Notes.md kommt als Datei über eine Server Action (rund 200 KB).
+  experimental: { serverActions: { bodySizeLimit: '5mb' } },
   // PGlite bringt WebAssembly mit, pg native Optionen: beide nicht bündeln.
   serverExternalPackages: ['@electric-sql/pglite', 'pg'],
   // Die Migrationen liest drizzle zur Laufzeit von der Platte.

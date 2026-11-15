@@ -156,3 +156,19 @@ test('Parallelformen: deutlich abweichende Variante', async () => {
   assert.equal(variantDiverges({ answers: 5, correct: 4 }, { answers: 5, correct: 3 }), false)
   assert.equal(variantDiverges({ answers: 2, correct: 2 }, { answers: 2, correct: 0 }), false)
 })
+
+test('Generator: Verteilung auf UEs nach Material und Bestand', async () => {
+  const { allocate } = await import('../lib/generate.ts')
+  const m = allocate(10, [{ number: 1, chunks: 10, statements: 0 }, { number: 2, chunks: 10, statements: 9 }, { number: 3, chunks: 0, statements: 0 }])
+  assert.equal([...m.values()].reduce((a, b) => a + b, 0), 10)
+  assert.ok((m.get(1) ?? 0) > (m.get(2) ?? 0))
+  assert.equal(m.has(3), false)
+})
+
+test('Folien-Zuordnung aus den Notes und Links darauf', async () => {
+  const { extractSlideFiles } = await import('../lib/core/parse.ts')
+  const files = extractSlideFiles('[[K/Slides/Vorlesung KliBio 2026-05 Sexualitat-Tln.pdf#page=7|KliBio VL5, p.7]] und **[[K/Zusammenfassungen/ZM.pdf#page=55|ZM KliBio, p.55]]**')
+  assert.deepEqual(files, { '5': 'K/Slides/Vorlesung KliBio 2026-05 Sexualitat-Tln.pdf' })
+  const url = sourceLinks('VL5 p.7', { vaultName: 'obsidian', slideFiles: files })[0].url!
+  assert.equal(decodeURIComponent(url.split('file=')[1]), 'K/Slides/Vorlesung KliBio 2026-05 Sexualitat-Tln.pdf#page=7')
+})

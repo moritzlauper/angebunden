@@ -244,6 +244,14 @@ export const TOOLS = [
       svc.reviewStatement(await getDb(), a.id, a.action, { text: a.text, truth: a.truth, reason: a.reason, sourceRef: a.source_ref, topic: a.topic }),
   }),
   tool({
+    name: 'approve_many',
+    title: 'Mehrere freigeben',
+    description:
+      'Gibt mehrere Inbox-Aussagen auf einmal frei. mode=ready: nur von der blinden Gegenprüfung bestätigte ohne Hinweise; mode=unflagged: alle ohne Hinweise, auch ungeprüfte. Nur auf ausdrücklichen Wunsch.',
+    input: z.object({ subject: subjectRef.optional(), mode: z.enum(['ready', 'unflagged']) }),
+    run: async (a) => svc.approveMany(await getDb(), a.subject ? await subjectId(a.subject) : null, a.mode),
+  }),
+  tool({
     name: 'list_statements',
     title: 'Aussagen suchen',
     description: 'Aussagen eines Fachs, filterbar nach UE, Status (inbox, active, flagged, retired) und Suchtext.',

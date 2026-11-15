@@ -33,6 +33,21 @@ test('Startfach Klinische Biopsychologie ist angelegt', async () => {
   assert.equal(kb.counts.new, 25)
 })
 
+test('Paket 1: 60 Aussagen mit Zitat in der Inbox, Folien-Links gesetzt', async () => {
+  const db = await getDb()
+  const inbox = await svc.listInbox(db, subjectId)
+  const pack = inbox.filter((x) => x.origin === 'claude')
+  assert.equal(pack.length, 60)
+  assert.ok(pack.every((x) => x.quote && x.sourceRef))
+  for (const u of [1, 2, 3, 4]) assert.equal(pack.filter((x) => x.unitNumber === u).length, 15)
+  const subj = await svc.resolveSubject(db, 'KliBio')
+  assert.match(subj.slideFiles['3'], /2026-03 Stress\.pdf$/)
+  // zweiter Start spielt nichts doppelt ein
+  const { applyPacks } = await import('../lib/seed.ts')
+  await applyPacks(db)
+  assert.equal((await svc.listInbox(db, subjectId)).filter((x) => x.origin === 'claude').length, 60)
+})
+
 test('MCP: initialize, tools/list, Benachrichtigung', async () => {
   const init = (await handleJsonRpc({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-06-18' } })) as any
   assert.equal(init.result.protocolVersion, '2025-06-18')
@@ -90,7 +105,8 @@ test('MCP: Notes einspielen, Aussage mit Beleg, blinde Prüfung, Freigabe', asyn
   assert.equal(added.rejected.length, 1)
   assert.ok(added.saved[1].flags.includes('absolutwort:immer'))
 
-  const queue = await call('get_check_queue', { subject: 'KliBio' })
+  const ids = added.saved.map((x: any) => x.id)
+  const queue = (await call('get_check_queue', { subject: 'KliBio', limit: 100 })).filter((q: any) => ids.includes(q.id))
   assert.equal(queue.length, 2)
   assert.equal(queue[0].truth, undefined, 'kein Label in der Prüfwarteschlange')
   await call('submit_checks', { checks: [{ statement_id: queue[0].id, truth: 'R' }, { statement_id: queue[1].id, truth: 'R' }] })
@@ -106,6 +122,16 @@ test('MCP: Notes einspielen, Aussage mit Beleg, blinde Prüfung, Freigabe', asyn
   const changed = notes.replace('exzessive Gedanken', 'übermässige Gedanken')
   const res = await call('sync_source', { subject: 'KliBio', kind: 'notes', path: 'Klinische Biopsychologie/Notes.md', content: changed })
   assert.equal(res.units[0].flagged, 1)
+})
+
+test('Notes mit Folienlinks: Fundstelle pro Textstück, Folien-Zuordnung', async () => {
+  const notes = `# UE 6\n[[Klinische Biopsychologie/Slides/Vorlesung KliBio 2026-06 Fertilitat.pdf#page=4|KliBio VL6, p.4]]\n\nDie Fertilität sinkt mit dem Alter.\n\n[[Klinische Biopsychologie/Slides/Vorlesung KliBio 2026-06 Fertilitat.pdf#page=5|KliBio VL6, p.5]]\n\nStress kann den Zyklus stören.\n`
+  await call('sync_source', { subject: 'KliBio', kind: 'notes', path: 'Klinische Biopsychologie/Notes6.md', content: notes })
+  const mat = await call('get_unit_material', { subject: 'KliBio', unit: 6 })
+  assert.deepEqual(mat.chunks.map((c: any) => [c.heading, c.page]), [['VL6 p.4', 4], ['VL6 p.5', 5]])
+  assert.equal(mat.unit.title, 'UE 6')
+  const r = await svc.approveMany(await getDb(), subjectId, 'ready')
+  assert.ok(r.approved >= 0)
 })
 
 test('UE-Grenze, Fehler melden, Fehlermeldungen', async () => {

@@ -225,7 +225,7 @@ export function splitNotesByUnit(markdown: string): NotesSection[] {
     const m = line.match(/^#\s+UE\s*(\d+)\s*[:–—-]?\s*(.*)$/i)
     if (m) {
       if (cur) out.push(cur)
-      cur = { unitNumber: Number(m[1]), title: m[2].trim() || `UE ${m[1]}`, markdown: '' }
+      cur = { unitNumber: Number(m[1]), title: m[2].trim(), markdown: '' }
       continue
     }
     if (cur) cur.markdown += `${line}\n`
@@ -236,6 +236,24 @@ export function splitNotesByUnit(markdown: string): NotesSection[] {
 
 export type TextChunk = { heading: string | null; text: string; page: number | null }
 
+/** [[Ordner/Slides/Vorlesung … .pdf#page=7|KliBio VL5, p.7]] */
+const SLIDE_LINK_RE = /\[\[([^\]|]+?\.pdf)#page=(\d+)\|[^\]]*?VL\s*(\d+)[^\]]*\]\]/g
+
+/** Liest aus den Notes, welche PDF-Datei zu welcher Vorlesung gehört. */
+export function extractSlideFiles(markdown: string): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const m of unescapeMarkdown(markdown).matchAll(SLIDE_LINK_RE)) {
+    if (/\/Slides\/|^Slides\//i.test(m[1])) out[m[3]] ??= m[1]
+  }
+  return out
+}
+
+/** Eine Zeile, die nur aus einem Folienlink besteht, beginnt ein neues Stück mit Fundstelle. */
+function slideHeader(line: string): { label: string; page: number } | null {
+  const m = line.trim().match(/^\*{0,2}\[\[([^\]|]+?\.pdf)#page=(\d+)\|[^\]]*?VL\s*(\d+)[^\]]*\]\]\*{0,2}$/)
+  return m ? { label: `VL${m[3]} p.${m[2]}`, page: Number(m[2]) } : null
+}
+
 /**
  * Zerlegt einen UE-Abschnitt in Stücke von höchstens ~1200 Zeichen entlang von
  * Überschriften und Absätzen. Die Überschrift wandert als Kontext mit.
@@ -243,13 +261,26 @@ export type TextChunk = { heading: string | null; text: string; page: number | n
 export function chunkMarkdown(markdown: string, maxChars = 1200): TextChunk[] {
   const out: TextChunk[] = []
   let heading: string | null = null
+  let page: number | null = null
   let buf: string[] = []
   const flush = () => {
     const text = buf.join('\n').trim()
-    if (text) out.push({ heading, text, page: null })
+    if (text) out.push({ heading, text, page })
     buf = []
   }
-  for (const block of markdown.split(/\n{2,}/)) {
+  // Folienlinks auf eigener Zeile als eigene Blöcke behandeln
+  const normalized = unescapeMarkdown(markdown)
+    .split('\n')
+    .map((l) => (slideHeader(l) ? `\n${l.trim()}\n` : l))
+    .join('\n')
+  for (const block of normalized.split(/\n{2,}/)) {
+    const sh = slideHeader(block)
+    if (sh) {
+      flush()
+      heading = sh.label
+      page = sh.page
+      continue
+    }
     const h = block.match(/^#{2,6}\s+(.+)$/m)
     if (h && block.trim().startsWith('#')) {
       flush()

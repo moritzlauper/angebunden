@@ -9,6 +9,19 @@
  * Stilvorlage für Länge, Fallen und Schwierigkeit, nicht als Aussagen.
  */
 
+/** Folien pro Vorlesung, wie sie in Notes.md verlinkt sind (Pfad ab Vault-Wurzel). */
+export const SLIDE_FILES: Record<string, string> = {
+  '1': 'Klinische Biopsychologie/Slides/Vorlesung KliBio 2026-01 Einfuhrung Teil 1.pdf',
+  '2': 'Klinische Biopsychologie/Slides/Vorlesung KliBio 2026-02 Schlaf.pdf',
+  '3': 'Klinische Biopsychologie/Slides/Vorlesung KliBio 2026-03 Stress.pdf',
+  '4': 'Klinische Biopsychologie/Slides/Vorlesung KliBio 2026-04 Konsum.pdf',
+  '5': 'Klinische Biopsychologie/Slides/Vorlesung KliBio 2026-05 Sexualitat-Tln.pdf',
+  '6': 'Klinische Biopsychologie/Slides/Vorlesung KliBio 2026-06 Fertilitat.pdf',
+  '7': 'Klinische Biopsychologie/Slides/Vorlesung KliBio 2026-07 SS_Metabolismus Tln.pdf',
+  '8': 'Klinische Biopsychologie/Slides/Vorlesung KliBio 2026-08 Schmerz.pdf',
+  '9': 'Klinische Biopsychologie/Slides/Vorlesung KliBio 2026-09 Herz-Kreislauf-Tln.pdf',
+}
+
 export const SUBJECT = {
   name: 'Klinische Biopsychologie',
   shortName: 'KliBio',
@@ -17,6 +30,7 @@ export const SUBJECT = {
   slidesPattern: 'Slides/VL{n}.pdf',
   zmPath: 'Zusammenfassungen/ZM_Klinische Biopsychologie.pdf',
   ueLimit: 4,
+  slideFiles: SLIDE_FILES,
 }
 
 export const UNITS = [

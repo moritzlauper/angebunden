@@ -1,0 +1,1 @@
+ALTER TABLE "subject" ADD COLUMN "slide_files" jsonb DEFAULT '{}'::jsonb NOT NULL;

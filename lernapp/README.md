@@ -4,7 +4,9 @@ Eine Next.js-App, die Klickerfragen im OLAT-Format abfragt (je fünf Aussagen A�
 
 **Claude steuert die App.** Sie ist ein MCP-Server: Claude kann Fragen stellen und auswerten, Notes und Folien einspielen, neue Aussagen vorschlagen und blind gegenprüfen, die UE-Grenze setzen und exportieren. Gebraucht wird dafür kein API-Key, nur der eigene Claude-Zugang (claude.ai, Claude Code oder Cowork). Im Browser übt man dieselben Fragen mit demselben Lernstand.
 
-Das erste Fach ist **Klinische Biopsychologie** (26HS 200-401a). Beim ersten Start legt die App es mit UE 1–4 an, übernimmt die 25 Aussagen aus `Klickerfragen_KliBio.md` und speichert die drei OLAT-Klickerfragen zu VL4 als Stilvorlagen (`data/seed/klinische-biopsychologie.ts`).
+Wer lieber direkt in der App arbeitet: Unter «Claude & Import» lädt man Notes.md hoch und lässt mit **«Neue Aussagen erzeugen»** (Anzahl, von UE, bis UE, optional ein Hinweis) Aussagen schreiben und blind gegenprüfen. Das braucht einen Anthropic-API-Key (`ANTHROPIC_API_KEY`), siehe `lib/generate.ts`.
+
+Das erste Fach ist **Klinische Biopsychologie** (26HS 200-401a). Beim ersten Start legt die App es mit UE 1–4 an, übernimmt die 25 Aussagen aus `Klickerfragen_KliBio.md` und speichert die drei OLAT-Klickerfragen zu VL4 als Stilvorlagen (`data/seed/klinische-biopsychologie.ts`). Dazu kommt **Paket 1** mit je 15 neuen Aussagen zu UE 1–4 aus Notes.md, jede mit wörtlichem Zitat (`data/seed/klibio-paket-1.ts`). Es landet beim nächsten Start einmal in der Inbox, auch in einer schon laufenden Installation.
 
 > Die App liegt vorerst im Repository `angebunden` und soll in ein eigenes Repository umziehen. Sie ist eigenständig, mit eigener `package.json`, eigenem Lockfile und eigener `pnpm-workspace.yaml`. Ausserhalb des Ordners liegt nur `.github/workflows/lernapp-pruefen.yml`: Beim Umzug mitnehmen und die `working-directory`-Zeilen streichen.
 >
@@ -40,7 +42,8 @@ pnpm build
 | `APP_PASSWORD` | Passwort für die Weboberfläche |
 | `SESSION_SECRET` | signiert das Login-Cookie, beliebige lange Zeichenkette |
 | `MCP_TOKEN` | Geheimnis für Claude, lange zufällige Zeichenkette |
-| `SEED_ON_EMPTY` | `1` (Standard): bei leerer DB Klinische Biopsychologie anlegen |
+| `SEED_ON_EMPTY` | `1` (Standard): bei leerer DB Klinische Biopsychologie anlegen, neue Pakete einspielen |
+| `ANTHROPIC_API_KEY` | optional: «Neue Aussagen erzeugen» und «Blinde Gegenprüfung» in der App |
 
 Danach liegt die App z. B. unter `https://klicker.vercel.app`.
 
@@ -108,7 +111,9 @@ Der Server ist zustandslos (Streamable HTTP, Antworten als JSON) und braucht kei
 - Parallelformen: Wird eine Variante deutlich anders beantwortet als ihre Ur-Aussage, kommt sie zurück in die Inbox.
 - Quellenänderung: Ändert sich eine `# UE`-Notiz, sucht die App das Zitat jeder betroffenen Aussage im neuen Text. Gefunden heisst neu verknüpfen, sonst «neu prüfen».
 
-**Fundstellen:** «VL3 p.15» und «ZM S.69» werden zu `obsidian://`-Links, die mit PDF++ auf der Seite öffnen. Dafür in den Fach-Einstellungen den Vault-Namen, den Ordner, das Folienmuster (`Slides/VL{n}.pdf`) und den Pfad der Zusammenfassung eintragen.
+**Fundstellen:** «VL3 p.15» und «ZM S.69» werden zu `obsidian://`-Links, die mit PDF++ auf der Seite öffnen. Welche PDF-Datei zu welcher Vorlesung gehört, liest die App aus den Folienlinks in Notes.md (`[[…/Slides/Vorlesung KliBio 2026-03 Stress.pdf#page=5|KliBio VL3, p.5]]`); für KliBio ist die Zuordnung schon hinterlegt. Ohne Zuordnung gilt das Folienmuster (`Slides/VL{n}.pdf`). Dazu in den Fach-Einstellungen den Namen des Vaults eintragen.
+
+**Generator in der App** (`lib/generate.ts`): verteilt die gewünschte Anzahl auf die UEs (oder genau n pro UE), schickt Claude pro UE nur deren Textstücke, die vorhandenen Aussagen und die Stilvorlagen und verlangt strukturierte Ausgabe. Danach laufen dieselben Prüfungen wie bei MCP und ein zweiter, blinder Aufruf. Modell Claude Opus 5.5 mit Effort «medium»; lehnt das Modell ab, springt serverseitig ein Ersatzmodell ein (`fallbacks: "default"`). In der Inbox gibt es «Blinde Gegenprüfung», «Alle bereiten freigeben» und «Alle ohne Hinweise freigeben».
 
 ## Datenmodell
 
@@ -119,8 +124,8 @@ Fach → UE → Quelle/Chunk → Aussage → Antwort; Fragen sind gespeicherte Z
 | Schritt | Stand |
 | --- | --- |
 | 1. MVP: ein Fach, Import, 5 Fragen, FSRS, UE-Grenze, Login | fertig |
-| 2. Vault-Anbindung | über Claude: Claude liest den Vault (z. B. Google Drive) und spielt ihn mit `sync_source` ein, Änderungen werden pro UE erkannt. Fundstellen sind klickbar. Noch offen: Sync ohne Claude (Git-Webhook oder Drive-API) und PDF-Zerlegung mit pdfjs-dist in der App |
-| 3. Generierung mit Qualitätssicherung | fertig, Generator und Prüfer ist Claude über MCP; Inbox, Abdeckungskarte |
+| 2. Vault-Anbindung | Notes.md hochladen in der App oder über Claude (`sync_source`), Änderungen werden pro UE erkannt, Folien-PDFs pro Vorlesung zugeordnet, Fundstellen klickbar. Noch offen: automatischer Sync (Git-Webhook oder Drive-API) und PDF-Zerlegung mit pdfjs-dist |
+| 3. Generierung mit Qualitätssicherung | fertig, Generator und Prüfer entweder Claude über MCP oder direkt in der App (API-Key); Inbox, Abdeckungskarte |
 | 4. Uploads und Kalibrierung | Stilvorlagen und Prüfungsmodus fertig; Datei-Upload in der Oberfläche fehlt noch |
 | 5. MCP-Server | fertig |
 | 6. Mehrere Nutzende, Trennschärfe | offen (`user_id` ist im Schema schon vorgesehen) |

@@ -126,3 +126,74 @@ export async function createSubject(fd: FormData) {
   })
   redirect(`/fach/${subj.id}`)
 }
+
+export async function uploadNotes(fd: FormData) {
+  await guard()
+  const file = fd.get('file')
+  const pasted = str(fd, 'content')
+  const content = file instanceof File && file.size > 0 ? await file.text() : pasted
+  const subjectId = num(fd, 'subjectId')
+  if (!content) redirect(`/verbinden?fehler=${encodeURIComponent('Keine Datei und kein Text.')}#notes`)
+  let msg: string
+  try {
+    const path = file instanceof File && file.name ? file.name : 'Notes.md'
+    const r = await svc.syncSource(await getDb(), subjectId, { kind: 'notes', path, content })
+    const changed = r.units.filter((u) => u.changed)
+    msg = changed.length
+      ? `Eingespielt: ${changed.map((u) => `UE ${u.unit} (${u.chunks} Textstücke)`).join(', ')}.`
+      : 'Keine Änderungen seit dem letzten Hochladen.'
+    const flagged = changed.reduce((a, u) => a + (u.flagged ?? 0), 0)
+    if (flagged) msg += ` ${flagged} Aussagen auf «neu prüfen» gesetzt.`
+  } catch (e) {
+    if (e instanceof svc.AppError) redirect(`/verbinden?fehler=${encodeURIComponent(e.message)}#notes`)
+    throw e
+  }
+  revalidatePath('/verbinden')
+  redirect(`/verbinden?ok=${encodeURIComponent(msg)}#notes`)
+}
+
+export async function generate(fd: FormData) {
+  await guard()
+  const { generateStatements } = await import('@/lib/generate.ts')
+  let msg: string
+  try {
+    const r = await generateStatements(await getDb(), num(fd, 'subjectId'), {
+      count: num(fd, 'count') || 15,
+      mode: str(fd, 'mode') === 'total' ? 'total' : 'perUnit',
+      fromUnit: num(fd, 'fromUnit') || 1,
+      toUnit: num(fd, 'toUnit') || 1,
+      hint: str(fd, 'hint') || null,
+    })
+    const saved = r.perUnit.reduce((a, u) => a + u.saved.length, 0)
+    const parts = r.perUnit.map((u) => `UE ${u.unit}: ${u.error ? `Fehler (${u.error})` : `${u.saved.length} von ${u.requested}`}`)
+    msg = `${saved} neue Aussagen in der Inbox (${parts.join(', ')}). Blind geprüft: ${r.checks.agree} bestätigt, ${r.checks.disagree} abweichend.`
+    if (r.skippedUnits.length) msg += ` Ohne Notes übersprungen: UE ${r.skippedUnits.join(', ')}.`
+  } catch (e) {
+    if (e instanceof svc.AppError) redirect(`/verbinden?fehler=${encodeURIComponent(e.message)}#erzeugen`)
+    throw e
+  }
+  revalidatePath('/inbox')
+  redirect(`/verbinden?ok=${encodeURIComponent(msg)}#erzeugen`)
+}
+
+export async function runBlindCheck() {
+  await guard()
+  const { blindCheck } = await import('@/lib/generate.ts')
+  let msg: string
+  try {
+    const r = await blindCheck(await getDb())
+    msg = r.checked ? `Blind geprüft: ${r.checked}, davon ${r.agree} bestätigt und ${r.disagree} abweichend.` : 'Nichts zu prüfen.'
+  } catch (e) {
+    if (e instanceof svc.AppError) redirect(`/inbox?fehler=${encodeURIComponent(e.message)}`)
+    throw e
+  }
+  revalidatePath('/inbox')
+  redirect(`/inbox?ok=${encodeURIComponent(msg)}`)
+}
+
+export async function approveMany(fd: FormData) {
+  await guard()
+  const r = await svc.approveMany(await getDb(), null, str(fd, 'mode') === 'unflagged' ? 'unflagged' : 'ready')
+  revalidatePath('/inbox')
+  redirect(`/inbox?ok=${encodeURIComponent(`${r.approved} Aussagen freigegeben.`)}`)
+}

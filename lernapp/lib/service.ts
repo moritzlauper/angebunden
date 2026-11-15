@@ -4,7 +4,7 @@ import * as s from './db/schema.ts'
 import { composeSession, type Candidate } from './core/compose.ts'
 import { dayToMarkdown, type ExportQuestion } from './core/export.ts'
 import { sourceLinks } from './core/links.ts'
-import { chunkMarkdown, parseBank, splitNotesByUnit, type TextChunk } from './core/parse.ts'
+import { chunkMarkdown, extractSlideFiles, parseBank, splitNotesByUnit, type TextChunk } from './core/parse.ts'
 import { checkStatement, variantDiverges } from './core/quality.ts'
 import { gradeFor, isSafe, review, type CardFields } from './core/schedule.ts'
 import { containsQuote, formatDateCH, LETTERS, normalize, sha256, slugify, type Letter } from './core/text.ts'
@@ -47,6 +47,7 @@ export type SubjectInput = {
   examDate?: string | null
   questionsPerSession?: number
   autoApprove?: boolean
+  slideFiles?: Record<string, string>
 }
 
 export async function createSubject(db: Db, input: SubjectInput): Promise<s.Subject> {
@@ -347,8 +348,14 @@ export async function syncSource(db: Db, subjectId: number, input: SyncInput) {
   if (input.kind === 'notes' && input.unit == null && input.content) {
     const sections = splitNotesByUnit(input.content)
     if (sections.length === 0) throw new AppError('Keine «# UE n»-Überschriften gefunden. Gib unit an oder ergänze die Überschriften.')
+    // Folienlinks in den Notes verraten, welche PDF-Datei zu welcher Vorlesung gehört.
+    const slideFiles = extractSlideFiles(input.content)
+    if (Object.keys(slideFiles).length) {
+      const [subj] = await db.select({ slideFiles: s.subject.slideFiles }).from(s.subject).where(eq(s.subject.id, subjectId))
+      await db.update(s.subject).set({ slideFiles: { ...(subj?.slideFiles ?? {}), ...slideFiles } }).where(eq(s.subject.id, subjectId))
+    }
     for (const sec of sections) {
-      const u = await upsertUnit(db, subjectId, sec.unitNumber, sec.title)
+      const u = await upsertUnit(db, subjectId, sec.unitNumber, sec.title || null)
       const h = sha256(sec.markdown)
       if (u.notesHash === h) {
         results.push({ unit: u.number, title: u.title, changed: false })
@@ -599,6 +606,26 @@ export async function reviewStatement(
   // Inhalt geändert: alter Lernstand passt nicht mehr zur neuen Formulierung.
   if (contentChanged) await db.delete(s.cardState).where(eq(s.cardState.statementId, id))
   return row
+}
+
+/**
+ * Mehrere auf einmal freigeben. «ready»: nur was die blinde Gegenprüfung bestätigt hat und
+ * keine Hinweise trägt. «unflagged»: alles in der Inbox ohne Hinweise, auch ungeprüft.
+ */
+export async function approveMany(db: Db, subjectId: number | null, mode: 'ready' | 'unflagged') {
+  const items = (await listInbox(db, subjectId)).filter((x) => x.status === 'inbox')
+  const pick = items.filter((x) => {
+    const flags = [...(x.flags ?? []), ...(x.check?.flags ?? [])]
+    if (flags.length) return false
+    return mode === 'ready' ? x.ready : !x.check || x.check.agrees
+  })
+  if (pick.length) {
+    await db
+      .update(s.statement)
+      .set({ status: 'active', updatedAt: new Date() })
+      .where(inArray(s.statement.id, pick.map((x) => x.id)))
+  }
+  return { approved: pick.length }
 }
 
 export async function reportError(db: Db, statementId: number, comment: string | null) {

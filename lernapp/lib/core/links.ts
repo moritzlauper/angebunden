@@ -29,6 +29,8 @@ export type LinkConfig = {
   vaultPath?: string | null
   slidesPattern?: string | null
   zmPath?: string | null
+  /** Vorlesung → Pfad ab Vault-Wurzel, aus den Notes gelesen */
+  slideFiles?: Record<string, string> | null
 }
 
 function joinPath(...parts: (string | null | undefined)[]): string {
@@ -43,7 +45,10 @@ export function refToUrl(ref: ParsedRef, cfg: LinkConfig): string | null {
   if (!cfg.vaultName) return null
   let file: string | null = null
   let page: number | null = null
-  if (ref.kind === 'slides' && cfg.slidesPattern) {
+  if (ref.kind === 'slides' && cfg.slideFiles?.[String(ref.lecture)]) {
+    file = cfg.slideFiles[String(ref.lecture)]
+    page = ref.page
+  } else if (ref.kind === 'slides' && cfg.slidesPattern) {
     file = joinPath(cfg.vaultPath, cfg.slidesPattern.replace('{n}', String(ref.lecture)))
     page = ref.page
   } else if (ref.kind === 'zm' && cfg.zmPath) {

@@ -1,8 +1,10 @@
 import { getDb } from '@/lib/db/index.ts'
 import { listInbox } from '@/lib/service.ts'
-import { review } from '../actions.ts'
+import { approveMany, review, runBlindCheck } from '../actions.ts'
+import { SubmitButton } from '../submit-button.tsx'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300
 
 const FLAG_TEXT: Record<string, string> = {
   pruefer_widerspricht: 'Prüfer kommt zu einem anderen Urteil',
@@ -23,8 +25,12 @@ function flagLabel(f: string) {
   return f
 }
 
-export default async function Inbox() {
+export default async function Inbox({ searchParams }: PageProps<'/inbox'>) {
+  const sp = await searchParams
   const items = await listInbox(await getDb(), null)
+  const unchecked = items.filter((x) => x.status === 'inbox' && !x.check && x.quote).length
+  const ready = items.filter((x) => x.ready && x.status === 'inbox').length
+  const unflagged = items.filter((x) => x.status === 'inbox' && [...x.flags, ...(x.check?.flags ?? [])].length === 0 && (!x.check || x.check.agrees)).length
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold">Inbox</h1>
@@ -32,6 +38,32 @@ export default async function Inbox() {
         Neue Aussagen von Claude und geflaggte Aussagen. Erst nach deinem OK kommen sie in die Übungen. «bereit» heisst: die blinde Gegenprüfung
         stimmt zu und es gibt keine Hinweise.
       </p>
+      {typeof sp.ok === 'string' ? <p className="card p-3 text-sm text-ok">{sp.ok}</p> : null}
+      {typeof sp.fehler === 'string' ? <p className="card p-3 text-sm text-bad">{sp.fehler}</p> : null}
+      {items.length ? (
+        <div className="card flex flex-wrap items-center gap-2 p-3 text-sm">
+          <span className="muted mr-auto">
+            {items.length} in der Inbox · {unchecked} ungeprüft · {ready} bereit
+          </span>
+          {unchecked ? (
+            <form action={runBlindCheck}>
+              <SubmitButton quiet pending="Claude prüft …">Blinde Gegenprüfung ({Math.min(unchecked, 60)})</SubmitButton>
+            </form>
+          ) : null}
+          {ready ? (
+            <form action={approveMany}>
+              <input type="hidden" name="mode" value="ready" />
+              <SubmitButton pending="…">Alle bereiten freigeben ({ready})</SubmitButton>
+            </form>
+          ) : null}
+          {unflagged > ready ? (
+            <form action={approveMany}>
+              <input type="hidden" name="mode" value="unflagged" />
+              <SubmitButton quiet pending="…">Alle ohne Hinweise freigeben ({unflagged})</SubmitButton>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
       {items.length === 0 ? <p>Leer.</p> : null}
       <ul className="space-y-4">
         {items.map((x) => (

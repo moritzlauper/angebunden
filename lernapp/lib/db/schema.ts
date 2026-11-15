@@ -34,6 +34,8 @@ export const subject = pgTable('subject', {
   vaultName: text('vault_name'),
   /** Muster für Folien, {n} = Vorlesungsnummer, z. B. «Slides/VL{n}.pdf» */
   slidesPattern: text('slides_pattern').default('Slides/VL{n}.pdf'),
+  /** Folien pro Vorlesung, Pfad ab Vault-Wurzel: { "3": "Klinische Biopsychologie/Slides/…Stress.pdf" }. Geht vor slidesPattern. */
+  slideFiles: jsonb('slide_files').$type<Record<string, string>>().notNull().default(sql`'{}'::jsonb`),
   /** Zusammenfassung (ZM) als PDF im Vault */
   zmPath: text('zm_path'),
   /** Regler «bis UE n» */
