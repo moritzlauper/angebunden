@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { composeSession, planUnits, truthTargets, type Candidate } from '../lib/core/compose.ts'
 import { dayToMarkdown } from '../lib/core/export.ts'
-import { refToUrl, parseSourceRefs, sourceLinks } from '../lib/core/links.ts'
+import { refToUrl, parseSourceRefs, slidesFile, sourceLinks } from '../lib/core/links.ts'
 import { chunkMarkdown, parseBank, splitNotesByUnit, splitReasonAndRef, topicFromStem } from '../lib/core/parse.ts'
 import { checkStatement } from '../lib/core/quality.ts'
 import { gradeFor, review } from '../lib/core/schedule.ts'
@@ -81,6 +81,16 @@ test('Fundstellen werden zu obsidian-Links', () => {
   assert.equal(refToUrl(parseSourceRefs('VL3 p.15')[0], cfg), 'obsidian://open?vault=obsidian&file=Klinische%20Biopsychologie%2FSlides%2FVL3.pdf%23page%3D15')
   assert.equal(sourceLinks('ZM S.69', cfg)[0].url?.includes('ZM.pdf%23page%3D69'), true)
   assert.equal(sourceLinks('VL1 p.2', { ...cfg, vaultName: null })[0].url, null)
+})
+
+test('Folienmuster als Dateiliste: n-ter Eintrag für die n-te Vorlesung', () => {
+  const list = 'Slides/Lektion_01_Folien_Einfuehrung.pdf|Slides/Lektion_02_Folien_ErsteSchritteR.pdf'
+  assert.equal(slidesFile(list, 2), 'Slides/Lektion_02_Folien_ErsteSchritteR.pdf')
+  assert.equal(slidesFile(list, 3), null)
+  assert.equal(slidesFile('Slides/VL{n}.pdf', 4), 'Slides/VL4.pdf')
+  const cfg = { vaultName: 'obsidian', vaultPath: 'Rechnergestützte Datenauswertung', slidesPattern: list }
+  assert.ok(refToUrl(parseSourceRefs('VL2 p.6')[0], cfg)?.endsWith('Lektion_02_Folien_ErsteSchritteR.pdf%23page%3D6'))
+  assert.equal(refToUrl(parseSourceRefs('VL5 p.1')[0], cfg), null)
 })
 
 test('FSRS: falsch kommt in der nächsten Session wieder, richtig später', () => {
@@ -205,5 +215,27 @@ test('Paket 2: jedes Zitat da, keine Hinweise, 10/10 pro UE', async () => {
   for (let u = 2; u <= 9; u++) {
     const mine = PACK.statements.filter((s) => s.unit === u)
     assert.equal(mine.filter((s) => s.truth === 'R').length, 10, `UE ${u}`)
+  }
+})
+
+test('RDA Paket 1: jedes Zitat da, keine Hinweise, F mit Verfälschungstyp, UE 1–13', async () => {
+  const { PACK, SUBJECT } = await import('../data/seed/rda-paket-1.ts')
+  assert.equal(PACK.subject, 'rda')
+  assert.equal(SUBJECT.shortName, 'RDA')
+  assert.equal(SUBJECT.slidesPattern?.split('|').length, 9)
+  assert.equal(PACK.statements.length, 315)
+  for (const s of PACK.statements) {
+    assert.deepEqual(s.flags, [], s.text)
+    assert.ok(s.quote.length >= 8, s.text)
+    assert.match(s.sourceRef, /^(ZM S\.\d+|VL\d p\.\d+)$/, s.text)
+    assert.deepEqual(checkStatement({ text: s.text, truth: s.truth, quote: s.quote, manipulationType: s.manipulationType }).flags.filter((f) => !f.startsWith('begriffe_')), [], s.text)
+    if (s.truth === 'F') assert.ok(s.manipulationType && s.reason, s.text)
+    assert.ok(s.topic && /^(zu|zum|zur) /.test(s.topic), s.text)
+  }
+  for (let u = 1; u <= 13; u++) {
+    const mine = PACK.statements.filter((s) => s.unit === u)
+    assert.ok(mine.length >= 20, `UE ${u}`)
+    assert.ok(mine.filter((s) => s.truth === 'F').length >= 7, `UE ${u}`)
+    assert.ok(PACK.unitTitles[u], `UE ${u}`)
   }
 })

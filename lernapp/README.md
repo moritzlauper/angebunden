@@ -4,7 +4,7 @@ Eine Next.js-App, die Klickerfragen im OLAT-Format abfragt (je fünf Aussagen A�
 
 **Claude steuert die App.** Sie ist ein MCP-Server: Claude kann Fragen stellen und auswerten, Notes und Folien einspielen, neue Aussagen vorschlagen und blind gegenprüfen, die UE-Grenze setzen und exportieren. Gebraucht wird dafür kein API-Key, nur der eigene Claude-Zugang (claude.ai, Claude Code oder Cowork). Im Browser übt man dieselben Fragen mit demselben Lernstand.
 
-Das erste Fach ist **Klinische Biopsychologie** (26HS 200-401a). Beim ersten Start legt die App es mit UE 1–4 an, übernimmt die 25 Aussagen aus `Klickerfragen_KliBio.md` und speichert die drei OLAT-Klickerfragen zu VL4 als Stilvorlagen (`data/seed/klinische-biopsychologie.ts`).
+Das erste Fach ist **Klinische Biopsychologie** (26HS 200-401a). Beim ersten Start legt die App es mit UE 1–4 an, übernimmt die 25 Aussagen aus `Klickerfragen_KliBio.md` und speichert die drei OLAT-Klickerfragen zu VL4 als Stilvorlagen (`data/seed/klinische-biopsychologie.ts`). Als zweites Fach kommt **Rechnergestützte Datenauswertung** dazu (`data/seed/rda-paket-1.ts`).
 
 > Die App liegt vorerst im Repository `angebunden` und soll in ein eigenes Repository umziehen. Sie ist eigenständig, mit eigener `package.json`, eigenem Lockfile und eigener `pnpm-workspace.yaml`. Ausserhalb des Ordners liegt nur `.github/workflows/lernapp-pruefen.yml`: Beim Umzug mitnehmen und die `working-directory`-Zeilen streichen.
 >
@@ -109,13 +109,14 @@ Der Server ist zustandslos (Streamable HTTP, Antworten als JSON) und braucht kei
 - Kein Detailwissen: Jahreszahlen, Autorinnen und Autoren, ICD-Codenummern, Prozentwerte und Anzahlen («14 Substanzklassen») muss man für die Prüfung kaum auswendig können. Die App markiert sie als `detailwissen:…` (`detailFlags`), der Generator gibt solche Aussagen nicht von selbst frei, und sein Prompt schliesst sie aus. Beim Üben nimmt «Nicht prüfungsrelevant» eine Aussage aus der Rotation (beim Besitzer sofort, bei anderen als Meldung); diese Aussagen bekommt der Generator als Gegenbeispiele.
 - Quellenänderung: Ändert sich eine `# UE`-Notiz, sucht die App das Zitat jeder betroffenen Aussage im neuen Text. Gefunden heisst neu verknüpfen, sonst «neu prüfen».
 
-**Fundstellen:** «VL3 p.15» und «ZM S.69» werden zu `obsidian://`-Links, die mit PDF++ auf der Seite öffnen. Dafür in den Fach-Einstellungen den Vault-Namen, den Ordner, das Folienmuster (`Slides/VL{n}.pdf`) und den Pfad der Zusammenfassung eintragen.
+**Fundstellen:** «VL3 p.15» und «ZM S.69» werden zu `obsidian://`-Links, die mit PDF++ auf der Seite öffnen. Dafür in den Fach-Einstellungen den Vault-Namen, den Ordner, das Folienmuster (`Slides/VL{n}.pdf`, oder bei Dateien ohne Muster eine Liste mit `|`, n-ter Eintrag = n-te Vorlesung) und den Pfad der Zusammenfassung eintragen.
 
 ## Aussagenpakete
 
-Neue Aussagen, die nicht über den Generator oder MCP kommen, liegen als Paket in `data/seed/` und werden beim nächsten Start genau einmal eingespielt (`lib/seed.ts`, `applyPacks`). Ein Paket kann auch Aussagen ausmustern (`retire`).
+Neue Aussagen, die nicht über den Generator oder MCP kommen, liegen als Paket in `data/seed/` und werden beim nächsten Start genau einmal eingespielt (`lib/seed.ts`, `applyPacks`). Ein Paket kann auch Aussagen ausmustern (`retire`). Ein neues Fach steht in `SUBJECTS` in `lib/seed.ts` und wird vor den Paketen angelegt, wenn es den Slug oder Namen noch nicht gibt (`ensureSubjects`).
 
 - `klibio-paket-2.ts`: je 20 Aussagen zu UE 1–9 von Klinische Biopsychologie (10 richtig, 10 falsch), aus Notes.md geschrieben, jedes Zitat gegen die Notes geprüft, ohne Detailwissen. Gemustert werden dabei «14 Substanzklassen», «IPQ 1984 von Leventhal» und der Aufbau der Vorlesungstermine.
+- `rda-paket-1.ts`: neues Fach Rechnergestützte Datenauswertung mit 315 Aussagen zu UE 1–13, vor allem aus der Zusammenfassung, ergänzt aus Notes.md und den Folien von Lektion 1–9. Jedes Zitat ist gegen seine Quelle geprüft, ohne Detailwissen. UE 10–13 stammen nur aus der Zusammenfassung und sind nach dem Themenplan der Vorlesung zugeordnet; die UE-Grenze steht auf 9. Die Folien folgen keinem Muster, deshalb ist das Folienmuster eine Dateiliste.
 
 Beim selben Start kommen vom App-Generator schon freigegebene Aussagen mit Detailwissen einmalig zurück in die Inbox.
 

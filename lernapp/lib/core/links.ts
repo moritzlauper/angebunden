@@ -39,12 +39,23 @@ function joinPath(...parts: (string | null | undefined)[]): string {
     .join('/')
 }
 
+/**
+ * Folienmuster: «Slides/VL{n}.pdf» mit {n} = Vorlesungsnummer, oder eine Liste mit «|» getrennt,
+ * wenn die Dateien keinem Muster folgen («Slides/Lektion_01_Folien_Einfuehrung.pdf|…»); dann ist
+ * der n-te Eintrag die Datei der n-ten Vorlesung.
+ */
+export function slidesFile(pattern: string, lecture: number): string | null {
+  if (pattern.includes('|')) return pattern.split('|').map((p) => p.trim())[lecture - 1] || null
+  return pattern.replace('{n}', String(lecture))
+}
+
 export function refToUrl(ref: ParsedRef, cfg: LinkConfig): string | null {
   if (!cfg.vaultName) return null
   let file: string | null = null
   let page: number | null = null
   if (ref.kind === 'slides' && cfg.slidesPattern) {
-    file = joinPath(cfg.vaultPath, cfg.slidesPattern.replace('{n}', String(ref.lecture)))
+    const slides = slidesFile(cfg.slidesPattern, ref.lecture)
+    file = slides ? joinPath(cfg.vaultPath, slides) : null
     page = ref.page
   } else if (ref.kind === 'zm' && cfg.zmPath) {
     file = joinPath(cfg.vaultPath, cfg.zmPath)

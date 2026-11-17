@@ -3,10 +3,11 @@ import type { Db } from './db/index.ts'
 import * as s from './db/schema.ts'
 import { BANK, OLAT_EXAMPLES, SUBJECT, UNITS } from '../data/seed/klinische-biopsychologie.ts'
 import { PACK as PACK_2 } from '../data/seed/klibio-paket-2.ts'
+import { PACK as RDA_PACK_1, SUBJECT as RDA_SUBJECT } from '../data/seed/rda-paket-1.ts'
 import type { Pack } from '../data/seed/types.ts'
 import { detailFlags } from './core/quality.ts'
-import { normalize } from './core/text.ts'
-import { addStyleExamples, createSubject, importBank, upsertUnit } from './service.ts'
+import { normalize, slugify } from './core/text.ts'
+import { addStyleExamples, createSubject, importBank, upsertUnit, type SubjectInput } from './service.ts'
 
 /** Legt Klinische Biopsychologie mit der bestehenden Aussagenbank an. */
 export async function seedKliBio(db: Db) {
@@ -30,8 +31,29 @@ export async function seedIfEmpty(db: Db) {
   }
 }
 
+/** Fächer, die nach dem ersten Start dazukommen. Ihre Aussagen kommen als Paket (PACKS). */
+export const SUBJECTS: SubjectInput[] = [RDA_SUBJECT]
+
+/** Legt fehlende Fächer an. Ein Fach gilt als vorhanden, wenn Slug oder Name schon vergeben sind. */
+export async function ensureSubjects(db: Db) {
+  let created = 0
+  for (const input of SUBJECTS) {
+    const slug = slugify(input.shortName || input.name)
+    const existing = await db.select({ id: s.subject.id, slug: s.subject.slug, name: s.subject.name }).from(s.subject)
+    if (existing.some((x) => x.slug === slug || normalize(x.name) === normalize(input.name))) continue
+    try {
+      await createSubject(db, input)
+      created++
+    } catch (e) {
+      // Zwei Instanzen gleichzeitig: die andere hat das Fach schon angelegt.
+      if (!isDuplicate(e)) throw e
+    }
+  }
+  return { created }
+}
+
 /** Aussagenpakete, die nach dem ersten Start dazukommen, in der Reihenfolge, in der sie entstanden sind. */
-export const PACKS: Pack[] = [PACK_2]
+export const PACKS: Pack[] = [PACK_2, RDA_PACK_1]
 
 /**
  * Setzt einen Merker (Quelle «<name>») und sagt, ob dieser Schritt hier zum ersten Mal läuft.
@@ -137,6 +159,7 @@ export async function moveDetailToInbox(db: Db) {
 }
 
 export async function applyPacks(db: Db) {
+  await ensureSubjects(db)
   for (const p of PACKS) await applyPack(db, p)
   await moveDetailToInbox(db)
 }

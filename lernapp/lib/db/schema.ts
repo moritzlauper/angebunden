@@ -32,7 +32,7 @@ export const subject = pgTable('subject', {
   vaultPath: text('vault_path'),
   /** Name des Obsidian-Vaults für obsidian://-Links */
   vaultName: text('vault_name'),
-  /** Muster für Folien, {n} = Vorlesungsnummer, z. B. «Slides/VL{n}.pdf» */
+  /** Muster für Folien, {n} = Vorlesungsnummer, z. B. «Slides/VL{n}.pdf», oder Dateiliste mit «|» (n-ter Eintrag = n-te Vorlesung) */
   slidesPattern: text('slides_pattern').default('Slides/VL{n}.pdf'),
   /** Zusammenfassung (ZM) als PDF im Vault */
   zmPath: text('zm_path'),

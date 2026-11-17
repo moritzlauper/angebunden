@@ -55,6 +55,27 @@ test('Paket 2: 20 Aussagen pro UE mit Zitat, Detailwissen ausgemustert, nur einm
   assert.equal((await svc.listStatements(db, subjectId, { limit: 1000 })).length, all.length)
 })
 
+test('Neues Fach RDA: angelegt, 13 UEs, Paket 1 aktiv, Grenze UE 9, nur einmal eingespielt', async () => {
+  const db = await getDb()
+  const subjects = await svc.listSubjects(db)
+  assert.equal(subjects[0].name, 'Klinische Biopsychologie')
+  const rda = subjects.find((x) => x.slug === 'rda')
+  assert.ok(rda)
+  assert.equal(rda.name, 'Rechnergestützte Datenauswertung')
+  assert.equal(rda.ueLimit, 9)
+  const all = await svc.listStatements(db, rda.id, { limit: 1000 })
+  assert.equal(all.length, 315)
+  assert.ok(all.every((x) => x.status === 'active' && x.origin === 'paket' && x.quote && x.sourceRef))
+  const ov = await svc.subjectOverview(db, rda.id)
+  assert.equal(ov.units.length, 13)
+  assert.equal(ov.units.find((u) => u.number === 8)?.title, 'Korrelation und einfache Regression')
+  // zweiter Start: kein zweites Fach, keine doppelten Aussagen
+  const { applyPacks } = await import('../lib/seed.ts')
+  await applyPacks(db)
+  assert.equal((await svc.listSubjects(db)).filter((x) => x.slug === 'rda').length, 1)
+  assert.equal((await svc.listStatements(db, rda.id, { limit: 1000 })).length, 315)
+})
+
 test('MCP: initialize, tools/list, Benachrichtigung', async () => {
   const init = (await handleJsonRpc({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-06-18' } })) as any
   assert.equal(init.result.protocolVersion, '2025-06-18')
