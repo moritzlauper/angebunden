@@ -4,7 +4,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod/v4'
 import type { Db } from './db/index.ts'
 import { MANIPULATION_TYPES } from './core/quality.ts'
-import { addStatements, AppError, getUnitMaterial, reviewStatement, submitChecks } from './service.ts'
+import { addStatements, AppError, getUnitMaterial, irrelevantExamples, reviewStatement, submitChecks } from './service.ts'
 
 /**
  * Neue Klicker-Aussagen direkt aus der App erzeugen, ohne claude.ai:
@@ -48,9 +48,11 @@ const GENERATE_SYSTEM = `Du schreibst Aussagen für Klickerfragen (Mehrfachauswa
 Regeln:
 - Schreib nur über Inhalte, die in den gelieferten Stücken stehen. Erfinde nichts.
 - Jede Aussage braucht ein wörtliches Zitat (quote) aus genau einem Stück und dessen chunk_id. Das Zitat muss Zeichen für Zeichen im Stück vorkommen; Markdown-Zeichen wie ** darfst du weglassen.
-- Etwa die Hälfte richtig (R), die Hälfte falsch (F). Eine F-Aussage enthält genau eine Verfälschung (vertauschung, negation, zahl, zuordnung, andere) und das Zitat belegt, was stimmt.
-- Keine Absolutwörter wie «immer», «nie», «nur», ausser sie sind die gewollte Verfälschung oder stehen im Zitat.
-- Prüfungsrelevant: Mechanismen, Befunde, Unterschiede, Definitionen, Zahlen von Folien. ICD-Codenummern müssen nicht auswendig gelernt werden, frag sie nicht ab.
+- Etwa die Hälfte richtig (R), die Hälfte falsch (F). Eine F-Aussage enthält genau eine Verfälschung (vertauschung, negation, zuordnung, andere) und das Zitat belegt, was stimmt. Sie darf sich nicht durch ein Absolutwort verraten.
+- Keine Absolutwörter wie «immer», «nie», «nur», «ausschliesslich», ausser sie stehen so im Zitat.
+- Frag Verständnis ab, nicht Detailwissen: Mechanismen und Wirkrichtungen, Ursache und Wirkung, Unterschiede zwischen ähnlichen Konzepten (z. B. Typ 1 vs. Typ 2, akut vs. chronisch, nozizeptiv vs. neuropathisch), Definitionen, zentrale Befunde und Behandlungsempfehlungen.
+- Kein Detailwissen, das man für die Prüfung kaum auswendig können muss: keine Jahreszahlen, keine Namen von Autorinnen und Autoren oder Studien, keine ICD-Codenummern, keine Prozentwerte und Fallzahlen aus Einzelstudien, keine Anzahlen («14 Substanzklassen», «vier Dimensionen»), keine organisatorischen Angaben zur Vorlesung. Solche Aussagen landen nicht in den Übungen.
+- Halte dich an Prüfungshinweise in den Notizen («merken», «nicht auswendig lernen», «wird nicht abgefragt», «für die Prüfung gilt die Folie»): Was dort als unwichtig markiert ist, fragst du nicht ab.
 - Keine Doppelungen mit den bestehenden Aussagen, auch nicht umformuliert. Decke Stellen ab, zu denen es noch keine Aussage gibt.
 - Fundstelle aus den Verweisen im Stück ableiten, z. B. «KliBio VL4, p.5» → «VL4 p.5», «ZM KliBio, p.69» → «ZM S.69».`
 
@@ -79,6 +81,8 @@ export async function generateForUnit(db: Db, subjectId: number, unitNumber: num
 
   const chunksText = material.chunks.map((c) => `<stueck id="${c.id}"${c.heading ? ` titel="${c.heading}"` : ''}>\n${c.text}\n</stueck>`).join('\n\n')
   const existing = material.statements.map((s) => `- [${s.truth}] ${s.text}`).join('\n') || '(noch keine)'
+  // Was der Besitzer schon als nicht prüfungsrelevant ausgemustert hat, dient als Gegenbeispiel.
+  const unwanted = await irrelevantExamples(db, subjectId)
   const styles = material.styleExamples.length
     ? material.styleExamples.map((e) => `${e.stem}\n${e.options.map((o) => `  - ${o.text}`).join('\n')}`).join('\n\n')
     : ''
@@ -93,6 +97,8 @@ export async function generateForUnit(db: Db, subjectId: number, unitNumber: num
         role: 'user',
         content: `UE ${unitNumber}: ${material.unit.title}\n\nNotizen zur UE:\n${chunksText}\n\nBestehende Aussagen (nicht wiederholen):\n${existing}${
           styles ? `\n\nStilvorlagen aus OLAT/Altprüfungen (nur für Länge und Schwierigkeit):\n${styles}` : ''
+        }${
+          unwanted.length ? `\n\nSolche Aussagen will die Person nicht, sie sind zu detailliert oder nicht prüfungsrelevant:\n${unwanted.map((t) => `- ${t}`).join('\n')}` : ''
         }\n\nSchreib ${count} neue Aussagen.`,
       },
     ],

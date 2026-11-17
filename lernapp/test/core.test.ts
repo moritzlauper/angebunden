@@ -71,7 +71,7 @@ test('Belegpflicht und Prüferhinweise', () => {
   assert.ok(r.flags.includes('zahl_fehlt_im_zitat:3'))
   assert.ok(!r.flags.includes('zitat_nicht_in_quelle'))
   const f = checkStatement({ text: 'Der IPQ wurde 1984 entwickelt.', truth: 'F', quote: 'IPQ von Moss-Morris et al. (2002)', manipulationType: 'zahl', chunkText: 'anders' })
-  assert.deepEqual(f.flags, ['zitat_nicht_in_quelle'])
+  assert.deepEqual(f.flags, ['zitat_nicht_in_quelle', 'detailwissen:jahr'])
   assert.ok(checkStatement({ text: 'a b c', truth: 'F', quote: 'ein langes Zitat' }).flags.includes('f_ohne_verfaelschungstyp'))
 })
 
@@ -169,4 +169,32 @@ test('Zitatprüfung ignoriert Hervorhebungen aus den Notes', () => {
 test('Bezeichnungen wie GLP-1 oder ICD-11 gelten nicht als Zahlen', () => {
   const r = checkStatement({ text: 'GLP-1 steht im ICD-11 bei 25% der Fälle, 5–10 Tage.', truth: 'R', quote: 'GLP-1 bei 25% der Fälle, 5–10 Tage' })
   assert.deepEqual(r.flags.filter((f) => f.startsWith('zahl')), [])
+})
+
+test('Detailwissen erkennen: Anzahlen, Jahre, Codes, Prozent, Autoren', async () => {
+  const { detailFlags } = await import('../lib/core/quality.ts')
+  assert.deepEqual(detailFlags('Im ICD-11 werden bei den Störungen durch Substanzgebrauch 14 Substanzklassen unterschieden.'), ['detailwissen:anzahl'])
+  assert.deepEqual(detailFlags('Der Code R63.0 gehört zur Kategorie F50.'), ['detailwissen:code'])
+  assert.deepEqual(detailFlags('Die PTBS trägt den Code 6B40.'), ['detailwissen:code'])
+  assert.deepEqual(detailFlags('Migräne findet sich bei jungen Frauen in rund 25 % der Fälle.'), ['detailwissen:prozent'])
+  assert.deepEqual(detailFlags('Laut Eckstein et al. wirkt Oxytocin.'), ['detailwissen:autor'])
+  assert.deepEqual(detailFlags('Das Konzept hat vier Dimensionen.'), ['detailwissen:anzahl'])
+  // Bezeichnungen sind kein Detailwissen
+  assert.deepEqual(detailFlags('Typ-1-Diabetes, Stadium N2, ICD-11, GLP-1, S3-Leitlinie und VL4 p.5.'), [])
+})
+
+test('Paket 2: jedes Zitat da, keine Hinweise, 10/10 pro UE', async () => {
+  const { PACK } = await import('../data/seed/klibio-paket-2.ts')
+  const { checkStatement } = await import('../lib/core/quality.ts')
+  assert.equal(PACK.statements.length, 180)
+  for (const s of PACK.statements) {
+    assert.deepEqual(s.flags, [], s.text)
+    assert.ok(s.quote.length >= 8, s.text)
+    assert.deepEqual(checkStatement({ text: s.text, truth: s.truth, quote: s.quote, manipulationType: s.manipulationType }).flags.filter((f) => !f.startsWith('begriffe_')), [], s.text)
+    if (s.truth === 'F') assert.ok(s.manipulationType, s.text)
+  }
+  for (let u = 2; u <= 9; u++) {
+    const mine = PACK.statements.filter((s) => s.unit === u)
+    assert.equal(mine.filter((s) => s.truth === 'R').length, 10, `UE ${u}`)
+  }
 })

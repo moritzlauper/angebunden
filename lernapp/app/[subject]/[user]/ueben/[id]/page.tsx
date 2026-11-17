@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { learnerContext } from '@/lib/learner.ts'
 import { AppError, getSessionView, sessionSummary, type StatementResult } from '@/lib/service.ts'
-import { answer, reportError } from '../../../../actions.ts'
+import { answer, markIrrelevant, reportError } from '../../../../actions.ts'
 import { PrimaryShortcut } from '../../../../shortcut.tsx'
 
 export const dynamic = 'force-dynamic'
@@ -73,7 +73,7 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
         </p>
         <ul className="space-y-3">
           {shown.results!.map((r) => (
-            <Result key={r.letter} r={r} back={back} user={user} />
+            <Result key={r.letter} r={r} back={back} user={user} isOwner={isOwner} />
           ))}
         </ul>
         <ActionBar align="end">{nextLink}</ActionBar>
@@ -125,7 +125,7 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
           <h2 className="font-semibold">Zum Wiederholen</h2>
           <ul className="space-y-3">
             {summary.repeat.map((r) => (
-              <Result key={r.statementId} r={r} back={`${base}/ueben/${id}?ende=1`} user={user} />
+              <Result key={r.statementId} r={r} back={`${base}/ueben/${id}?ende=1`} user={user} isOwner={isOwner} />
             ))}
           </ul>
         </section>
@@ -158,7 +158,7 @@ function ActionBar({ children, align }: { children: React.ReactNode; align: 'sta
   )
 }
 
-function Result({ r, back, user }: { r: StatementResult; back: string; user: string }) {
+function Result({ r, back, user, isOwner }: { r: StatementResult; back: string; user: string; isOwner: boolean }) {
   return (
     <li className="card space-y-1 p-3" style={{ borderColor: r.correct ? 'var(--color-ok)' : 'var(--color-bad)' }}>
       <p>
@@ -185,7 +185,16 @@ function Result({ r, back, user }: { r: StatementResult; back: string; user: str
             </span>
           ),
         )}
-        <details className="ml-auto">
+        {/* Detailwissen, das man nicht auswendig können muss: Besitzer mustert aus, andere melden. */}
+        <form action={markIrrelevant} className="ml-auto">
+          <input type="hidden" name="statementId" value={r.statementId} />
+          <input type="hidden" name="back" value={back} />
+          <input type="hidden" name="user" value={user} />
+          <button className="muted cursor-pointer underline-offset-2 hover:underline" title={isOwner ? 'Aus den Übungen nehmen' : 'Dem Besitzer melden'}>
+            Nicht prüfungsrelevant
+          </button>
+        </form>
+        <details>
           <summary className="muted cursor-pointer">Fehler melden</summary>
           <form action={reportError} className="mt-2 flex gap-2">
             <input type="hidden" name="statementId" value={r.statementId} />

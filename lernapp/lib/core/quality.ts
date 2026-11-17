@@ -82,12 +82,34 @@ export function checkStatement(input: QualityInput): QualityResult {
     if (missing.length >= 2) flags.push(`begriffe_nicht_in_quelle:${missing.slice(0, 4).join(',')}`)
   }
 
+  flags.push(...detailFlags(input.text))
+
   let hard = false
   if (input.truth === 'F') {
     if (!input.manipulationType) flags.push('f_ohne_verfaelschungstyp')
     if (input.manipulationType === 'doppelt') hard = true
   }
   return { accept: true, flags, hard }
+}
+
+/**
+ * Detailwissen, das man für die Prüfung kaum auswendig wissen muss: Jahreszahlen, Autorinnen
+ * und Autoren, Codenummern, Prozentwerte und Anzahlen («14 Substanzklassen»). Solche Aussagen
+ * gibt der Generator nicht von selbst frei, sie landen in der Inbox.
+ */
+const COUNT_NOUNS =
+  'Substanzklassen|Klassen|Kategorien|Subtypen|Unterformen|Formen|Typen|Gruppen|Codes?|Diagnosen|Stufen|Stadien|Phasen|Komponenten|Dimensionen|Bausteine|Kriterien|Schritte|Symptomgruppen'
+
+export function detailFlags(text: string): string[] {
+  const out: string[] = []
+  if (/\b(1[5-9]\d{2}|20\d{2})\b/.test(text)) out.push('detailwissen:jahr')
+  if (/\bet al\.|\([A-ZÄÖÜ][\p{L}-]+(?: (?:&|und) [A-ZÄÖÜ][\p{L}-]+)?,? \d{4}\)/u.test(text)) out.push('detailwissen:autor')
+  if (/(?<![\p{L}\d-])(?:[A-Z]\d{2}(?:\.\d+)?|6[A-Z]\d{2}(?:\.\d+)?|[A-Z]{2}\d{2}[A-Z]?(?:\.\d+)?)(?![\p{L}\d])/u.test(text))
+    out.push('detailwissen:code')
+  if (/\d\s?%/.test(text)) out.push('detailwissen:prozent')
+  const count = text.match(new RegExp(`\\b(\\d+|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf|vierzehn)\\s+(?:[\\p{L}-]+\\s+)?(?:${COUNT_NOUNS})\\b`, 'iu'))
+  if (count) out.push('detailwissen:anzahl')
+  return out
 }
 
 /** Verhält sich eine Variante deutlich anders als ihre Ur-Aussage? */

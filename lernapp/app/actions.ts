@@ -186,3 +186,11 @@ export async function createSubject(fd: FormData) {
   })
   redirect(`/${subj.slug}/${svc.OWNER}/stand`)
 }
+
+/** Beim Üben: «Nicht prüfungsrelevant». Besitzer mustert aus, andere melden. */
+export async function markIrrelevant(fd: FormData) {
+  await guard()
+  await svc.markIrrelevant(await getDb(), num(fd, 'statementId'), userOf(fd))
+  const back = str(fd, 'back')
+  redirect(back.startsWith('/') && !back.startsWith('//') ? back : '/')
+}

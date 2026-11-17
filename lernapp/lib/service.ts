@@ -422,7 +422,8 @@ export async function listSources(db: Db, subjectId: number) {
       chunks: sql<number>`(select count(*)::int from ${s.chunk} where ${s.chunk.sourceId} = ${s.source.id})`,
     })
     .from(s.source)
-    .where(eq(s.source.subjectId, subjectId))
+    // Merker für eingespielte Pakete und Wartungsschritte sind keine Quellen.
+    .where(and(eq(s.source.subjectId, subjectId), sql`${s.source.path} not like 'paket:%'`, sql`${s.source.path} not like 'wartung:%'`))
     .orderBy(desc(s.source.syncedAt))
   return rows
 }
@@ -638,6 +639,33 @@ export async function reviewStatement(
   // Inhalt geändert: alter Lernstand passt nicht mehr zur neuen Formulierung.
   if (contentChanged) await db.delete(s.cardState).where(eq(s.cardState.statementId, id))
   return row
+}
+
+/**
+ * «Nicht prüfungsrelevant»: Der Besitzer nimmt die Aussage damit gleich aus der Rotation
+ * (ausgemustert, Flag nicht_relevant). Der Generator bekommt solche Aussagen als Beispiele
+ * dafür, was nicht gewünscht ist. Andere Personen melden sie nur, der Besitzer entscheidet.
+ */
+export async function markIrrelevant(db: Db, statementId: number, user = OWNER) {
+  if (user !== OWNER) return reportError(db, statementId, 'nicht prüfungsrelevant', user)
+  const [st] = await db.select().from(s.statement).where(eq(s.statement.id, statementId))
+  if (!st) throw new AppError(`Aussage ${statementId} nicht gefunden`)
+  await db.insert(s.report).values({ statementId, comment: 'nicht prüfungsrelevant', userId: user, resolved: true })
+  const flags = [...new Set([...(st.flags ?? []), 'nicht_relevant'])]
+  await db.update(s.statement).set({ status: 'retired', flags, updatedAt: new Date() }).where(eq(s.statement.id, statementId))
+  return { statementId, status: 'retired' }
+}
+
+/** Aussagen, die der Besitzer als nicht prüfungsrelevant ausgemustert hat (Negativbeispiele für den Generator). */
+export async function irrelevantExamples(db: Db, subjectId: number, limit = 15) {
+  const rows = await db
+    .select({ text: s.statement.text })
+    .from(s.statement)
+    .innerJoin(s.unit, eq(s.statement.unitId, s.unit.id))
+    .where(and(eq(s.unit.subjectId, subjectId), sql`${s.statement.flags} @> '["nicht_relevant"]'::jsonb`))
+    .orderBy(desc(s.statement.updatedAt))
+    .limit(limit)
+  return rows.map((r) => r.text)
 }
 
 export async function reportError(db: Db, statementId: number, comment: string | null, user = OWNER) {

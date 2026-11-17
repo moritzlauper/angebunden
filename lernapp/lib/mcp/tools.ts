@@ -334,6 +334,14 @@ export const TOOLS = [
     run: async (a) => svc.reportError(await getDb(), a.statement_id, a.comment ?? null),
   }),
   tool({
+    name: 'mark_irrelevant',
+    title: 'Nicht prüfungsrelevant',
+    description:
+      'Nimmt eine Aussage mit Detailwissen, das man für die Prüfung nicht auswendig können muss (Jahreszahlen, Codes, Anzahlen, Studiendetails), aus der Rotation. Der Generator bekommt solche Aussagen als Beispiele dafür, was nicht gewünscht ist.',
+    input: z.object({ statement_id: z.number().int() }),
+    run: async (a) => svc.markIrrelevant(await getDb(), a.statement_id),
+  }),
+  tool({
     name: 'export_markdown',
     title: 'Export für den Exercises-Ordner',
     description:

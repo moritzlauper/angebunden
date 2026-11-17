@@ -106,9 +106,18 @@ Der Server ist zustandslos (Streamable HTTP, Antworten als JSON) und braucht kei
 - Freigabe: Neue Aussagen kommen erst nach deinem OK in die Übungen. Mit `auto_approve` werden Aussagen ohne Freigabe aktiv, wenn der Prüfer zustimmt und nichts geflaggt ist (Standard: aus).
 - Feste Items: In der Session wird nichts neu formuliert. Ändert man den Inhalt einer Aussage, steigt die Version und der Lernstand beginnt neu.
 - Parallelformen: Wird eine Variante deutlich anders beantwortet als ihre Ur-Aussage, kommt sie zurück in die Inbox.
+- Kein Detailwissen: Jahreszahlen, Autorinnen und Autoren, ICD-Codenummern, Prozentwerte und Anzahlen («14 Substanzklassen») muss man für die Prüfung kaum auswendig können. Die App markiert sie als `detailwissen:…` (`detailFlags`), der Generator gibt solche Aussagen nicht von selbst frei, und sein Prompt schliesst sie aus. Beim Üben nimmt «Nicht prüfungsrelevant» eine Aussage aus der Rotation (beim Besitzer sofort, bei anderen als Meldung); diese Aussagen bekommt der Generator als Gegenbeispiele.
 - Quellenänderung: Ändert sich eine `# UE`-Notiz, sucht die App das Zitat jeder betroffenen Aussage im neuen Text. Gefunden heisst neu verknüpfen, sonst «neu prüfen».
 
 **Fundstellen:** «VL3 p.15» und «ZM S.69» werden zu `obsidian://`-Links, die mit PDF++ auf der Seite öffnen. Dafür in den Fach-Einstellungen den Vault-Namen, den Ordner, das Folienmuster (`Slides/VL{n}.pdf`) und den Pfad der Zusammenfassung eintragen.
+
+## Aussagenpakete
+
+Neue Aussagen, die nicht über den Generator oder MCP kommen, liegen als Paket in `data/seed/` und werden beim nächsten Start genau einmal eingespielt (`lib/seed.ts`, `applyPacks`). Ein Paket kann auch Aussagen ausmustern (`retire`).
+
+- `klibio-paket-2.ts`: je 20 Aussagen zu UE 1–9 von Klinische Biopsychologie (10 richtig, 10 falsch), aus Notes.md geschrieben, jedes Zitat gegen die Notes geprüft, ohne Detailwissen. Gemustert werden dabei «14 Substanzklassen», «IPQ 1984 von Leventhal» und der Aufbau der Vorlesungstermine.
+
+Beim selben Start kommen vom App-Generator schon freigegebene Aussagen mit Detailwissen einmalig zurück in die Inbox.
 
 ## Datenmodell
 
