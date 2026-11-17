@@ -14,7 +14,7 @@ export default async function Start() {
       <h1 className="text-2xl font-bold">Fächer</h1>
       {subjects.length === 0 ? (
         <p className="muted">
-          Noch kein Fach. Lege eines unter <Link className="link" href="/verbinden">Claude &amp; Import</Link> an.
+          Noch kein Fach. Lege eines unter <Link className="link" href="/verbinden">Erstellung &amp; Import</Link> an.
         </p>
       ) : (
         <ul className="space-y-2">

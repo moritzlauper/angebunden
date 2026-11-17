@@ -116,6 +116,15 @@ test('Session: Grenze, mind. drei UEs, neueste doppelt, variierende Anzahl richt
   }
 })
 
+test('Session: Bereich «von UE 2 bis 4» lässt UE 1 weg', () => {
+  for (let seed = 1; seed < 10; seed++) {
+    const qs = composeSession(cands(), { ueFrom: 2, ueLimit: 4, nQuestions: 5, rng: seeded(seed) })
+    assert.equal(qs.length, 5)
+    const units = new Set(qs.flatMap((q) => q.statementIds).map((id) => Math.ceil(id / 10)))
+    assert.ok([...units].every((u) => u >= 2 && u <= 4), 'nur UE 2–4')
+  }
+})
+
 test('Session: Varianten derselben Ur-Aussage nie zusammen', () => {
   const c = cands().map((x) => ({ ...x, family: Math.ceil(x.id / 2) }))
   const qs = composeSession(c, { ueLimit: 6, rng: seeded(3) })

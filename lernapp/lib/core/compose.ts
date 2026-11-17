@@ -5,7 +5,7 @@ import { stemFromTopic } from './parse.ts'
  * ist nur eine Zusammenstellung von fünf Aussagen für den Moment.
  *
  * Regeln:
- *  1. nur UEs bis zur eingestellten Grenze,
+ *  1. nur UEs im eingestellten Bereich («von m bis n»),
  *  2. mindestens drei UEs pro Session (wenn vorhanden), die neueste UE doppelt,
  *  3. die Anzahl richtiger Aussagen variiert über die Session (0 bis 5),
  *  4. eine Aussage nie zusammen mit ihrer Umkehrung oder einer Variante derselben
@@ -33,6 +33,8 @@ export type Candidate = {
 }
 
 export type ComposeOptions = {
+  /** untere Grenze, Standard 1 */
+  ueFrom?: number
   ueLimit: number
   nQuestions?: number
   now?: Date
@@ -117,7 +119,7 @@ export function composeSession(candidates: Candidate[], opts: ComposeOptions): C
   const examMode = !!opts.examMode
   const newLimit = opts.newLimit ?? 15
 
-  const eligible = candidates.filter((c) => c.unitNumber <= opts.ueLimit)
+  const eligible = candidates.filter((c) => c.unitNumber >= (opts.ueFrom ?? 1) && c.unitNumber <= opts.ueLimit)
   if (eligible.length < PER_QUESTION) return []
 
   // Priorität mit etwas Zufall, damit gleich dringende Aussagen nicht immer gleich gemischt werden.
@@ -161,7 +163,7 @@ export function composeSession(candidates: Candidate[], opts: ComposeOptions): C
     const unitNumber = plan[qi]
     let t = targets[qi]
     const picked: Candidate[] = []
-    // erst aus der geplanten UE, dann aus allen anderen bis zur Grenze
+    // erst aus der geplanten UE, dann aus allen anderen im Bereich
     const fill = (truth: 'R' | 'F', count: number) => {
       const a = take(unitNumber, truth, count)
       const b = a.length < count ? take(null, truth, count - a.length) : []

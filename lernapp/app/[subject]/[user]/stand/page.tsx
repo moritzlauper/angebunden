@@ -148,6 +148,12 @@ export default async function Stand({ params, searchParams }: PageProps<'/[subje
               <input type="hidden" name="subjectId" value={s.id} />
               <input type="hidden" name="user" value={user} />
               <label className="space-y-1">
+                <span>Abfragen von</span>
+                <select name="ueFrom" defaultValue={s.ueFrom}>
+                  <UeOptions units={ov.units} ueLimit={s.ueLimit} />
+                </select>
+              </label>
+              <label className="space-y-1">
                 <span>Abfragen bis</span>
                 <select name="ueLimit" defaultValue={s.ueLimit}>
                   <UeOptions units={ov.units} ueLimit={s.ueLimit} />

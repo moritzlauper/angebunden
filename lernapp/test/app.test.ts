@@ -154,7 +154,7 @@ test('Freunde lernen mit denselben Aussagen, aber eigenem Lernstand und eigener 
   assert.equal(svc.learnerSlug('x'), null)
 
   const ownerBefore = (await svc.listSubjects(db))[0]
-  await svc.setLearnerUeLimit(db, 'david', subjectId, 2)
+  await svc.setLearnerUeRange(db, 'david', subjectId, 1, 2)
   const [david] = await svc.listSubjects(db, new Date(), 'david')
   assert.equal(david.ueLimit, 2)
   assert.equal(david.counts.seen, 0)
@@ -170,6 +170,16 @@ test('Freunde lernen mit denselben Aussagen, aber eigenem Lernstand und eigener 
   assert.equal(davidAfter.counts.seen, 5)
   const [ownerAfter] = await svc.listSubjects(db)
   assert.equal(ownerAfter.counts.seen, ownerBefore.counts.seen)
+
+  // «von» und «bis» verkehrt gewählt: wird vertauscht.
+  await svc.setLearnerUeRange(db, 'david', subjectId, 4, 2)
+  const [range] = await svc.listSubjects(db, new Date(), 'david')
+  assert.deepEqual([range.ueFrom, range.ueLimit], [2, 4])
+  const v2 = await svc.startSession(db, subjectId, { user: 'david', nQuestions: 3 })
+  assert.deepEqual([v2.session.ueFrom, v2.session.ueLimit], [2, 4])
+  assert.ok(v2.questions.every((q) => (q.unitNumber ?? 0) >= 2 && (q.unitNumber ?? 0) <= 4))
+  assert.equal(svc.ueRangeLabel(2, 4), 'UE 2–4')
+  assert.equal(svc.ueRangeLabel(1, 4), 'bis UE 4')
 })
 
 test('Nicht prüfungsrelevant: Besitzer mustert aus, andere melden, Generator bekommt Gegenbeispiele', async () => {

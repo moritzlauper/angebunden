@@ -86,9 +86,10 @@ export const TOOLS = [
     name: 'update_subject',
     title: 'Fach einstellen',
     description:
-      'Einstellungen ändern, vor allem die UE-Grenze («bis UE n»), das Prüfungsdatum und den Prüfungsmodus (fragt alles bis zur Grenze einmal durch, gewichtet nach Schwäche). auto_approve: Aussagen werden ohne Freigabe aktiv, wenn Generator und Prüfer übereinstimmen und nichts geflaggt ist.',
+      'Einstellungen ändern, vor allem den UE-Bereich (ue_from «von UE m», ue_limit «bis UE n»), das Prüfungsdatum und den Prüfungsmodus (fragt alles bis zur Grenze einmal durch, gewichtet nach Schwäche). auto_approve: Aussagen werden ohne Freigabe aktiv, wenn Generator und Prüfer übereinstimmen und nichts geflaggt ist.',
     input: z.object({
       subject: subjectRef,
+      ue_from: z.number().int().min(1).optional(),
       ue_limit: z.number().int().min(0).optional(),
       exam_date: z.string().nullable().optional(),
       exam_mode: z.boolean().optional(),
@@ -104,6 +105,7 @@ export const TOOLS = [
     }),
     run: async (a) =>
       svc.updateSubject(await getDb(), await subjectId(a.subject), {
+        ueFrom: a.ue_from,
         ueLimit: a.ue_limit,
         examDate: a.exam_date,
         examMode: a.exam_mode,
@@ -261,10 +263,11 @@ export const TOOLS = [
     name: 'get_due',
     title: 'Fragen für heute',
     description:
-      'Startet eine Session: fällige Aussagen zuerst, mit neuen aufgefüllt, gemischt nach den Regeln (nur bis zur UE-Grenze, mind. drei UEs, neueste doppelt, Anzahl richtiger variiert 0–5, nie Aussage und Umkehrung zusammen). Gibt die Fragen ohne Lösung zurück. Stelle sie einzeln im OLAT-Format (A–E), warte auf die Antwort und melde sie mit report_answer.',
+      'Startet eine Session: fällige Aussagen zuerst, mit neuen aufgefüllt, gemischt nach den Regeln (nur im UE-Bereich, mind. drei UEs, neueste doppelt, Anzahl richtiger variiert 0–5, nie Aussage und Umkehrung zusammen). Gibt die Fragen ohne Lösung zurück. Stelle sie einzeln im OLAT-Format (A–E), warte auf die Antwort und melde sie mit report_answer.',
     input: z.object({
       subject: subjectRef,
       questions: z.number().int().min(1).max(20).optional(),
+      ue_from: z.number().int().optional().describe('nur für diese Session, sonst die Einstellung des Fachs'),
       ue_limit: z.number().int().optional().describe('nur für diese Session, sonst die Einstellung des Fachs'),
       exam_mode: z.boolean().optional(),
     }),
@@ -272,11 +275,13 @@ export const TOOLS = [
       const view = await svc.startSession(await getDb(), await subjectId(a.subject), {
         channel: 'mcp',
         nQuestions: a.questions,
+        ueFrom: a.ue_from,
         ueLimit: a.ue_limit,
         examMode: a.exam_mode,
       })
       return {
         session_id: view.session.id,
+        ue_from: view.session.ueFrom,
         ue_limit: view.session.ueLimit,
         questions: view.questions.map((q) => ({
           question_id: q.id,

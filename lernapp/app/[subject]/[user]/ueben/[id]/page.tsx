@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { learnerContext } from '@/lib/learner.ts'
-import { AppError, getSessionView, sessionSummary, type StatementResult } from '@/lib/service.ts'
+import { AppError, getSessionView, sessionSummary, ueRangeLabel, type StatementResult } from '@/lib/service.ts'
 import { answer, markIrrelevant, reportError } from '../../../../actions.ts'
 import { PrimaryShortcut } from '../../../../shortcut.tsx'
 
@@ -30,7 +30,7 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
           {q?.unitNumber != null ? ` · UE ${q.unitNumber}${q.unitTitle ? ` ${q.unitTitle}` : ''}` : ''}
         </span>
         <span className="shrink-0">
-          bis UE {view.session.ueLimit}
+          {ueRangeLabel(view.session.ueFrom, view.session.ueLimit)}
           {view.session.examMode ? ' · Prüfung' : ''}
         </span>
       </p>
