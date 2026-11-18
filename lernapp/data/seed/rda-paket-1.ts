@@ -1,18 +1,19 @@
 /**
  * Rechnergestützte Datenauswertung (HS 2026, PD Dr. Thomas Welchowski): neues Fach mit
- * Paket 1, 315 Aussagen zu UE 1–13 (Stand 17.11.2026).
+ * Paket 1, 324 Aussagen zu UE 1–13 (Stand 18.11.2026).
  *
  * - Geschrieben vor allem aus der Zusammenfassung (ZM_Rechnergestützte Datenauswertung), dazu
- *   aus Notes.md, wo sie Korrektes ergänzt, und aus den Folien von Lektion 1–9.
+ *   aus Notes.md, wo sie Korrektes ergänzt, und aus den Folien von Lektion 1–10.
  * - Jede Aussage hat ein wörtliches Zitat; per Skript geprüft, dass es in der genannten Quelle
  *   steht («ZM S.n» = Seite im PDF der Zusammenfassung, «VLn p.m» = Folie m von Lektion n).
  * - Kein Detailwissen (Jahreszahlen, Prozentwerte, Anzahlen); falsche Aussagen enthalten genau
  *   eine Verfälschung und verraten sich nicht über Absolutwörter.
- * - UE 10–13 stammen nur aus der Zusammenfassung, zugeordnet nach dem Themenplan auf Folie 16
- *   von Lektion 1 (10 t-Test/U-Test, 11 ANOVA/Kruskal-Wallis, 12 mehrfaktorielle ANOVA,
- *   13 Open Science). Die UE-Grenze steht auf 9, sie kommen also erst dran, wenn man sie hochsetzt.
+ * - UE 10 aus Zusammenfassung und Folien von Lektion 10, mit dem Kruskal-Wallis-Test, der dieses
+ *   Jahr schon in Lektion 10 kam. UE 11–13 stammen nur aus der Zusammenfassung, zugeordnet nach
+ *   dem Themenplan auf Folie 16 von Lektion 1 (11 ANOVA/Post-hoc, 12 mehrfaktorielle ANOVA,
+ *   13 Open Science). Die UE-Grenze steht auf 10.
  *
- * Pro UE: UE 1: 23, UE 2: 25, UE 3: 27, UE 4: 23, UE 5: 26, UE 6: 25, UE 7: 25, UE 8: 26, UE 9: 26, UE 10: 23, UE 11: 23, UE 12: 21, UE 13: 22.
+ * Pro UE: UE 1: 23, UE 2: 25, UE 3: 27, UE 4: 23, UE 5: 26, UE 6: 25, UE 7: 25, UE 8: 26, UE 9: 26, UE 10: 35, UE 11: 20, UE 12: 21, UE 13: 22.
  *
  * Wird beim Start einmal eingespielt (lib/seed.ts): ensureSubjects legt das Fach an,
  * applyPacks spielt die Aussagen ein, ohne Hinweise direkt in die Übungen.
@@ -27,15 +28,15 @@ export const SUBJECT: SubjectInput = {
   "dozent": "PD Dr. Thomas Welchowski",
   "vaultName": "obsidian",
   "vaultPath": "Rechnergestützte Datenauswertung",
-  "slidesPattern": "Slides/Lektion_01_Folien_Einfuehrung.pdf|Slides/Lektion_02_Folien_ErsteSchritteR.pdf|Slides/Lektion_03_Folien_DatensaetzeR.pdf|Slides/Lektion_04_Folien_KategVar.pdf|Slides/Lektion_05_Folien_MehrKategVar.pdf|Slides/Lektion_06_Folien_MetrVar.pdf|Slides/Lektion_07_Folien_VerteilVoraus.pdf|Slides/Lektion_08_Folien_EinfRegression.pdf|Slides/Lektion_09_Folien_MultipRegression.pdf",
+  "slidesPattern": "Slides/Lektion_01_Folien_Einfuehrung.pdf|Slides/Lektion_02_Folien_ErsteSchritteR.pdf|Slides/Lektion_03_Folien_DatensaetzeR.pdf|Slides/Lektion_04_Folien_KategVar.pdf|Slides/Lektion_05_Folien_MehrKategVar.pdf|Slides/Lektion_06_Folien_MetrVar.pdf|Slides/Lektion_07_Folien_VerteilVoraus.pdf|Slides/Lektion_08_Folien_EinfRegression.pdf|Slides/Lektion_09_Folien_MultipRegression.pdf|Slides/Lektion_10_Folien_MittelwVergl.pdf",
   "zmPath": "Zusammenfassungen/ZM_Rechnergestützte Datenauswertung.pdf",
-  "ueLimit": 9
+  "ueLimit": 10
 }
 
 export const PACK: Pack = {
   id: 'rda-ue1-13-v1',
   subject: 'rda',
-  unitTitles: {"1": "Einführung", "2": "Erste Schritte in R", "3": "Datensätze in R", "4": "Eine kategoriale Variable", "5": "Mehrere kategoriale Variablen", "6": "Eine metrische Variable", "7": "Verteilungsvoraussetzungen", "8": "Korrelation und einfache Regression", "9": "Multiple Regression", "10": "Mittelwertsvergleiche zweier Gruppen", "11": "Einfaktorielle ANOVA und Kruskal-Wallis-Test", "12": "Zweifaktorielle ANOVA", "13": "Open Science"},
+  unitTitles: {"1": "Einführung", "2": "Erste Schritte in R", "3": "Datensätze in R", "4": "Eine kategoriale Variable", "5": "Mehrere kategoriale Variablen", "6": "Eine metrische Variable", "7": "Verteilungsvoraussetzungen", "8": "Korrelation und einfache Regression", "9": "Multiple Regression", "10": "Einfaktorielle Mittelwertsvergleiche", "11": "Einfaktorielle ANOVA und Post-hoc-Vergleiche", "12": "Zweifaktorielle ANOVA", "13": "Open Science"},
   retire: [],
   statements: [
   {
@@ -3243,7 +3244,7 @@ export const PACK: Pack = {
     "flags": []
   },
   {
-    "unit": 11,
+    "unit": 10,
     "text": "Der Kruskal-Wallis-Test ist eine Verallgemeinerung des Wilcoxon-Tests.",
     "truth": "R",
     "reason": null,
@@ -3255,7 +3256,7 @@ export const PACK: Pack = {
     "flags": []
   },
   {
-    "unit": 11,
+    "unit": 10,
     "text": "Der Kruskal-Wallis-Test vergleicht Rangplätze und setzt eine ordinalskalierte Variable voraus.",
     "truth": "R",
     "reason": null,
@@ -3267,7 +3268,7 @@ export const PACK: Pack = {
     "flags": []
   },
   {
-    "unit": 11,
+    "unit": 10,
     "text": "Der Kruskal-Wallis-Test setzt normalverteilte, intervallskalierte Daten voraus.",
     "truth": "F",
     "reason": "er vergleicht Rangplätze; vorausgesetzt ist eine ordinalskalierte Variable",
@@ -3279,7 +3280,7 @@ export const PACK: Pack = {
     "flags": []
   },
   {
-    "unit": 11,
+    "unit": 10,
     "text": "Die Prüfgrösse des Kruskal-Wallis-Tests ist bei nicht zu kleinen Stichproben annähernd χ²-verteilt.",
     "truth": "R",
     "reason": null,
@@ -3291,7 +3292,7 @@ export const PACK: Pack = {
     "flags": []
   },
   {
-    "unit": 11,
+    "unit": 10,
     "text": "Den Kruskal-Wallis-Test rechnet man in R mit wilcox.test().",
     "truth": "F",
     "reason": "mit kruskal.test()",
@@ -3816,6 +3817,114 @@ export const PACK: Pack = {
     "topic": "zur Präregistrierung",
     "manipulationType": null,
     "family": "ue13-rr",
+    "flags": []
+  },
+  {
+    "unit": 10,
+    "text": "Wilcoxon-Test und Kruskal-Wallis-Test sind nichtparametrische Tests: Sie vergleichen Rangplätze.",
+    "truth": "R",
+    "reason": null,
+    "quote": "Nichtparametrisch: (Rangplatzvergleich) Wilcoxon -Test Kruskal-Wallis-Test",
+    "sourceRef": "VL10 p.14",
+    "topic": "zu parametrischen und nichtparametrischen Tests",
+    "manipulationType": null,
+    "family": "ue10-param",
+    "flags": []
+  },
+  {
+    "unit": 10,
+    "text": "Der t-Test ist ein nichtparametrischer Test, weil er Rangplätze vergleicht.",
+    "truth": "F",
+    "reason": "der t-Test ist parametrisch und vergleicht Mittelwerte; Rangplätze vergleichen Wilcoxon- und Kruskal-Wallis-Test",
+    "quote": "Parametrisch: (Mittelwertsvergleich) t-Test",
+    "sourceRef": "VL10 p.14",
+    "topic": "zu parametrischen und nichtparametrischen Tests",
+    "manipulationType": "zuordnung",
+    "family": "ue10-param",
+    "flags": []
+  },
+  {
+    "unit": 10,
+    "text": "Die Varianzanalyse (ANOVA) ist das parametrische Verfahren für den Vergleich mehrerer Gruppen.",
+    "truth": "R",
+    "reason": null,
+    "quote": "Parametrisch: (Mittelwertsvergleich) t-Test Varianzanalyse (ANOVA)",
+    "sourceRef": "VL10 p.14",
+    "topic": "zu parametrischen und nichtparametrischen Tests",
+    "manipulationType": null,
+    "family": "ue10-kwparam",
+    "flags": []
+  },
+  {
+    "unit": 10,
+    "text": "Der Kruskal-Wallis-Test ist das parametrische Verfahren für den Vergleich mehrerer Gruppen.",
+    "truth": "F",
+    "reason": "er ist nichtparametrisch; das parametrische Verfahren ist die ANOVA",
+    "quote": "Kruskal-Wallis-Test (nichtparametrisch)",
+    "sourceRef": "VL10 p.15",
+    "topic": "zu parametrischen und nichtparametrischen Tests",
+    "manipulationType": "zuordnung",
+    "family": "ue10-kwparam",
+    "flags": []
+  },
+  {
+    "unit": 10,
+    "text": "Für grosse Stichproben nähert sich die Verteilung der t-Statistik unter der Nullhypothese der Standardnormalverteilung an.",
+    "truth": "R",
+    "reason": null,
+    "quote": "Für grosse Stichproben nähert sich die Verteilung der t-Statistik unter der Nullhypothese der Standardnormalverteilung an",
+    "sourceRef": "VL10 p.7",
+    "topic": "zum t-Test",
+    "manipulationType": null,
+    "family": null,
+    "flags": []
+  },
+  {
+    "unit": 10,
+    "text": "Abhängige Stichproben werden auch verbundene Stichproben genannt.",
+    "truth": "R",
+    "reason": null,
+    "quote": "Abhängige Stichproben (auch \"verbundene\" Stichproben genannt)",
+    "sourceRef": "VL10 p.11",
+    "topic": "zu unabhängigen und abhängigen Stichproben",
+    "manipulationType": null,
+    "family": null,
+    "flags": []
+  },
+  {
+    "unit": 10,
+    "text": "Für abhängige Daten gibt es einen eigenen t-Test bzw. Wilcoxon-Test für verbundene Stichproben (engl. paired).",
+    "truth": "R",
+    "reason": null,
+    "quote": "t-Test bzw. Wilcoxon-Test für verbundene Stichproben (engl.: paired)",
+    "sourceRef": "VL10 p.11",
+    "topic": "zu unabhängigen und abhängigen Stichproben",
+    "manipulationType": null,
+    "family": null,
+    "flags": []
+  },
+  {
+    "unit": 11,
+    "text": "Statt einer ANOVA kann man bedenkenlos paarweise t-Tests zwischen den Gruppen rechnen, weil dabei kein Problem mit multiplem Testen entsteht.",
+    "truth": "F",
+    "reason": "gerade paarweise Tests bergen die Gefahr des multiplen Testens",
+    "quote": "Eine Gefahr: Multiples Testen",
+    "sourceRef": "ZM S.28",
+    "topic": "zu Post-hoc-Vergleichen",
+    "manipulationType": "negation",
+    "family": null,
+    "flags": []
+  },
+  {
+    "unit": 11,
+    "text": "Varianzhomogenität heisst in der einfaktoriellen ANOVA, dass die Zellen denselben Mittelwert haben.",
+    "truth": "F",
+    "reason": "Varianzhomogenität heisst gleiche Varianz pro Zelle",
+    "quote": "Varianzhomogenität: Gleiche Varianz pro Zelle",
+    "sourceRef": "ZM S.27",
+    "topic": "zur einfaktoriellen ANOVA",
+    "manipulationType": "zuordnung",
+    "family": null,
     "flags": []
   }
 ],

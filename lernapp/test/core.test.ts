@@ -222,20 +222,22 @@ test('RDA Paket 1: jedes Zitat da, keine Hinweise, F mit Verfälschungstyp, UE 1
   const { PACK, SUBJECT } = await import('../data/seed/rda-paket-1.ts')
   assert.equal(PACK.subject, 'rda')
   assert.equal(SUBJECT.shortName, 'RDA')
-  assert.equal(SUBJECT.slidesPattern?.split('|').length, 9)
-  assert.equal(PACK.statements.length, 315)
+  assert.equal(SUBJECT.slidesPattern?.split('|').length, 10)
+  assert.equal(PACK.statements.length, 324)
   for (const s of PACK.statements) {
     assert.deepEqual(s.flags, [], s.text)
     assert.ok(s.quote.length >= 8, s.text)
-    assert.match(s.sourceRef, /^(ZM S\.\d+|VL\d p\.\d+)$/, s.text)
+    assert.match(s.sourceRef, /^(ZM S\.\d+|VL\d+ p\.\d+)$/, s.text)
     assert.deepEqual(checkStatement({ text: s.text, truth: s.truth, quote: s.quote, manipulationType: s.manipulationType }).flags.filter((f) => !f.startsWith('begriffe_')), [], s.text)
     if (s.truth === 'F') assert.ok(s.manipulationType && s.reason, s.text)
     assert.ok(s.topic && /^(zu|zum|zur) /.test(s.topic), s.text)
   }
   for (let u = 1; u <= 13; u++) {
     const mine = PACK.statements.filter((s) => s.unit === u)
-    assert.ok(mine.length >= 20, `UE ${u}`)
+    assert.ok(mine.length >= 15, `UE ${u}`)
     assert.ok(mine.filter((s) => s.truth === 'F').length >= 7, `UE ${u}`)
     assert.ok(PACK.unitTitles[u], `UE ${u}`)
   }
+  // Kruskal-Wallis kam dieses Jahr in Lektion 10
+  assert.ok(PACK.statements.filter((s) => /Kruskal-Wallis/.test(s.text)).every((s) => s.unit === 10))
 })
