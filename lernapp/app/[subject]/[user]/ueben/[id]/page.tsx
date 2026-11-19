@@ -151,7 +151,7 @@ function ActionBar({ children, align }: { children: React.ReactNode; align: 'sta
   return (
     <div
       className={`sticky bottom-0 -mx-4 flex items-center gap-4 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${align === 'end' ? 'justify-end' : ''}`}
-      style={{ background: 'var(--bg)', borderColor: 'var(--line)' }}
+      style={{ background: 'var(--panel)', borderColor: 'var(--line)' }}
     >
       {children}
     </div>
@@ -165,7 +165,7 @@ function Result({ r, back, user, isOwner }: { r: StatementResult; back: string; 
         <b>{r.letter})</b> {r.text}
       </p>
       <p className={`text-sm font-semibold ${r.correct ? 'text-ok' : 'text-bad'}`}>
-        {r.truth === 'R' ? 'richtig' : 'falsch'} · {r.marked ? 'angekreuzt' : 'nicht angekreuzt'} · {r.correct ? '✓' : '✗'}
+        {r.truth === 'R' ? 'richtig' : 'falsch'} · {r.marked ? 'angekreuzt' : 'nicht angekreuzt'} · {r.correct ? 'korrekt' : 'daneben'}
       </p>
       {r.reason ? <p className="text-sm">{r.reason}</p> : null}
       {r.quote ? (

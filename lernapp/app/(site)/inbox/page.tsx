@@ -38,10 +38,10 @@ export default async function Inbox() {
         {items.map((x) => (
           <li key={x.id} className="card space-y-2 p-4">
             <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded px-2 py-0.5 font-bold" style={{ background: 'var(--bg)' }}>
+              <span className="rounded px-2 py-0.5 font-bold" style={{ background: 'var(--panel)' }}>
                 UE {x.unitNumber}
               </span>
-              <span className={`rounded px-2 py-0.5 font-bold ${x.truth === 'R' ? 'text-ok' : 'text-bad'}`} style={{ background: 'var(--bg)' }}>
+              <span className={`rounded px-2 py-0.5 font-bold ${x.truth === 'R' ? 'text-ok' : 'text-bad'}`} style={{ background: 'var(--panel)' }}>
                 {x.truth === 'R' ? 'richtig' : 'falsch'}
                 {x.manipulationType ? ` · ${x.manipulationType}` : ''}
               </span>
@@ -58,7 +58,7 @@ export default async function Inbox() {
             ) : null}
             {x.check ? (
               <p className="text-sm">
-                Prüfer: {x.check.truth === 'R' ? 'richtig' : 'falsch'} {x.check.agrees ? '✓ stimmt überein' : '✗ weicht ab'}
+                Prüfer: {x.check.truth === 'R' ? 'richtig' : 'falsch'} {x.check.agrees ? 'stimmt überein' : 'weicht ab'}
                 {x.check.comment ? ` · ${x.check.comment}` : ''}
               </p>
             ) : null}

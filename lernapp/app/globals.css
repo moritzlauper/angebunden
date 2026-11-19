@@ -1,29 +1,65 @@
 @import 'tailwindcss';
+@import './fonts.css';
 
+/*
+ * Gleiches Erscheinungsbild wie MARA: Desktop eines alten Betriebssystems in Lila,
+ * erhabene Fenster und Knöpfe, eingelassene Felder, Pixelschrift für Bedienelemente.
+ */
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --color-ok: #15803d;
-  --color-bad: #b91c1c;
+  --font-sans: 'Space Grotesk', -apple-system, system-ui, sans-serif;
+  --font-mono: 'Roboto Mono', ui-monospace, Menlo, monospace;
+  --color-ok: #2f8f4e;
+  --color-bad: #c4304b;
 }
 
 :root {
-  color-scheme: light dark;
-  --bg: #fafaf9;
-  --card: #ffffff;
-  --line: #e7e5e4;
-  --muted: #78716c;
-  --fg: #1c1917;
-  --accent: #1d4ed8;
+  color-scheme: light;
+  --bg: #b9b2c9;
+  --panel: #dcd7e6;
+  --face: #e9e5f0;
+  --hi: #fbf9ff;
+  --lo: #8d859e;
+  --fg: #1c1824;
+  --card: var(--face);
+  --line: #8d859e;
+  --muted: #5b5469;
+  --accent: #6d3fd1;
+  --accent2: #e2479c;
+  --on-accent: #fff;
+  --lime: #c8f03a;
+  --lime-edge: #5f7d00;
+  --field: #fff;
+  --shadow: #1c1824;
+  --drop: rgba(28, 24, 36, 0.18);
+  --dis-fg: #a39cb3;
+  --title: linear-gradient(90deg, #4b2aa0, #b2399a 70%, #e2479c);
+  --display: 'Bungee', Impact, sans-serif;
+  --pixel: 'Silkscreen', ui-monospace, monospace;
+  --mono: 'Roboto Mono', ui-monospace, Menlo, monospace;
+  --sans: 'Space Grotesk', -apple-system, system-ui, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0c0a09;
-    --card: #1c1917;
-    --line: #292524;
-    --muted: #a8a29e;
-    --fg: #f5f5f4;
-    --accent: #93c5fd;
+    color-scheme: dark;
+    --bg: #110f17;
+    --panel: #1f1b28;
+    --face: #2a2535;
+    --hi: #4b4360;
+    --lo: #08070b;
+    --fg: #ece8f6;
+    --line: #4b4360;
+    --muted: #a69eb8;
+    --accent: #a98bff;
+    --accent2: #ff7ac0;
+    --on-accent: #110f17;
+    --field: #15121d;
+    --shadow: #000;
+    --drop: rgba(0, 0, 0, 0.45);
+    --dis-fg: #5e5672;
+    --title: linear-gradient(90deg, #3a1f86, #8f2a83 70%, #c23584);
+    --color-ok: #6fd38e;
+    --color-bad: #ff6b85;
   }
 }
 
@@ -35,62 +71,164 @@ html {
 body {
   background: var(--bg);
   color: var(--fg);
+  font: 15px/1.5 var(--sans);
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Keine runden Ecken: alles kantig wie damals. */
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+}
+
+h1 {
+  font-family: var(--display);
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--accent);
+}
+h2,
+summary {
+  font-family: var(--pixel);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Kopfzeile wie bei MARA: Leiste mit kräftiger Unterkante, Logo in Bungee. */
+.topbar {
+  background: var(--panel);
+  border-bottom: 3px solid var(--fg);
+}
+.logo {
+  font-family: var(--display);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+.logo:hover {
+  color: var(--accent2);
+  text-shadow: 2px 2px 0 var(--lime);
+}
+.topbar nav > a:not(.btn-quiet):not(.logo) {
+  font-family: var(--pixel);
+  font-size: 0.8rem;
+}
+
+/* Fenster: erhaben, mit hartem Schatten. */
 .card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 0.75rem;
+  background: var(--face);
+  border: 2px solid;
+  border-color: var(--hi) var(--lo) var(--lo) var(--hi);
+  box-shadow:
+    1px 1px 0 var(--shadow),
+    4px 4px 0 var(--drop);
+}
+.card.border-bad {
+  border-color: var(--color-bad);
+}
+
+/* Titelleiste oben in einem Fenster. */
+.window-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: var(--title);
+  color: #fff;
+  font: 0.75rem/1.4 var(--pixel);
+  letter-spacing: 0.05em;
+  padding: 0.3rem 0.6rem;
+}
+
+/* Eingelassene Fläche, z. B. für Kennzahlen. */
+.well {
+  background: var(--field);
+  border: 2px solid;
+  border-color: var(--lo) var(--hi) var(--hi) var(--lo);
 }
 
 .muted {
   color: var(--muted);
 }
 
+/* Hauptknopf: grün wie bei MARA, in Bungee. */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.9rem;
+  padding: 0.5rem 1rem;
   min-height: 2.75rem;
-  font-weight: 600;
-  background: var(--fg);
-  color: var(--bg);
+  font-family: var(--display);
+  font-weight: 400;
+  background: var(--lime);
+  color: #1c1824;
+  border: 2px solid var(--lime-edge);
+  box-shadow:
+    inset -2px -2px #0003,
+    inset 2px 2px #ffffff8c;
   touch-action: manipulation;
 }
-.btn:disabled {
-  opacity: 0.6;
-}
 .btn:hover {
-  opacity: 0.9;
+  filter: brightness(1.05);
 }
+.btn:active:not(:disabled) {
+  box-shadow: inset 2px 2px #0004;
+  transform: translate(1px, 1px);
+}
+.btn:disabled {
+  color: #5f7d00;
+  filter: saturate(0.4);
+}
+
+/* Normaler Knopf: erhabene Kante, Pixelschrift. */
 .btn-quiet {
   display: inline-flex;
   align-items: center;
-  border-radius: 0.5rem;
   padding: 0.35rem 0.7rem;
   min-height: 2.5rem;
-  border: 1px solid var(--line);
-  font-size: 0.875rem;
+  background: var(--face);
+  color: var(--fg);
+  border: 2px solid;
+  border-color: var(--hi) var(--lo) var(--lo) var(--hi);
+  font: 0.8rem var(--pixel);
   touch-action: manipulation;
 }
 .btn-quiet:hover {
-  background: var(--line);
+  filter: brightness(1.05);
+}
+.btn-quiet:active,
+.btn-quiet[aria-current],
+.btn-quiet[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--shadow);
+  box-shadow: inset 2px 2px #0004;
 }
 
+/* Eingabefelder: eingelassen. */
 input[type='text'],
 input[type='date'],
 input[type='number'],
 input[type='password'],
 select,
 textarea {
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
+  background: var(--field);
+  color: var(--fg);
+  border: 2px solid;
+  border-color: var(--lo) var(--hi) var(--hi) var(--lo);
   padding: 0.4rem 0.6rem;
   width: 100%;
+  font-family: var(--mono);
+  font-size: 0.875rem;
+}
+input[type='checkbox'],
+input[type='radio'] {
+  accent-color: var(--accent);
 }
 
 a.link {
@@ -99,21 +237,29 @@ a.link {
   text-underline-offset: 2px;
 }
 
+/* Fortschrittsbalken: eingelassen, Füllung in Blöcken. */
 .bar {
   display: flex;
-  height: 0.5rem;
-  border-radius: 999px;
-  background: var(--line);
+  height: 0.9rem;
+  background: var(--field);
+  border: 2px solid;
+  border-color: var(--lo) var(--hi) var(--hi) var(--lo);
   overflow: hidden;
 }
 .bar > span {
   display: block;
   height: 100%;
-  background: var(--color-ok);
+  background: repeating-linear-gradient(90deg, var(--accent) 0, var(--accent) 7px, transparent 7px, transparent 9px);
 }
 /* schon gesehen, aber noch nicht sicher */
 .bar > span.seen {
-  background: color-mix(in srgb, var(--color-ok) 35%, var(--line));
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 35%, var(--field)) 0,
+    color-mix(in srgb, var(--accent) 35%, var(--field)) 7px,
+    transparent 7px,
+    transparent 9px
+  );
 }
 
 /* iOS zoomt beim Antippen in Felder mit weniger als 16px Schrift. */
@@ -131,5 +277,12 @@ a.link {
 /* Angekreuzte Antwort deutlich markieren, auch ohne Blick auf das Kästchen. */
 label.card:has(input[name='marked']:checked) {
   border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+  background: color-mix(in srgb, var(--accent) 14%, var(--face));
+  box-shadow: inset 2px 2px #0003;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }
