@@ -269,3 +269,31 @@ test('TT Paket 1: jedes Zitat da, keine Hinweise, F mit Verfälschungstyp, UE 1�
   for (const s of PACK.statements) if (s.family) fam.set(s.family, (fam.get(s.family) ?? new Set()).add(s.unit))
   assert.ok([...fam.values()].every((u) => u.size === 1))
 })
+
+test('KPF Paket 1: jedes Zitat da, keine Hinweise, F mit Verfälschungstyp, UE 1–9', async () => {
+  const { PACK, SUBJECT } = await import('../data/seed/kpf-paket-1.ts')
+  assert.equal(PACK.subject, 'kpf')
+  assert.equal(SUBJECT.shortName, 'KPF')
+  assert.equal(SUBJECT.ueLimit, 9)
+  assert.equal(SUBJECT.slidesPattern?.split('|').length, 9)
+  assert.equal(PACK.statements.length, 345)
+  for (const s of PACK.statements) {
+    assert.deepEqual(s.flags, [], s.text)
+    assert.ok(s.quote.length >= 8, s.text)
+    // Nur Folien dieses Jahres, keine Zusammenfassung
+    assert.match(s.sourceRef, /^VL[1-9] p\.\d+$/, s.text)
+    assert.deepEqual(checkStatement({ text: s.text, truth: s.truth, quote: s.quote, manipulationType: s.manipulationType }).flags.filter((f) => !f.startsWith('begriffe_')), [], s.text)
+    if (s.truth === 'F') assert.ok(s.manipulationType && s.reason, s.text)
+    assert.ok(s.topic && /^(zu|zum|zur) /.test(s.topic), s.text)
+  }
+  for (let u = 1; u <= 9; u++) {
+    const mine = PACK.statements.filter((s) => s.unit === u)
+    assert.ok(mine.length >= 30, `UE ${u}`)
+    assert.ok(mine.filter((s) => s.truth === 'F').length >= 9, `UE ${u}`)
+    assert.ok(PACK.unitTitles[u], `UE ${u}`)
+  }
+  // Paare zum selben Punkt bleiben in ihrer UE
+  const fam = new Map<string, Set<number>>()
+  for (const s of PACK.statements) if (s.family) fam.set(s.family, (fam.get(s.family) ?? new Set()).add(s.unit))
+  assert.ok([...fam.values()].every((u) => u.size === 1))
+})

@@ -5,6 +5,7 @@ import { BANK, OLAT_EXAMPLES, SUBJECT, UNITS } from '../data/seed/klinische-biop
 import { PACK as PACK_2 } from '../data/seed/klibio-paket-2.ts'
 import { PACK as RDA_PACK_1, SUBJECT as RDA_SUBJECT } from '../data/seed/rda-paket-1.ts'
 import { PACK as TT_PACK_1, SUBJECT as TT_SUBJECT } from '../data/seed/tt-paket-1.ts'
+import { PACK as KPF_PACK_1, SUBJECT as KPF_SUBJECT } from '../data/seed/kpf-paket-1.ts'
 import type { Pack } from '../data/seed/types.ts'
 import { detailFlags } from './core/quality.ts'
 import { normalize, slugify } from './core/text.ts'
@@ -33,7 +34,7 @@ export async function seedIfEmpty(db: Db) {
 }
 
 /** Fächer, die nach dem ersten Start dazukommen. Ihre Aussagen kommen als Paket (PACKS). */
-export const SUBJECTS: SubjectInput[] = [RDA_SUBJECT, TT_SUBJECT]
+export const SUBJECTS: SubjectInput[] = [RDA_SUBJECT, TT_SUBJECT, KPF_SUBJECT]
 
 /** Legt fehlende Fächer an. Ein Fach gilt als vorhanden, wenn Slug oder Name schon vergeben sind. */
 export async function ensureSubjects(db: Db) {
@@ -54,7 +55,7 @@ export async function ensureSubjects(db: Db) {
 }
 
 /** Aussagenpakete, die nach dem ersten Start dazukommen, in der Reihenfolge, in der sie entstanden sind. */
-export const PACKS: Pack[] = [PACK_2, RDA_PACK_1, TT_PACK_1]
+export const PACKS: Pack[] = [PACK_2, RDA_PACK_1, TT_PACK_1, KPF_PACK_1]
 
 /**
  * Setzt einen Merker (Quelle «<name>») und sagt, ob dieser Schritt hier zum ersten Mal läuft.

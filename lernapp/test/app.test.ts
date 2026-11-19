@@ -94,6 +94,24 @@ test('Neues Fach TT: angelegt, 8 UEs, Paket 1 aktiv, Grenze UE 8, nur einmal ein
   assert.equal((await svc.listStatements(db, tt.id, { limit: 1000 })).length, 359)
 })
 
+test('Neues Fach KPF: angelegt, 9 UEs, Paket 1 aktiv, Grenze UE 9, nur einmal eingespielt', async () => {
+  const db = await getDb()
+  const kpf = (await svc.listSubjects(db)).find((x) => x.slug === 'kpf')
+  assert.ok(kpf)
+  assert.equal(kpf.name, 'Klinische Paar- und Familienpsychologie')
+  assert.equal(kpf.ueLimit, 9)
+  const all = await svc.listStatements(db, kpf.id, { limit: 1000 })
+  assert.equal(all.length, 345)
+  assert.ok(all.every((x) => x.status === 'active' && x.origin === 'paket' && x.quote && x.sourceRef))
+  const ov = await svc.subjectOverview(db, kpf.id)
+  assert.equal(ov.units.length, 9)
+  assert.equal(ov.units.find((u) => u.number === 9)?.title, 'Erziehung und dysfunktionales Erziehungsverhalten')
+  const { applyPacks } = await import('../lib/seed.ts')
+  await applyPacks(db)
+  assert.equal((await svc.listSubjects(db)).filter((x) => x.slug === 'kpf').length, 1)
+  assert.equal((await svc.listStatements(db, kpf.id, { limit: 1000 })).length, 345)
+})
+
 test('MCP: initialize, tools/list, Benachrichtigung', async () => {
   const init = (await handleJsonRpc({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2025-06-18' } })) as any
   assert.equal(init.result.protocolVersion, '2025-06-18')
