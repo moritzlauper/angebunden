@@ -4,6 +4,7 @@ import * as s from './db/schema.ts'
 import { BANK, OLAT_EXAMPLES, SUBJECT, UNITS } from '../data/seed/klinische-biopsychologie.ts'
 import { PACK as PACK_2 } from '../data/seed/klibio-paket-2.ts'
 import { PACK as RDA_PACK_1, SUBJECT as RDA_SUBJECT } from '../data/seed/rda-paket-1.ts'
+import { PACK as TT_PACK_1, SUBJECT as TT_SUBJECT } from '../data/seed/tt-paket-1.ts'
 import type { Pack } from '../data/seed/types.ts'
 import { detailFlags } from './core/quality.ts'
 import { normalize, slugify } from './core/text.ts'
@@ -32,7 +33,7 @@ export async function seedIfEmpty(db: Db) {
 }
 
 /** Fächer, die nach dem ersten Start dazukommen. Ihre Aussagen kommen als Paket (PACKS). */
-export const SUBJECTS: SubjectInput[] = [RDA_SUBJECT]
+export const SUBJECTS: SubjectInput[] = [RDA_SUBJECT, TT_SUBJECT]
 
 /** Legt fehlende Fächer an. Ein Fach gilt als vorhanden, wenn Slug oder Name schon vergeben sind. */
 export async function ensureSubjects(db: Db) {
@@ -53,7 +54,7 @@ export async function ensureSubjects(db: Db) {
 }
 
 /** Aussagenpakete, die nach dem ersten Start dazukommen, in der Reihenfolge, in der sie entstanden sind. */
-export const PACKS: Pack[] = [PACK_2, RDA_PACK_1]
+export const PACKS: Pack[] = [PACK_2, RDA_PACK_1, TT_PACK_1]
 
 /**
  * Setzt einen Merker (Quelle «<name>») und sagt, ob dieser Schritt hier zum ersten Mal läuft.
@@ -80,8 +81,20 @@ async function subjectStatements(db: Db, subjectId: number) {
     .where(eq(s.unit.subjectId, subjectId))
 }
 
+/**
+ * Fach eines Pakets: per Slug, sonst ein Fach aus SUBJECTS, das schon unter seinem Namen (mit
+ * anderem Slug) angelegt war, damit das Paket dort landet statt still zu entfallen.
+ */
+async function packSubject(db: Db, slug: string) {
+  const all = await db.select().from(s.subject)
+  const bySlug = all.find((x) => x.slug === slug)
+  if (bySlug) return bySlug
+  const input = SUBJECTS.find((x) => slugify(x.shortName || x.name) === slug)
+  return input ? all.find((x) => normalize(x.name) === normalize(input.name)) : undefined
+}
+
 export async function applyPack(db: Db, pack: Pack) {
-  const [subj] = await db.select().from(s.subject).where(eq(s.subject.slug, pack.subject))
+  const subj = await packSubject(db, pack.subject)
   if (!subj || !(await once(db, subj.id, `paket:${pack.id}`))) return { added: 0, retired: 0, skipped: true }
 
   // UEs anlegen; vorhandene Titel bleiben, nur Platzhalter «UE n» werden ersetzt.
