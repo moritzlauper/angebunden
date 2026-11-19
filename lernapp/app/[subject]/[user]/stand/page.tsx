@@ -56,7 +56,7 @@ export default async function Stand({ params, searchParams }: PageProps<'/[subje
                 </summary>
                 <ul className="mt-2 flex flex-wrap gap-2">
                   {u.coverage.map(([ref, n]) => (
-                    <li key={ref} className="rounded px-2 py-0.5" style={{ background: 'var(--bg)' }}>
+                    <li key={ref} className="rounded px-2 py-0.5" style={{ background: 'var(--panel)' }}>
                       {ref}: <b>{n}</b>
                     </li>
                   ))}

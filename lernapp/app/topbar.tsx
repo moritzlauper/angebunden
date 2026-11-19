@@ -6,9 +6,9 @@ import Link from 'next/link'
  */
 export function TopBar({ brand, brandHref = '/', children }: { brand?: React.ReactNode; brandHref?: string; children?: React.ReactNode }) {
   return (
-    <header className="sticky top-0 z-10 border-b pt-[env(safe-area-inset-top)]" style={{ borderColor: 'var(--line)', background: 'var(--bg)' }}>
-      <nav className="mx-auto flex max-w-3xl items-center gap-4 overflow-x-auto px-4 py-3 text-sm whitespace-nowrap">
-        <Link href={brandHref} className="font-bold">
+    <header className="topbar sticky top-0 z-10 pt-[env(safe-area-inset-top)]">
+      <nav className="mx-auto flex max-w-3xl items-center gap-3 overflow-x-auto px-4 py-3 text-sm whitespace-nowrap">
+        <Link href={brandHref} className="logo">
           {brand ?? 'Klicker'}
         </Link>
         {children}

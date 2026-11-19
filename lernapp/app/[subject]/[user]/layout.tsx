@@ -13,11 +13,11 @@ export default async function LernerLayout({ children, params }: LayoutProps<'/[
       <TopBar brand={user} brandHref={base}>
         {subjects.map((x) =>
           x.id === subj.id ? (
-            <Link key={x.id} href={base} aria-current="page" className="btn-quiet font-semibold" style={{ background: 'var(--line)' }}>
+            <Link key={x.id} href={base} aria-current="page" className="btn-quiet">
               {x.shortName ?? x.name}
             </Link>
           ) : (
-            <Link key={x.id} href={`/${x.slug}/${user}`} className="btn-quiet muted">
+            <Link key={x.id} href={`/${x.slug}/${user}`} className="btn-quiet">
               {x.shortName ?? x.name}
             </Link>
           ),

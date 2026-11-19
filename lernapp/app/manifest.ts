@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: 'Klickerfragen mit eigenem Lernstand',
     start_url: '/',
     display: 'standalone',
-    background_color: '#0c0a09',
-    theme_color: '#0c0a09',
+    background_color: '#b9b2c9',
+    theme_color: '#dcd7e6',
     icons: [
       { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml' },
       { src: '/apple-icon', sizes: '180x180', type: 'image/png' },
