@@ -17,7 +17,7 @@
  *
  * Umgebung:
  *   ANTHROPIC_API_KEY   Schlüssel für die Claude API
- *   KI_MODELL           freiwillig, sonst claude-opus-5-5
+ *   KI_MODELL           freiwillig, sonst claude-haiku-5-5
  */
 import Anthropic from '@anthropic-ai/sdk'
 import { betaJSONSchemaOutputFormat } from '@anthropic-ai/sdk/helpers/beta/json-schema'
@@ -25,7 +25,7 @@ import type { KiWerte, Merkmal, SeitenFund } from '../../app/wohnungen/typen.ts'
 
 export type { KiWerte, SeitenFund }
 
-const MODELL = process.env.KI_MODELL || 'claude-opus-5-5'
+const MODELL = process.env.KI_MODELL || 'claude-haiku-5-5'
 
 export const MERKMALE: Merkmal[] = ['balkon', 'waschmaschine', 'geschirrspueler', 'lift', 'haustiere', 'hindernisfrei']
 
@@ -38,14 +38,12 @@ export const kiVerbrauch = { anfragen: 0, eingabe: 0, ausgabe: 0 }
 
 const DATUM = /^\d{4}-\d{2}-\d{2}$/
 
-/** Ein Aufruf mit erzwungenem JSON-Schema. Lehnt das Modell ab, springt die Fallback-Kette des Servers ein. */
+/** Ein Aufruf mit erzwungenem JSON-Schema. Haiku 5.5 hat keinen serverseitigen Rückfall: eine Ablehnung liefert null. */
 async function frage<T>(system: string, text: string, schema: Parameters<typeof betaJSONSchemaOutputFormat>[0]): Promise<T | null> {
   if (!client) return null
   const antwort = await client.beta.messages.parse({
     model: MODELL,
     max_tokens: 16000,
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
     output_config: { effort: 'low', format: betaJSONSchemaOutputFormat(schema) },
     system,
     messages: [{ role: 'user', content: text }],
