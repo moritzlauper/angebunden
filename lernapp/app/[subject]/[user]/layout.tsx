@@ -10,7 +10,7 @@ export default async function LernerLayout({ children, params }: LayoutProps<'/[
       <TopBar brand={`${subj.shortName ?? subj.name} · ${user}`} brandHref={base}>
         <Link href={`${base}/stand`}>Details</Link>
         {isOwner ? <Link href="/inbox">Inbox</Link> : null}
-        <Link href={`/${subj.slug}`} className="muted ml-auto">
+        <Link href={`${base}/wechseln`} className="muted ml-auto">
           Wechseln
         </Link>
       </TopBar>
