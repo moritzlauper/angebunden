@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { learnerContext } from '@/lib/learner.ts'
 import { AppError, getSessionView, sessionSummary, ueRangeLabel, type StatementResult } from '@/lib/service.ts'
 import { answer, markIrrelevant, reportError } from '../../../../actions.ts'
-import { PrimaryShortcut } from '../../../../shortcut.tsx'
+import { OptionShortcuts, PrimaryShortcut } from '../../../../shortcut.tsx'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,13 +89,17 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
         <h1 className="font-semibold">{next.stem}</h1>
         <input type="hidden" name="questionId" value={next.id} />
         <ul className="space-y-2">
-          {next.options.map((o) => (
+          {next.options.map((o, i) => (
             <li key={o.letter}>
-              <label className="card flex cursor-pointer gap-3 p-3 has-[:checked]:border-[var(--accent)]">
-                <input type="checkbox" name="marked" value={o.letter} className="mt-0.5 size-5 shrink-0" />
-                <span>
+              <label className="card flex cursor-pointer gap-3 p-3 has-[:checked]:border-[var(--accent)]" title={`Taste ${i + 1}`}>
+                <input type="checkbox" name="marked" value={o.letter} data-option={i + 1} className="mt-0.5 size-5 shrink-0" />
+                <span className="flex-1">
                   <b>{o.letter})</b> {o.text}
                 </span>
+                {/* Tastenkürzel nur auf Geräten mit Tastatur anzeigen */}
+                <kbd className="muted hidden self-start rounded border px-1.5 font-mono text-xs sm:inline" style={{ borderColor: 'var(--line)' }}>
+                  {i + 1}
+                </kbd>
               </label>
             </li>
           ))}
@@ -107,8 +111,10 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="guessed" value="1" /> war geraten
           </label>
+          <span className="muted ml-auto hidden text-xs sm:inline">1–5 ankreuzen · Cmd+Enter abgeben</span>
         </ActionBar>
         <PrimaryShortcut />
+        <OptionShortcuts />
       </form>
     )
   }
