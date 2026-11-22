@@ -242,6 +242,29 @@ test('RDA Paket 1: jedes Zitat da, keine Hinweise, F mit Verfälschungstyp, UE 1
   assert.ok(PACK.statements.filter((s) => /Kruskal-Wallis/.test(s.text)).every((s) => s.unit === 10))
 })
 
+test('RDA Paket 2: Übungen L1–10, jedes Zitat da, keine Hinweise, F mit Verfälschungstyp', async () => {
+  const { PACK } = await import('../data/seed/rda-paket-2.ts')
+  assert.equal(PACK.subject, 'rda')
+  assert.equal(PACK.statements.length, 103)
+  for (const s of PACK.statements) {
+    assert.deepEqual(s.flags, [], s.text)
+    assert.ok(s.quote.length >= 8, s.text)
+    assert.match(s.sourceRef, /^Übung L(0[1-9]|10)$/, s.text)
+    assert.equal(s.sourceRef, `Übung L${String(s.unit).padStart(2, '0')}`, s.text)
+    assert.deepEqual(checkStatement({ text: s.text, truth: s.truth, quote: s.quote, manipulationType: s.manipulationType }).flags.filter((f) => !f.startsWith('begriffe_')), [], s.text)
+    if (s.truth === 'F') assert.ok(s.manipulationType && s.reason, s.text)
+    assert.ok(s.topic && /^(zu|zum|zur) /.test(s.topic), s.text)
+  }
+  for (let u = 1; u <= 10; u++) {
+    const mine = PACK.statements.filter((s) => s.unit === u)
+    assert.ok(mine.length >= 7, `UE ${u}`)
+    assert.ok(mine.filter((s) => s.truth === 'F').length >= 2, `UE ${u}`)
+  }
+  const fams = new Map<string, Set<number>>()
+  for (const s of PACK.statements) if (s.family) fams.set(s.family, (fams.get(s.family) ?? new Set()).add(s.unit))
+  for (const [f, units] of fams) assert.equal(units.size, 1, f)
+})
+
 test('TT Paket 1: jedes Zitat da, keine Hinweise, F mit Verfälschungstyp, UE 1–8', async () => {
   const { PACK, SUBJECT } = await import('../data/seed/tt-paket-1.ts')
   assert.equal(PACK.subject, 'tt')

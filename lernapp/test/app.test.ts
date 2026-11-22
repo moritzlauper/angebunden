@@ -55,7 +55,7 @@ test('Paket 2: 20 Aussagen pro UE mit Zitat, Detailwissen ausgemustert, nur einm
   assert.equal((await svc.listStatements(db, subjectId, { limit: 1000 })).length, all.length)
 })
 
-test('Neues Fach RDA: angelegt, 13 UEs, Paket 1 aktiv, Grenze UE 10, nur einmal eingespielt', async () => {
+test('Neues Fach RDA: angelegt, 13 UEs, Paket 1 und Übungspaket aktiv, Grenze UE 10, nur einmal eingespielt', async () => {
   const db = await getDb()
   const subjects = await svc.listSubjects(db)
   assert.equal(subjects[0].name, 'Klinische Biopsychologie')
@@ -64,7 +64,8 @@ test('Neues Fach RDA: angelegt, 13 UEs, Paket 1 aktiv, Grenze UE 10, nur einmal 
   assert.equal(rda.name, 'Rechnergestützte Datenauswertung')
   assert.equal(rda.ueLimit, 10)
   const all = await svc.listStatements(db, rda.id, { limit: 1000 })
-  assert.equal(all.length, 324)
+  assert.equal(all.length, 324 + 103)
+  assert.equal(all.filter((x) => x.sourceRef?.startsWith('Übung L')).length, 103)
   assert.ok(all.every((x) => x.status === 'active' && x.origin === 'paket' && x.quote && x.sourceRef))
   const ov = await svc.subjectOverview(db, rda.id)
   assert.equal(ov.units.length, 13)
@@ -73,7 +74,7 @@ test('Neues Fach RDA: angelegt, 13 UEs, Paket 1 aktiv, Grenze UE 10, nur einmal 
   const { applyPacks } = await import('../lib/seed.ts')
   await applyPacks(db)
   assert.equal((await svc.listSubjects(db)).filter((x) => x.slug === 'rda').length, 1)
-  assert.equal((await svc.listStatements(db, rda.id, { limit: 1000 })).length, 324)
+  assert.equal((await svc.listStatements(db, rda.id, { limit: 1000 })).length, 324 + 103)
 })
 
 test('Neues Fach TT: angelegt, 8 UEs, Paket 1 aktiv, Grenze UE 8, nur einmal eingespielt', async () => {

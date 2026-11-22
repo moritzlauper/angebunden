@@ -6,6 +6,7 @@ import { PACK as PACK_2 } from '../data/seed/klibio-paket-2.ts'
 import { PACK as RDA_PACK_1, SUBJECT as RDA_SUBJECT } from '../data/seed/rda-paket-1.ts'
 import { PACK as TT_PACK_1, SUBJECT as TT_SUBJECT } from '../data/seed/tt-paket-1.ts'
 import { PACK as KPF_PACK_1, SUBJECT as KPF_SUBJECT } from '../data/seed/kpf-paket-1.ts'
+import { PACK as RDA_PACK_2 } from '../data/seed/rda-paket-2.ts'
 import type { Pack } from '../data/seed/types.ts'
 import { detailFlags } from './core/quality.ts'
 import { normalize, slugify } from './core/text.ts'
@@ -55,7 +56,7 @@ export async function ensureSubjects(db: Db) {
 }
 
 /** Aussagenpakete, die nach dem ersten Start dazukommen, in der Reihenfolge, in der sie entstanden sind. */
-export const PACKS: Pack[] = [PACK_2, RDA_PACK_1, TT_PACK_1, KPF_PACK_1]
+export const PACKS: Pack[] = [PACK_2, RDA_PACK_1, TT_PACK_1, KPF_PACK_1, RDA_PACK_2]
 
 /**
  * Setzt einen Merker (Quelle «<name>») und sagt, ob dieser Schritt hier zum ersten Mal läuft.
