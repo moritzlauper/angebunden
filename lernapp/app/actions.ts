@@ -62,6 +62,17 @@ export async function enterName(fd: FormData) {
   redirect(`/${subject}/${name}`)
 }
 
+/** Speichert «von UE m bis UE n» sofort beim Ändern der Auswahl, damit Balken und Zahlen mitgehen. */
+export async function saveUeRange(fd: FormData) {
+  await guard()
+  const subjectId = num(fd, 'subjectId')
+  const user = userOf(fd)
+  const ueLimit = num(fd, 'ueLimit')
+  if (!Number.isInteger(ueLimit) || ueLimit < 1) return
+  await svc.setLearnerUeRange(await getDb(), user, subjectId, num(fd, 'ueFrom') || 1, ueLimit)
+  revalidatePath(await basePath(subjectId, user), 'layout')
+}
+
 export async function startSession(fd: FormData) {
   await guard()
   const db = await getDb()

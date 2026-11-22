@@ -1,6 +1,7 @@
 import { learnerContext } from '@/lib/learner.ts'
 import { listSubjects, subjectOverview, ueRangeLabel } from '@/lib/service.ts'
-import { startSession } from '../../actions.ts'
+import { saveUeRange, startSession } from '../../actions.ts'
+import { RangeAutoSave } from '../../range-autosave.tsx'
 import { Progress, UeOptions } from '../../ui.tsx'
 
 export const dynamic = 'force-dynamic'
@@ -58,16 +59,17 @@ export default async function Lernen({ params, searchParams }: PageProps<'/[subj
               <label htmlFor="ue-from" className="shrink-0">
                 von
               </label>
-              <select id="ue-from" name="ueFrom" defaultValue={s.ueFrom} className="min-w-0 flex-1 sm:max-w-xs">
+              <select key={`from-${s.ueFrom}-${s.ueLimit}`} id="ue-from" name="ueFrom" defaultValue={s.ueFrom} className="min-w-0 flex-1 sm:max-w-xs">
                 <UeOptions units={us} ueLimit={s.ueLimit} />
               </select>
               <label htmlFor="ue-limit" className="shrink-0">
                 bis
               </label>
-              <select id="ue-limit" name="ueLimit" defaultValue={s.ueLimit} className="min-w-0 flex-1 sm:max-w-xs">
+              <select key={`limit-${s.ueFrom}-${s.ueLimit}`} id="ue-limit" name="ueLimit" defaultValue={s.ueLimit} className="min-w-0 flex-1 sm:max-w-xs">
                 <UeOptions units={us} ueLimit={s.ueLimit} />
               </select>
             </div>
+            <RangeAutoSave action={saveUeRange} />
           </form>
 
           <div className="space-y-3">
