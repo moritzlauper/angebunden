@@ -998,7 +998,7 @@ async function flagDivergentVariants(db: Db, variants: s.Statement[]) {
   }
 }
 
-/** Ende der Session: x von n komplett richtig und die zwei Aussagen zum Wiederholen. */
+/** Ende der Session: x von n komplett richtig und alle daneben beantworteten Aussagen zum Wiederholen. */
 export async function sessionSummary(db: Db, sessionId: number) {
   const view = await getSessionView(db, sessionId)
   const wrong = view.questions.flatMap((q) => (q.results ?? []).filter((r) => !r.correct))

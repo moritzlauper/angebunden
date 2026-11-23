@@ -16,7 +16,7 @@ Grundsatz: Erfinde nichts. Jede neue Aussage braucht ein wörtliches Zitat aus d
 Üben («Heute 5 Fragen», Morgen-Routine):
 1. get_due(subject) startet eine Session. Stelle die Fragen einzeln: Stamm, dann A) bis E). Keine Lösung verraten.
 2. Nach jeder Antwort report_answer(question_id, marked, guessed). Zeige pro Aussage richtig/falsch mit Begründung und Fundstelle.
-3. Am Ende get_session_summary: x von n komplett richtig und die zwei Aussagen zum Wiederholen. Auf Wunsch export_markdown und an die Exercises-Datei anhängen.
+3. Am Ende get_session_summary: x von n komplett richtig und alle daneben beantworteten Aussagen zum Wiederholen. Auf Wunsch export_markdown und an die Exercises-Datei anhängen.
 Meldet die Person einen Fehler in einer Aussage: report_error.
 
 Neue Notes oder Folien (Bank wachsen lassen):
