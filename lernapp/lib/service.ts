@@ -1004,9 +1004,8 @@ export async function sessionSummary(db: Db, sessionId: number) {
   const wrong = view.questions.flatMap((q) => (q.results ?? []).filter((r) => !r.correct))
   const ids = wrong.map((w) => w.statementId)
   const states = await cardStates(db, ids, view.session.userId)
-  const repeat = wrong
-    .sort((a, b) => (states.get(b.statementId)?.lapses ?? 0) - (states.get(a.statementId)?.lapses ?? 0))
-    .slice(0, 2)
+  // alle daneben beantworteten Aussagen, die am häufigsten vergessenen zuerst
+  const repeat = wrong.sort((a, b) => (states.get(b.statementId)?.lapses ?? 0) - (states.get(a.statementId)?.lapses ?? 0))
   return { score: view.score, repeat, finished: view.finished }
 }
 
