@@ -149,6 +149,18 @@ test('Session: fällige vor neuen', () => {
   assert.ok(qs.flatMap((q) => q.statementIds).includes(7))
 })
 
+test('Session: Aussagen der vorherigen Runde nicht gleich wieder, auch wenn fällig', () => {
+  const now = new Date('2026-11-14T10:00:00Z')
+  const due = new Date('2026-11-14T09:59:00Z')
+  const c = cands().map((x) => (x.id <= 5 ? { ...x, due, stability: 0.2, lapses: 1, recent: true } : x))
+  const qs = composeSession(c, { ueLimit: 6, rng: seeded(4), now })
+  const all = qs.flatMap((q) => q.statementIds)
+  assert.ok(all.every((id) => id > 5))
+  // reicht der Rest nicht, kommen sie trotzdem dran
+  const few = composeSession(c.filter((x) => x.id <= 8), { ueLimit: 6, rng: seeded(4), now })
+  assert.equal(few.length, 1)
+})
+
 test('Session: zu wenig Aussagen ergibt keine Fragen', () => {
   assert.deepEqual(composeSession(cands().slice(0, 4), { ueLimit: 6 }), [])
   assert.equal(planUnits(new Map([[1, 1]]), 3).length, 3)

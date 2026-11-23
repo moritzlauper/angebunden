@@ -9,7 +9,9 @@ import { stemFromTopic } from './parse.ts'
  *  2. mindestens drei UEs pro Session (wenn vorhanden), die neueste UE doppelt,
  *  3. die Anzahl richtiger Aussagen variiert über die Session (0 bis 5),
  *  4. eine Aussage nie zusammen mit ihrer Umkehrung oder einer Variante derselben
- *     Ur-Aussage (hier: nie zweimal dieselbe Familie in einer Session).
+ *     Ur-Aussage (hier: nie zweimal dieselbe Familie in einer Session),
+ *  5. nie zwei Runden hintereinander: Aussagen aus der vorherigen Session kommen nur dran,
+ *     wenn sonst zu wenige da sind. Falsch Beantwortetes kommt so eine Runde später wieder.
  *
  * Reihenfolge: zuerst fällige Aussagen, dann neue, dann die am wenigsten stabilen.
  * Im Prüfungsmodus zählt nicht der Plan, sondern Schwäche und «lange nicht gesehen».
@@ -30,6 +32,8 @@ export type Candidate = {
   lastAnswered: Date | null
   /** Anteil falscher Antworten (0–1), null wenn nie beantwortet */
   wrongRate: number | null
+  /** kam in der vorherigen Session schon vor, beantwortet oder nicht */
+  recent?: boolean
 }
 
 export type ComposeOptions = {
@@ -133,10 +137,13 @@ export function composeSession(candidates: Candidate[], opts: ComposeOptions): C
       if (seenNew > newLimit) s.p = 0.5
     }
   }
+  // Aussagen aus der vorherigen Session ganz nach hinten, untereinander in derselben Reihenfolge.
+  const RECENT_PENALTY = 100
+  for (const s of scored) if (s.c.recent) s.p -= RECENT_PENALTY
   scored.sort((a, b) => b.p - a.p)
 
   const unitWeights = new Map<number, number>()
-  for (const s of scored) unitWeights.set(s.c.unitNumber, (unitWeights.get(s.c.unitNumber) ?? 0) + s.p)
+  for (const s of scored) unitWeights.set(s.c.unitNumber, (unitWeights.get(s.c.unitNumber) ?? 0) + Math.max(0, s.p))
   const titles = new Map(eligible.map((c) => [c.unitNumber, c.unitTitle]))
 
   const plan = planUnits(unitWeights, n)

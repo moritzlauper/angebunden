@@ -745,6 +745,25 @@ export async function importBank(db: Db, subjectId: number, markdown: string, st
 
 // ───────────────────────────── Üben ─────────────────────────────
 
+/** Aussagen der letzten Session dieser Person im Fach, wenn sie höchstens drei Stunden zurückliegt. */
+async function lastSessionStatements(db: Db, subjectId: number, user: string, now: Date): Promise<Set<number>> {
+  const [last] = await db
+    .select({ id: s.practiceSession.id })
+    .from(s.practiceSession)
+    .where(
+      and(
+        eq(s.practiceSession.subjectId, subjectId),
+        eq(s.practiceSession.userId, user),
+        gte(s.practiceSession.startedAt, new Date(now.getTime() - 3 * 3_600_000)),
+      ),
+    )
+    .orderBy(desc(s.practiceSession.startedAt))
+    .limit(1)
+  if (!last) return new Set()
+  const qs = await db.select({ ids: s.question.statementIds }).from(s.question).where(eq(s.question.sessionId, last.id))
+  return new Set(qs.flatMap((q) => q.ids ?? []))
+}
+
 export async function startSession(
   db: Db,
   subjectId: number,
@@ -763,7 +782,7 @@ export async function startSession(
     .innerJoin(s.unit, eq(s.statement.unitId, s.unit.id))
     .where(and(eq(s.unit.subjectId, subjectId), eq(s.statement.status, 'active'), gte(s.unit.number, ueFrom), lte(s.unit.number, ueLimit)))
   const ids = rows.map((r) => r.st.id)
-  const [states, stats] = await Promise.all([cardStates(db, ids, user), answerStats(db, ids, user)])
+  const [states, stats, recent] = await Promise.all([cardStates(db, ids, user), answerStats(db, ids, user), lastSessionStatements(db, subjectId, user, now)])
   const candidates: Candidate[] = rows.map((r) => {
     const cs = states.get(r.st.id)
     const st = stats.get(r.st.id)
@@ -779,6 +798,7 @@ export async function startSession(
       lapses: cs ? cs.lapses : 0,
       lastAnswered: st?.lastAnswered ?? null,
       wrongRate: st ? st.wrong / st.answers : null,
+      recent: recent.has(r.st.id),
     }
   })
   const composed = composeSession(candidates, {
