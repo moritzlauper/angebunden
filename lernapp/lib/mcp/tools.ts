@@ -326,7 +326,7 @@ export const TOOLS = [
   tool({
     name: 'get_session_summary',
     title: 'Session-Abschluss',
-    description: 'x von n Fragen komplett richtig und die zwei Aussagen zum Wiederholen.',
+    description: 'x von n Fragen komplett richtig und alle daneben beantworteten Aussagen zum Wiederholen.',
     input: z.object({ session_id: z.number().int() }),
     readOnly: true,
     run: async (a) => svc.sessionSummary(await getDb(), a.session_id),

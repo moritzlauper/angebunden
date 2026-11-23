@@ -140,7 +140,10 @@ test('MCP: Session über get_due und report_answer, FSRS-Update', async () => {
   for (const qq of due.questions.slice(1)) await call('report_answer', { question_id: qq.question_id, marked: [] })
   const sum = await call('get_session_summary', { session_id: due.session_id })
   assert.equal(sum.finished, true)
-  assert.ok(sum.repeat.length <= 2)
+  // alle daneben beantworteten Aussagen der Session, keine Obergrenze
+  const view = await svc.getSessionView(await getDb(), due.session_id)
+  const wrong = view.questions.flatMap((x) => (x.results ?? []).filter((y) => !y.correct))
+  assert.equal(sum.repeat.length, wrong.length)
   const [kb] = await svc.listSubjects(await getDb())
   assert.equal(kb.counts.new, before.counts.new - 25)
   const md = await call('export_markdown', { subject: 'KliBio', session_id: due.session_id })
