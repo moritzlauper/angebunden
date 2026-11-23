@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ThemeSwitch } from './theme-switch.tsx'
 
 /**
  * Eine einzige, kompakte Kopfzeile. Auf dem Handy scrollen die Links waagrecht,
@@ -12,6 +13,7 @@ export function TopBar({ brand, brandHref = '/', children }: { brand?: React.Rea
           {brand ?? 'Klicker'}
         </Link>
         {children}
+        <ThemeSwitch />
       </nav>
     </header>
   )

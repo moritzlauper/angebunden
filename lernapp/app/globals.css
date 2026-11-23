@@ -39,28 +39,27 @@
   --sans: 'Space Grotesk', -apple-system, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --bg: #110f17;
-    --panel: #1f1b28;
-    --face: #2a2535;
-    --hi: #4b4360;
-    --lo: #08070b;
-    --fg: #ece8f6;
-    --line: #4b4360;
-    --muted: #a69eb8;
-    --accent: #a98bff;
-    --accent2: #ff7ac0;
-    --on-accent: #110f17;
-    --field: #15121d;
-    --shadow: #000;
-    --drop: rgba(0, 0, 0, 0.45);
-    --dis-fg: #5e5672;
-    --title: linear-gradient(90deg, #3a1f86, #8f2a83 70%, #c23584);
-    --color-ok: #6fd38e;
-    --color-bad: #ff6b85;
-  }
+/* data-theme setzt das Skript im <head> (layout.tsx) aus Wahl im Umschalter oder Systemeinstellung. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #110f17;
+  --panel: #1f1b28;
+  --face: #2a2535;
+  --hi: #4b4360;
+  --lo: #08070b;
+  --fg: #ece8f6;
+  --line: #4b4360;
+  --muted: #a69eb8;
+  --accent: #a98bff;
+  --accent2: #ff7ac0;
+  --on-accent: #110f17;
+  --field: #15121d;
+  --shadow: #000;
+  --drop: rgba(0, 0, 0, 0.45);
+  --dis-fg: #5e5672;
+  --title: linear-gradient(90deg, #3a1f86, #8f2a83 70%, #c23584);
+  --color-ok: #6fd38e;
+  --color-bad: #ff6b85;
 }
 
 html {
@@ -114,9 +113,22 @@ summary {
   color: var(--accent2);
   text-shadow: 2px 2px 0 var(--lime);
 }
-.topbar nav > a:not(.btn-quiet):not(.logo) {
+.topbar nav > a:not(.btn-quiet):not(.logo),
+.theme-switch {
   font-family: var(--pixel);
   font-size: 0.8rem;
+}
+.theme-switch {
+  margin-left: auto;
+  color: var(--muted);
+  min-height: 2.5rem;
+  padding: 0 0.25rem;
+}
+.topbar nav > .ml-auto ~ .theme-switch {
+  margin-left: 0;
+}
+.theme-switch:hover {
+  color: var(--fg);
 }
 
 /* Fenster: erhaben, mit hartem Schatten. */

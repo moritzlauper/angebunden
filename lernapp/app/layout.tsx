@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
+import { themeScript } from './theme-switch.tsx'
 
 export const metadata: Metadata = {
   title: 'Klicker',
@@ -14,16 +15,16 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#dcd7e6' },
-    { media: '(prefers-color-scheme: dark)', color: '#1f1b28' },
-  ],
+  // themeColor setzt themeScript passend zur gewählten Darstellung.
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // Browser-Erweiterungen hängen Attribute ans <html>; die Warnung dazu ist kein Fehler der App.
     <html lang="de-CH" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="min-h-dvh antialiased">
         {children}
         <Analytics />
