@@ -114,6 +114,15 @@ export async function reportError(fd: FormData) {
   redirect(back.startsWith('/') && !back.startsWith('//') ? back : '/')
 }
 
+/** Rückgängig zu «Nicht prüfungsrelevant», nur für den Besitzer. */
+export async function unmarkIrrelevant(fd: FormData) {
+  await guard()
+  if (userOf(fd) !== svc.OWNER) return
+  await svc.unmarkIrrelevant(await getDb(), num(fd, 'statementId'))
+  const back = str(fd, 'back')
+  redirect(back.startsWith('/') && !back.startsWith('//') ? back : '/')
+}
+
 export async function updateSubject(fd: FormData) {
   await guard()
   ownerOnly(fd)

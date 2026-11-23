@@ -664,14 +664,27 @@ export async function reviewStatement(
  * (ausgemustert, Flag nicht_relevant). Der Generator bekommt solche Aussagen als Beispiele
  * dafür, was nicht gewünscht ist. Andere Personen melden sie nur, der Besitzer entscheidet.
  */
+const IRRELEVANT = 'nicht prüfungsrelevant'
+
 export async function markIrrelevant(db: Db, statementId: number, user = OWNER) {
-  if (user !== OWNER) return reportError(db, statementId, 'nicht prüfungsrelevant', user)
+  if (user !== OWNER) return reportError(db, statementId, IRRELEVANT, user)
   const [st] = await db.select().from(s.statement).where(eq(s.statement.id, statementId))
   if (!st) throw new AppError(`Aussage ${statementId} nicht gefunden`)
-  await db.insert(s.report).values({ statementId, comment: 'nicht prüfungsrelevant', userId: user, resolved: true })
+  await db.insert(s.report).values({ statementId, comment: IRRELEVANT, userId: user, resolved: true })
   const flags = [...new Set([...(st.flags ?? []), 'nicht_relevant'])]
   await db.update(s.statement).set({ status: 'retired', flags, updatedAt: new Date() }).where(eq(s.statement.id, statementId))
   return { statementId, status: 'retired' }
+}
+
+/** Macht «Nicht prüfungsrelevant» des Besitzers rückgängig: Aussage wieder aktiv, Markierung weg. */
+export async function unmarkIrrelevant(db: Db, statementId: number) {
+  const [st] = await db.select().from(s.statement).where(eq(s.statement.id, statementId))
+  if (!st) throw new AppError(`Aussage ${statementId} nicht gefunden`)
+  if (!(st.flags ?? []).includes('nicht_relevant')) return { statementId, status: st.status }
+  const flags = (st.flags ?? []).filter((f) => f !== 'nicht_relevant')
+  await db.update(s.statement).set({ status: 'active', flags, updatedAt: new Date() }).where(eq(s.statement.id, statementId))
+  await db.delete(s.report).where(and(eq(s.report.statementId, statementId), eq(s.report.comment, IRRELEVANT), eq(s.report.userId, OWNER)))
+  return { statementId, status: 'active' }
 }
 
 /** Aussagen, die der Besitzer als nicht prüfungsrelevant ausgemustert hat (Negativbeispiele für den Generator). */
@@ -836,6 +849,10 @@ export type StatementResult = {
   quote: string | null
   sourceRef: string | null
   links: { label: string; url: string | null }[]
+  /** als nicht prüfungsrelevant markiert (Besitzer: ausgemustert, andere: gemeldet) */
+  irrelevant: boolean
+  /** Fehler gemeldet von der Person dieser Session */
+  reported: boolean
 }
 
 export async function getSessionView(db: Db, sessionId: number) {
@@ -850,6 +867,14 @@ export async function getSessionView(db: Db, sessionId: number) {
   const answers = qIds.length ? await db.select().from(s.answer).where(inArray(s.answer.questionId, qIds)) : []
   const units = await db.select().from(s.unit).where(eq(s.unit.subjectId, sess.subjectId))
   const unitTitle = new Map(units.map((u) => [u.number, u.title]))
+  const reports = allIds.length
+    ? await db
+        .select({ statementId: s.report.statementId, comment: s.report.comment })
+        .from(s.report)
+        .where(and(inArray(s.report.statementId, allIds), eq(s.report.userId, sess.userId)))
+    : []
+  const reportedIrrelevant = new Set(reports.filter((r) => r.comment === IRRELEVANT).map((r) => r.statementId))
+  const reportedError = new Set(reports.filter((r) => r.comment !== IRRELEVANT).map((r) => r.statementId))
 
   const view = questions.map((q) => {
     const answered = !!q.answeredAt
@@ -875,6 +900,9 @@ export async function getSessionView(db: Db, sessionId: number) {
           quote: st.quote,
           sourceRef: st.sourceRef,
           links: sourceLinks(st.sourceRef, subj),
+          irrelevant:
+            sess.userId === OWNER ? st.status === 'retired' && (st.flags ?? []).includes('nicht_relevant') : reportedIrrelevant.has(id),
+          reported: reportedError.has(id),
         }
       })
     }

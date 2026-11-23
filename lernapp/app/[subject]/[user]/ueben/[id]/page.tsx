@@ -1,37 +1,64 @@
-import Link from 'next/link'
-import { notFound } from 'next/navigation'
-import { learnerContext } from '@/lib/learner.ts'
-import { AppError, getSessionView, sessionSummary, ueRangeLabel, type StatementResult } from '@/lib/service.ts'
-import { answer, markIrrelevant, reportError } from '../../../../actions.ts'
-import { OptionShortcuts, PrimaryShortcut } from '../../../../shortcut.tsx'
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { learnerContext } from "@/lib/learner.ts";
+import {
+  AppError,
+  getSessionView,
+  sessionSummary,
+  ueRangeLabel,
+  type StatementResult,
+} from "@/lib/service.ts";
+import {
+  answer,
+  markIrrelevant,
+  reportError,
+  unmarkIrrelevant,
+} from "../../../../actions.ts";
+import { PendingButton } from "../../../../pending-button.tsx";
+import { OptionShortcuts, PrimaryShortcut } from "../../../../shortcut.tsx";
 
-export const dynamic = 'force-dynamic'
+export const dynamic = "force-dynamic";
 
-export default async function Ueben({ params, searchParams }: PageProps<'/[subject]/[user]/ueben/[id]'>) {
-  const { id } = await params
-  const { db, user, base, isOwner } = await learnerContext(params, `/ueben/${id}`)
-  const sp = await searchParams
+export default async function Ueben({
+  params,
+  searchParams,
+}: PageProps<"/[subject]/[user]/ueben/[id]">) {
+  const { id } = await params;
+  const { db, user, base, isOwner } = await learnerContext(
+    params,
+    `/ueben/${id}`,
+  );
+  const sp = await searchParams;
   const view = await getSessionView(db, Number(id)).catch((e) => {
-    if (e instanceof AppError) notFound()
-    throw e
-  })
+    if (e instanceof AppError) notFound();
+    throw e;
+  });
   // Fremde Sitzungen nicht zeigen: jede Person sieht nur ihre eigenen.
-  if (view.session.userId !== user) notFound()
-  const shownId = Number(sp.q)
-  const shown = view.questions.find((q) => q.id === shownId && q.answered)
-  const next = view.questions.find((q) => !q.answered)
-  const back = `${base}/ueben/${id}${shown ? `?q=${shown.id}` : ''}`
+  if (view.session.userId !== user) notFound();
+  const shownId = Number(sp.q);
+  const shown = view.questions.find((q) => q.id === shownId && q.answered);
+  const next = view.questions.find((q) => !q.answered);
+  const back = `${base}/ueben/${id}${shown ? `?q=${shown.id}` : ""}`;
 
-  const header = (q?: { id: number; position: number; unitNumber: number | null; unitTitle: string | null }) => (
+  const header = (q?: {
+    id: number;
+    position: number;
+    unitNumber: number | null;
+    unitTitle: string | null;
+  }) => (
     <div className="space-y-1.5">
       <p className="muted flex justify-between gap-3 text-xs">
         <span className="truncate">
-          {q ? `Frage ${q.position} von ${view.score.total}` : `${view.score.answered} von ${view.score.total} beantwortet`}
-          {q?.unitNumber != null ? ` · UE ${q.unitNumber}${q.unitTitle ? ` ${q.unitTitle}` : ''}` : ''}
+          {q
+            ? `Frage ${q.position} von ${view.score.total}`
+            : `${view.score.answered} von ${view.score.total} beantwortet`}
+          {q?.unitNumber != null
+            ? ` · UE ${q.unitNumber}${q.unitTitle ? ` ${q.unitTitle}` : ""}`
+            : ""}
         </span>
         <span className="shrink-0">
           {ueRangeLabel(view.session.ueFrom, view.session.ueLimit)}
-          {view.session.examMode ? ' · Prüfung' : ''}
+          {view.session.examMode ? " · Prüfung" : ""}
         </span>
       </p>
       {/* Fortschritt über die Fragen der Sitzung: grün = komplett richtig, rot = nicht ganz, hell = offen */}
@@ -41,45 +68,70 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
             key={x.id}
             className="h-1 flex-1 rounded-full"
             style={{
-              background: !x.answered ? 'var(--line)' : x.allCorrect ? 'var(--color-ok)' : 'var(--color-bad)',
-              outline: q?.id === x.id ? '1px solid var(--fg)' : undefined,
+              background: !x.answered
+                ? "var(--line)"
+                : x.allCorrect
+                  ? "var(--color-ok)"
+                  : "var(--color-bad)",
+              outline: q?.id === x.id ? "1px solid var(--fg)" : undefined,
             }}
           />
         ))}
       </div>
     </div>
-  )
+  );
 
   // Steht unten rechts fix am Bildschirmrand, damit man nie scrollen muss.
   const nextLink = next ? (
-    <Link className="btn" href={`${base}/ueben/${id}`} autoFocus data-shortcut="primary">
+    <Link
+      className="btn"
+      href={`${base}/ueben/${id}`}
+      autoFocus
+      data-shortcut="primary"
+    >
       Nächste Frage →
     </Link>
   ) : (
-    <Link className="btn" href={`${base}/ueben/${id}?ende=1`} autoFocus data-shortcut="primary">
+    <Link
+      className="btn"
+      href={`${base}/ueben/${id}?ende=1`}
+      autoFocus
+      data-shortcut="primary"
+    >
       Zur Auswertung →
     </Link>
-  )
+  );
 
   if (shown) {
     return (
       <div className="space-y-4">
         {header(shown)}
         <h1 className="font-semibold">{shown.stem}</h1>
-        <p className={`font-semibold ${shown.allCorrect ? 'text-ok' : 'text-bad'}`}>
-          {shown.allCorrect ? 'Komplett richtig.' : 'Nicht ganz.'} Richtig:{' '}
-          {shown.results!.filter((r) => r.truth === 'R').map((r) => r.letter).join(', ') || 'keine'}
-          {shown.guessed ? ' · als geraten markiert' : ''}
+        <p
+          className={`font-semibold ${shown.allCorrect ? "text-ok" : "text-bad"}`}
+        >
+          {shown.allCorrect ? "Komplett richtig." : "Nicht ganz."} Richtig:{" "}
+          {shown
+            .results!.filter((r) => r.truth === "R")
+            .map((r) => r.letter)
+            .join(", ") || "keine"}
+          {shown.guessed ? " · als geraten markiert" : ""}
         </p>
         <ul className="space-y-3">
           {shown.results!.map((r) => (
-            <Result key={r.letter} r={r} back={back} user={user} isOwner={isOwner} />
+            <Result
+              key={r.letter}
+              r={r}
+              back={back}
+              user={user}
+              isOwner={isOwner}
+            />
           ))}
         </ul>
         <ActionBar align="end">{nextLink}</ActionBar>
         <PrimaryShortcut />
       </div>
-    )
+    );
   }
 
   if (next) {
@@ -91,13 +143,25 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
         <ul className="space-y-2">
           {next.options.map((o, i) => (
             <li key={o.letter}>
-              <label className="card flex cursor-pointer gap-3 p-3 has-[:checked]:border-[var(--accent)]" title={`Taste ${i + 1}`}>
-                <input type="checkbox" name="marked" value={o.letter} data-option={i + 1} className="mt-0.5 size-5 shrink-0" />
+              <label
+                className="card flex cursor-pointer gap-3 p-3 has-[:checked]:border-[var(--accent)]"
+                title={`Taste ${i + 1}`}
+              >
+                <input
+                  type="checkbox"
+                  name="marked"
+                  value={o.letter}
+                  data-option={i + 1}
+                  className="mt-0.5 size-5 shrink-0"
+                />
                 <span className="flex-1">
                   <b>{o.letter})</b> {o.text}
                 </span>
                 {/* Tastenkürzel nur auf Geräten mit Tastatur anzeigen */}
-                <kbd className="muted hidden self-start rounded border px-1.5 font-mono text-xs sm:inline" style={{ borderColor: 'var(--line)' }}>
+                <kbd
+                  className="muted hidden self-start rounded border px-1.5 font-mono text-xs sm:inline"
+                  style={{ borderColor: "var(--line)" }}
+                >
                   {i + 1}
                 </kbd>
               </label>
@@ -111,15 +175,17 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="guessed" value="1" /> war geraten
           </label>
-          <span className="muted ml-auto hidden text-xs sm:inline">1–5 ankreuzen · Cmd+Enter abgeben</span>
+          <span className="muted ml-auto hidden text-xs sm:inline">
+            1–5 ankreuzen · Cmd+Enter abgeben
+          </span>
         </ActionBar>
         <PrimaryShortcut />
         <OptionShortcuts />
       </form>
-    )
+    );
   }
 
-  const summary = await sessionSummary(db, Number(id))
+  const summary = await sessionSummary(db, Number(id));
   return (
     <div className="space-y-5">
       {header()}
@@ -131,7 +197,13 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
           <h2 className="font-semibold">Zum Wiederholen</h2>
           <ul className="space-y-3">
             {summary.repeat.map((r) => (
-              <Result key={r.statementId} r={r} back={`${base}/ueben/${id}?ende=1`} user={user} isOwner={isOwner} />
+              <Result
+                key={r.statementId}
+                r={r}
+                back={`${base}/ueben/${id}?ende=1`}
+                user={user}
+                isOwner={isOwner}
+              />
             ))}
           </ul>
         </section>
@@ -143,40 +215,72 @@ export default async function Ueben({ params, searchParams }: PageProps<'/[subje
           Fertig
         </Link>
         {isOwner ? (
-          <a className="btn-quiet" href={`/api/export?subject=${view.subject.id}&session=${id}`} target="_blank">
+          <a
+            className="btn-quiet"
+            href={`/api/export?subject=${view.subject.id}&session=${id}`}
+            target="_blank"
+          >
             Als Markdown für Exercises
           </a>
         ) : null}
       </div>
     </div>
-  )
+  );
 }
 
 /** Knopfleiste, die beim Scrollen am unteren Bildschirmrand kleben bleibt. */
-function ActionBar({ children, align }: { children: React.ReactNode; align: 'start' | 'end' }) {
+function ActionBar({
+  children,
+  align,
+}: {
+  children: React.ReactNode;
+  align: "start" | "end";
+}) {
   return (
     <div
-      className={`sticky bottom-0 -mx-4 flex items-center gap-4 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${align === 'end' ? 'justify-end' : ''}`}
-      style={{ background: 'var(--panel)', borderColor: 'var(--line)' }}
+      className={`sticky bottom-0 -mx-4 flex items-center gap-4 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] ${align === "end" ? "justify-end" : ""}`}
+      style={{ background: "var(--panel)", borderColor: "var(--line)" }}
     >
       {children}
     </div>
-  )
+  );
 }
 
-function Result({ r, back, user, isOwner }: { r: StatementResult; back: string; user: string; isOwner: boolean }) {
+function Result({
+  r,
+  back,
+  user,
+  isOwner,
+}: {
+  r: StatementResult;
+  back: string;
+  user: string;
+  isOwner: boolean;
+}) {
   return (
-    <li className="card space-y-1 p-3" style={{ borderColor: r.correct ? 'var(--color-ok)' : 'var(--color-bad)' }}>
+    <li
+      className="card space-y-1 p-3"
+      style={{
+        borderColor: r.correct ? "var(--color-ok)" : "var(--color-bad)",
+      }}
+    >
       <p>
         <b>{r.letter})</b> {r.text}
       </p>
-      <p className={`text-sm font-semibold ${r.correct ? 'text-ok' : 'text-bad'}`}>
-        {r.truth === 'R' ? 'richtig' : 'falsch'} · {r.marked ? 'angekreuzt' : 'nicht angekreuzt'} · {r.correct ? 'korrekt' : 'daneben'}
+      <p
+        className={`text-sm font-semibold ${r.correct ? "text-ok" : "text-bad"}`}
+      >
+        {r.truth === "R" ? "richtig" : "falsch"} ·{" "}
+        {r.marked ? "angekreuzt" : "nicht angekreuzt"} ·{" "}
+        {r.correct ? "korrekt" : "daneben"}
       </p>
       {r.reason ? <p className="text-sm">{r.reason}</p> : null}
       {r.quote ? (
-        <blockquote className="muted border-l-2 pl-3 text-sm" style={{ borderColor: 'var(--line)' }}>
-          «{r.quote.replace(/\*\*|<\/?u>/g, '')}»
+        <blockquote
+          className="muted border-l-2 pl-3 text-sm"
+          style={{ borderColor: "var(--line)" }}
+        >
+          «{r.quote.replace(/\*\*|<\/?u>/g, "")}»
         </blockquote>
       ) : null}
       <div className="flex flex-wrap items-center gap-3 text-sm">
@@ -192,25 +296,63 @@ function Result({ r, back, user, isOwner }: { r: StatementResult; back: string; 
           ),
         )}
         {/* Detailwissen, das man nicht auswendig können muss: Besitzer mustert aus, andere melden. */}
-        <form action={markIrrelevant} className="ml-auto">
-          <input type="hidden" name="statementId" value={r.statementId} />
-          <input type="hidden" name="back" value={back} />
-          <input type="hidden" name="user" value={user} />
-          <button className="muted cursor-pointer underline-offset-2 hover:underline" title={isOwner ? 'Aus den Übungen nehmen' : 'Dem Besitzer melden'}>
-            Nicht prüfungsrelevant
-          </button>
-        </form>
-        <details>
-          <summary className="muted cursor-pointer">Fehler melden</summary>
-          <form action={reportError} className="mt-2 flex gap-2">
+        {r.irrelevant ? (
+          <span className="ml-auto flex items-center gap-2">
+            <span className="text-ok font-semibold">
+              ✓{" "}
+              {isOwner
+                ? "Ausgemustert, kommt nicht mehr"
+                : "Als nicht prüfungsrelevant gemeldet"}
+            </span>
+            {isOwner ? (
+              <form action={unmarkIrrelevant}>
+                <input type="hidden" name="statementId" value={r.statementId} />
+                <input type="hidden" name="back" value={back} />
+                <input type="hidden" name="user" value={user} />
+                <PendingButton
+                  className="muted cursor-pointer underline underline-offset-2"
+                  pendingText="…"
+                >
+                  Rückgängig
+                </PendingButton>
+              </form>
+            ) : null}
+          </span>
+        ) : (
+          <form action={markIrrelevant} className="ml-auto">
             <input type="hidden" name="statementId" value={r.statementId} />
             <input type="hidden" name="back" value={back} />
             <input type="hidden" name="user" value={user} />
-            <input type="text" name="comment" placeholder="Was stimmt nicht?" />
-            <button className="btn-quiet">Melden</button>
+            <PendingButton
+              className="muted cursor-pointer underline-offset-2 hover:underline"
+              pendingText={isOwner ? "Wird ausgemustert …" : "Wird gemeldet …"}
+              title={isOwner ? "Aus den Übungen nehmen" : "Dem Besitzer melden"}
+            >
+              Nicht prüfungsrelevant
+            </PendingButton>
           </form>
-        </details>
+        )}
+        {r.reported ? (
+          <span className="text-ok font-semibold">✓ Fehler gemeldet</span>
+        ) : (
+          <details>
+            <summary className="muted cursor-pointer">Fehler melden</summary>
+            <form action={reportError} className="mt-2 flex gap-2">
+              <input type="hidden" name="statementId" value={r.statementId} />
+              <input type="hidden" name="back" value={back} />
+              <input type="hidden" name="user" value={user} />
+              <input
+                type="text"
+                name="comment"
+                placeholder="Was stimmt nicht?"
+              />
+              <PendingButton className="btn-quiet" pendingText="…">
+                Melden
+              </PendingButton>
+            </form>
+          </details>
+        )}
       </div>
     </li>
-  )
+  );
 }
