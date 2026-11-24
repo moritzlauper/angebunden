@@ -29,9 +29,10 @@ test('Startfach Klinische Biopsychologie ist angelegt', async () => {
   const [kb] = await svc.listSubjects(await getDb())
   assert.equal(kb.name, 'Klinische Biopsychologie')
   assert.equal(kb.ueLimit, 4)
-  // 25 aus der Startbank, davon 2 als Detailwissen ausgemustert, dazu Paket 2 mit 20 pro UE 1–9
-  assert.equal(kb.counts.active, 23 + 180)
-  assert.equal(kb.counts.new, 23 + 4 * 20)
+  // 25 aus der Startbank, davon 2 als Detailwissen ausgemustert, dazu Paket 2 mit 20 pro UE 1–9;
+  // Paket 3 mustert 19 aus, die nur aus der Zusammenfassung stammen (17 davon in UE 1–4)
+  assert.equal(kb.counts.active, 23 + 180 - 19)
+  assert.equal(kb.counts.new, 23 + 4 * 20 - 17)
 })
 
 test('Paket 2: 20 Aussagen pro UE mit Zitat, Detailwissen ausgemustert, nur einmal eingespielt', async () => {
@@ -40,7 +41,8 @@ test('Paket 2: 20 Aussagen pro UE mit Zitat, Detailwissen ausgemustert, nur einm
   const pack = all.filter((x) => x.origin === 'paket')
   assert.equal(pack.length, 180)
   for (let u = 1; u <= 9; u++) assert.equal(pack.filter((x) => x.unitNumber === u).length, 20, `UE ${u}`)
-  assert.ok(pack.every((x) => x.status === 'active' && x.quote && x.sourceRef))
+  assert.ok(pack.every((x) => x.quote && x.sourceRef))
+  assert.equal(pack.filter((x) => x.status === 'active').length, 180 - 19) // Paket 3 mustert 19 aus
   // Varianten derselben Ur-Aussage hängen zusammen, damit sie nie in derselben Frage stehen
   assert.ok(pack.some((x) => x.parentId !== null))
   const retired = all.filter((x) => x.status === 'retired').map((x) => x.text)
@@ -53,6 +55,31 @@ test('Paket 2: 20 Aussagen pro UE mit Zitat, Detailwissen ausgemustert, nur einm
   const { applyPacks } = await import('../lib/seed.ts')
   await applyPacks(db)
   assert.equal((await svc.listStatements(db, subjectId, { limit: 1000 })).length, all.length)
+})
+
+test('Paket 3: Aussagen, die nur aus der Zusammenfassung stammen, sind ausgemustert', async () => {
+  const db = await getDb()
+  const { PACK: P3 } = await import('../data/seed/klibio-paket-3.ts')
+  const { PACK: P2 } = await import('../data/seed/klibio-paket-2.ts')
+  const all = await svc.listStatements(db, subjectId, { limit: 1000 })
+  const byText = new Map(all.map((x) => [x.text, x]))
+  assert.equal(P3.retire.length, 19)
+  for (const t of P3.retire) {
+    const st = byText.get(t)
+    assert.ok(st, `fehlt: ${t}`)
+    assert.equal(st.status, 'retired', t)
+    assert.ok(st.flags.includes('nicht_relevant'), t)
+  }
+  // nur ZM-Aussagen werden ausgemustert; die 8 übrigen ZM-Aussagen und alle VL-Aussagen bleiben aktiv
+  const retire = new Set(P3.retire)
+  const zm = P2.statements.filter((x) => x.sourceRef.startsWith('ZM'))
+  assert.ok(P3.retire.every((t) => zm.some((x) => x.text === t)))
+  assert.equal(zm.filter((x) => !retire.has(x.text)).length, 8)
+  for (const x of P2.statements.filter((x) => !retire.has(x.text))) assert.equal(byText.get(x.text)?.status, 'active', x.text)
+  // zweiter Start ändert nichts
+  const { applyPacks } = await import('../lib/seed.ts')
+  await applyPacks(db)
+  assert.equal((await svc.listStatements(db, subjectId, { limit: 1000 })).filter((x) => x.status === 'retired').length, all.filter((x) => x.status === 'retired').length)
 })
 
 test('Neues Fach RDA: angelegt, 13 UEs, Paket 1 und Übungspaket aktiv, Grenze UE 10, nur einmal eingespielt', async () => {

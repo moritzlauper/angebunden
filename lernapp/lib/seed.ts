@@ -3,6 +3,7 @@ import type { Db } from './db/index.ts'
 import * as s from './db/schema.ts'
 import { BANK, OLAT_EXAMPLES, SUBJECT, UNITS } from '../data/seed/klinische-biopsychologie.ts'
 import { PACK as PACK_2 } from '../data/seed/klibio-paket-2.ts'
+import { PACK as PACK_3 } from '../data/seed/klibio-paket-3.ts'
 import { PACK as RDA_PACK_1, SUBJECT as RDA_SUBJECT } from '../data/seed/rda-paket-1.ts'
 import { PACK as TT_PACK_1, SUBJECT as TT_SUBJECT } from '../data/seed/tt-paket-1.ts'
 import { PACK as KPF_PACK_1, SUBJECT as KPF_SUBJECT } from '../data/seed/kpf-paket-1.ts'
@@ -56,7 +57,7 @@ export async function ensureSubjects(db: Db) {
 }
 
 /** Aussagenpakete, die nach dem ersten Start dazukommen, in der Reihenfolge, in der sie entstanden sind. */
-export const PACKS: Pack[] = [PACK_2, RDA_PACK_1, TT_PACK_1, KPF_PACK_1, RDA_PACK_2]
+export const PACKS: Pack[] = [PACK_2, PACK_3, RDA_PACK_1, TT_PACK_1, KPF_PACK_1, RDA_PACK_2]
 
 /**
  * Setzt einen Merker (Quelle «<name>») und sagt, ob dieser Schritt hier zum ersten Mal läuft.
