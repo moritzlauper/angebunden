@@ -4,6 +4,7 @@ import * as s from './db/schema.ts'
 import { BANK, OLAT_EXAMPLES, SUBJECT, UNITS } from '../data/seed/klinische-biopsychologie.ts'
 import { PACK as PACK_2 } from '../data/seed/klibio-paket-2.ts'
 import { PACK as PACK_3 } from '../data/seed/klibio-paket-3.ts'
+import { PACK as PACK_4 } from '../data/seed/klibio-paket-4.ts'
 import { PACK as RDA_PACK_1, SUBJECT as RDA_SUBJECT } from '../data/seed/rda-paket-1.ts'
 import { PACK as TT_PACK_1, SUBJECT as TT_SUBJECT } from '../data/seed/tt-paket-1.ts'
 import { PACK as KPF_PACK_1, SUBJECT as KPF_SUBJECT } from '../data/seed/kpf-paket-1.ts'
@@ -57,7 +58,7 @@ export async function ensureSubjects(db: Db) {
 }
 
 /** Aussagenpakete, die nach dem ersten Start dazukommen, in der Reihenfolge, in der sie entstanden sind. */
-export const PACKS: Pack[] = [PACK_2, PACK_3, RDA_PACK_1, TT_PACK_1, KPF_PACK_1, RDA_PACK_2]
+export const PACKS: Pack[] = [PACK_2, PACK_3, RDA_PACK_1, TT_PACK_1, KPF_PACK_1, RDA_PACK_2, PACK_4]
 
 /**
  * Setzt einen Merker (Quelle «<name>») und sagt, ob dieser Schritt hier zum ersten Mal läuft.
@@ -138,17 +139,43 @@ export async function applyPack(db: Db, pack: Pack) {
     added++
   }
 
+  await applySubjectLinks(db, subj, pack.subjectLinks)
+
   const retire = new Set(pack.retire.map(normalize))
-  let retired = 0
-  for (const r of await subjectStatements(db, subj.id)) {
-    if (r.st.status === 'retired' || !retire.has(normalize(r.st.text))) continue
+  const topics = (pack.retireMatching ?? []).map((p) => new RegExp(p, 'i'))
+  const rows = await subjectStatements(db, subj.id)
+  const hit = (st: s.Statement) => retire.has(normalize(st.text)) || topics.some((re) => re.test(st.text))
+  // Getroffen (auch schon früher ausgemustert) und Varianten davon, über beliebig viele Stufen.
+  const outIds = new Set(rows.filter((r) => hit(r.st)).map((r) => r.st.id))
+  for (let grew = true; grew; ) {
+    grew = false
+    for (const r of rows) {
+      if (outIds.has(r.st.id) || r.st.parentId == null || !outIds.has(r.st.parentId)) continue
+      outIds.add(r.st.id)
+      grew = true
+    }
+  }
+  const victims = rows.map((r) => r.st).filter((st) => st.status !== 'retired' && outIds.has(st.id))
+  for (const st of victims) {
     await db
       .update(s.statement)
-      .set({ status: 'retired', flags: [...new Set([...(r.st.flags ?? []), 'nicht_relevant'])], updatedAt: new Date() })
-      .where(eq(s.statement.id, r.st.id))
-    retired++
+      .set({ status: 'retired', flags: [...new Set([...(st.flags ?? []), 'nicht_relevant'])], updatedAt: new Date() })
+      .where(eq(s.statement.id, st.id))
   }
-  return { added, retired, skipped: false }
+  return { added, retired: victims.length, skipped: false }
+}
+
+/** Folienlinks eines Fachs nachtragen, ohne Einträge zu überschreiben, die jemand von Hand gemacht hat. */
+async function applySubjectLinks(db: Db, subj: s.Subject, links: Pack['subjectLinks']) {
+  if (!links) return
+  const patch: Partial<Pick<s.Subject, 'vaultName' | 'vaultPath' | 'slidesPattern' | 'zmPath'>> = {}
+  for (const key of ['vaultName', 'vaultPath', 'slidesPattern', 'zmPath'] as const) {
+    const value = links[key]
+    if (!value) continue
+    const current = subj[key]
+    if (!current?.trim() || current === links.replace?.[key]) patch[key] = value
+  }
+  if (Object.keys(patch).length) await db.update(s.subject).set(patch).where(eq(s.subject.id, subj.id))
 }
 
 /**

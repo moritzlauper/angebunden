@@ -82,6 +82,79 @@ test('Paket 3: Aussagen, die nur aus der Zusammenfassung stammen, sind ausgemust
   assert.equal((await svc.listStatements(db, subjectId, { limit: 1000 })).filter((x) => x.status === 'retired').length, all.filter((x) => x.status === 'retired').length)
 })
 
+test('Paket 4: Themen und Varianten aus der Zusammenfassung ausgemustert, Folienlinks für KliBio', async () => {
+  const db = await getDb()
+  const schema = await import('../lib/db/schema.ts')
+  const { and, eq, inArray } = await import('drizzle-orm')
+  const { applyPack } = await import('../lib/seed.ts')
+  const { sourceLinks } = await import('../lib/core/links.ts')
+  const { PACK: P2 } = await import('../data/seed/klibio-paket-2.ts')
+  const { PACK: P3 } = await import('../data/seed/klibio-paket-3.ts')
+  const { PACK: P4 } = await import('../data/seed/klibio-paket-4.ts')
+  const { BANK } = await import('../data/seed/klinische-biopsychologie.ts')
+
+  // Die Muster treffen jede der 19 Aussagen aus Paket 3, aber keine andere aus Paket 2 und keine Klickerfrage.
+  const topics = P4.retireMatching!.map((p) => new RegExp(p, 'i'))
+  const matches = (t: string) => topics.some((re) => re.test(t))
+  for (const t of P3.retire) assert.ok(matches(t), t)
+  for (const x of P2.statements) if (!P3.retire.includes(x.text)) assert.ok(!matches(x.text), x.text)
+  const bank = [...BANK.matchAll(/^[A-E]\)\s*(.+)$/gm)].map((m) => m[1])
+  assert.ok(bank.length >= 20)
+  for (const t of bank) assert.ok(!matches(t), t)
+
+  // Folienlinks: «VL3 p.5» öffnet Folie 5 des dritten Foliensatzes im Vault
+  const subj = async () => (await db.select().from(schema.subject).where(eq(schema.subject.id, subjectId)))[0]
+  const url = (ref: string) => sourceLinks(ref, subj0)[0].url
+  let subj0 = await subj()
+  assert.equal(
+    url('VL3 p.5'),
+    `obsidian://open?vault=obsidian&file=${encodeURIComponent('Klinische Biopsychologie/Slides/Vorlesung KliBio 2026-03 Stress.pdf#page=5')}`,
+  )
+  assert.ok(url('VL10 p.2')?.includes(encodeURIComponent('2026-10 Hormontransitionen.pdf')))
+  assert.ok(url('ZM S.69')?.includes(encodeURIComponent('Zusammenfassungen/ZM_Klinische Biopsychologie.pdf#page=69')))
+
+  // Datenbank wie in Produktion vor Paket 4: alte Vorgaben fürs Fach, dazu Varianten, die nur dort stehen
+  await db.update(schema.subject).set({ vaultName: null, slidesPattern: 'Slides/VL{n}.pdf' }).where(eq(schema.subject.id, subjectId))
+  const units = await db.select().from(schema.unit).where(eq(schema.unit.subjectId, subjectId))
+  const ue3 = units.find((u) => u.number === 3)!.id
+  const [yerkes] = await db.select().from(schema.statement).where(and(eq(schema.statement.unitId, ue3), eq(schema.statement.text, P3.retire.find((t) => t.includes('Yerkes'))!)))
+  const [ptbs] = await db.select().from(schema.statement).where(eq(schema.statement.text, 'Eine PTBS setzt per Definition innerhalb eines Monats nach dem Ereignis ein.'))
+  assert.ok(yerkes && ptbs)
+  const row = (text: string, parentId: number | null = null) => ({ unitId: ue3, text, truth: 'F' as const, quote: 'x', origin: 'claude-app', status: 'active', parentId })
+  const [a] = await db.insert(schema.statement).values(row('Nach Yerkes-Dodson steigt die Leistung linear mit dem Erregungsniveau.', yerkes.id)).returning()
+  const [b] = await db.insert(schema.statement).values(row('In der Alarmreaktion nach Selye springt vor allem die HPA-Achse an.')).returning()
+  const [aa] = await db.insert(schema.statement).values(row('Am besten gelingt eine Aufgabe bei möglichst hoher Anspannung.', a.id)).returning()
+  const [c] = await db.insert(schema.statement).values(row('Eine PTBS setzt per Definition erst nach mehr als einem Monat ein.', ptbs.id)).returning()
+  const ids = [a.id, b.id, aa.id, c.id]
+  const before = await svc.listStatements(db, subjectId, { limit: 2000 })
+
+  const res = await applyPack(db, { ...P4, id: 'test-paket-4-erneut' })
+  assert.equal(res.retired, 3)
+  const after = new Map((await db.select().from(schema.statement).where(inArray(schema.statement.id, ids))).map((x) => [x.id, x]))
+  for (const x of [a, b, aa]) {
+    assert.equal(after.get(x.id)?.status, 'retired', x.text)
+    assert.ok(after.get(x.id)?.flags.includes('nicht_relevant'))
+  }
+  assert.equal(after.get(c.id)?.status, 'active') // Vorlesung (C aus dem Screenshot), bleibt
+  // sonst ändert sich nichts
+  const now = new Map((await svc.listStatements(db, subjectId, { limit: 2000 })).map((x) => [x.id, x.status]))
+  for (const x of before) if (!ids.includes(x.id)) assert.equal(now.get(x.id), x.status, x.text)
+  subj0 = await subj()
+  assert.equal(subj0.vaultName, 'obsidian')
+  assert.ok(url('VL3 p.5')?.includes(encodeURIComponent('2026-03 Stress.pdf#page=5')))
+
+  // Von Hand eingetragene Werte bleiben
+  await db.update(schema.subject).set({ vaultName: 'mein-vault', slidesPattern: 'Folien/{n}.pdf' }).where(eq(schema.subject.id, subjectId))
+  await applyPack(db, { ...P4, id: 'test-paket-4-handarbeit' })
+  subj0 = await subj()
+  assert.equal(subj0.vaultName, 'mein-vault')
+  assert.equal(subj0.slidesPattern, 'Folien/{n}.pdf')
+
+  // aufräumen, damit die übrigen Tests den Stand nach dem Start sehen
+  await db.update(schema.subject).set({ vaultName: 'obsidian', slidesPattern: P4.subjectLinks!.slidesPattern }).where(eq(schema.subject.id, subjectId))
+  await db.delete(schema.statement).where(inArray(schema.statement.id, ids))
+})
+
 test('Neues Fach RDA: angelegt, 13 UEs, Paket 1 und Übungspaket aktiv, Grenze UE 10, nur einmal eingespielt', async () => {
   const db = await getDb()
   const subjects = await svc.listSubjects(db)

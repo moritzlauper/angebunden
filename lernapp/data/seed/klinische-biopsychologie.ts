@@ -9,12 +9,29 @@
  * Stilvorlage für Länge, Fallen und Schwierigkeit, nicht als Aussagen.
  */
 
+/** Foliensätze im Vault, der n-te Eintrag ist VLn (so heissen die Dateien aus OLAT). */
+export const KLIBIO_SLIDES = [
+  'Vorlesung KliBio 2026-01 Einfuhrung Teil 1.pdf',
+  'Vorlesung KliBio 2026-02 Schlaf.pdf',
+  'Vorlesung KliBio 2026-03 Stress.pdf',
+  'Vorlesung KliBio 2026-04 Konsum.pdf',
+  'Vorlesung KliBio 2026-05 Sexualitat-Tln.pdf',
+  'Vorlesung KliBio 2026-06 Fertilitat.pdf',
+  'Vorlesung KliBio 2026-07 SS_Metabolismus Tln.pdf',
+  'Vorlesung KliBio 2026-08 Schmerz.pdf',
+  'Vorlesung KliBio 2026-09 Herz-Kreislauf-Tln.pdf',
+  'Vorlesung KliBio 2026-10 Hormontransitionen.pdf',
+]
+  .map((f) => `Slides/${f}`)
+  .join('|')
+
 export const SUBJECT = {
   name: 'Klinische Biopsychologie',
   shortName: 'KliBio',
   courseCode: '26HS 200-401a',
+  vaultName: 'obsidian',
   vaultPath: 'Klinische Biopsychologie',
-  slidesPattern: 'Slides/VL{n}.pdf',
+  slidesPattern: KLIBIO_SLIDES,
   zmPath: 'Zusammenfassungen/ZM_Klinische Biopsychologie.pdf',
   ueLimit: 4,
 }

@@ -22,4 +22,22 @@ export type Pack = {
   statements: PackStatement[]
   /** Aussagen (wörtlich), die aus der Rotation genommen werden: Detailwissen, nicht prüfungsrelevant */
   retire: string[]
+  /**
+   * Themen, die aus der Rotation genommen werden: reguläre Ausdrücke (ohne Gross-/Kleinschreibung),
+   * die auf jede Aussage des Fachs passen, auch auf Varianten und Aussagen, die nur in der Datenbank
+   * stehen. Varianten (parentId) ausgemusterter Aussagen gehen jeweils mit.
+   */
+  retireMatching?: string[]
+  /**
+   * Felder für die Folienlinks des Fachs. Gesetzt wird ein Feld nur, wenn es noch leer ist oder den
+   * alten Wert unter `replace` hat; was jemand von Hand eingetragen hat, bleibt.
+   */
+  subjectLinks?: {
+    vaultName?: string
+    vaultPath?: string
+    slidesPattern?: string
+    zmPath?: string
+    /** Bisherige Werte, die überschrieben werden dürfen (z. B. ein Vorgabemuster, das nicht passt) */
+    replace?: { vaultName?: string; vaultPath?: string; slidesPattern?: string; zmPath?: string }
+  }
 }
